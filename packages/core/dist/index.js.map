@@ -1,1 +1,0 @@
-{"version":3,"sources":["../src/constants.ts"],"sourcesContent":["export const CORE_PACKAGE_NAME = \"@maestro/core\";\n"],"mappings":";AAAO,IAAM,oBAAoB;","names":[]}
