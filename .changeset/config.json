@@ -1,0 +1,22 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": true,
+  "fixed": [],
+  "linked": [
+    [
+      "@maestro/cli",
+      "@maestro/core",
+      "@maestro/tui",
+      "@maestro/agents",
+      "@maestro/sensors",
+      "@maestro/kb",
+      "@maestro/config",
+      "@maestro/provider"
+    ]
+  ],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": []
+}
