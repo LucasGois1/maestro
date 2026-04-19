@@ -1,0 +1,19 @@
+import { Box, Text } from 'ink';
+
+import { formatHelloMessage } from '../message.js';
+
+export function HelloWorld(props: { version: string }) {
+  const { version } = props;
+
+  return (
+    <Box
+      borderColor="green"
+      borderStyle="round"
+      flexDirection="column"
+      paddingX={2}
+      paddingY={1}
+    >
+      <Text color="green">{formatHelloMessage(version)}</Text>
+    </Box>
+  );
+}

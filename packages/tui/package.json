@@ -1,0 +1,27 @@
+{
+  "name": "@maestro/tui",
+  "version": "0.0.1",
+  "description": "Ink-based terminal UI components",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "ink": "^6.3.1",
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "ink-testing-library": "^4.0.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT"
+}

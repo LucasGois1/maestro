@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/index.ts"],"sourcesContent":["export const CONFIG_PACKAGE_NAME = \"@maestro/config\";\n"],"mappings":";AAAO,IAAM,sBAAsB;","names":[]}

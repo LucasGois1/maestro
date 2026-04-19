@@ -1,0 +1,20 @@
+{
+  "name": "@maestro/provider",
+  "version": "0.0.1",
+  "description": "AI SDK v6 wrapper for model-agnostic LLM access (Claude, OpenAI, Gemini, Ollama)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT"
+}

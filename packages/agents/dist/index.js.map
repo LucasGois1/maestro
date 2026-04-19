@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/index.ts"],"sourcesContent":["export const AGENTS_PACKAGE_NAME = \"@maestro/agents\";\n"],"mappings":";AAAO,IAAM,sBAAsB;","names":[]}

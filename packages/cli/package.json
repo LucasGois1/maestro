@@ -1,0 +1,31 @@
+{
+  "name": "@maestro/cli",
+  "version": "0.0.1",
+  "description": "Maestro CLI — multi-agent coding orchestrator",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "maestro": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "dependencies": {
+    "@maestro/tui": "workspace:*",
+    "commander": "^14.0.1",
+    "ink": "^6.3.1",
+    "react": "^19.2.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "dev": "pnpm run build:watch",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT"
+}
