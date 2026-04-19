@@ -15,8 +15,9 @@
   "dependencies": {
     "@maestro/tui": "workspace:*",
     "commander": "^14.0.1",
-    "ink": "^6.3.1",
-    "react": "^19.2.0"
+    "ink": "7.0.1",
+    "react": "^19.2.0",
+    "react-devtools-core": "^6.1.2"
   },
   "scripts": {
     "build": "tsup",
