@@ -1,0 +1,27 @@
+{
+  "name": "@maestro/pipeline",
+  "version": "0.0.1",
+  "description": "Pipeline engine — Planner → Architect → Generator → Evaluator → Merger state machine",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@maestro/agents": "workspace:*",
+    "@maestro/config": "workspace:*",
+    "@maestro/contract": "workspace:*",
+    "@maestro/core": "workspace:*",
+    "@maestro/state": "workspace:*"
+  }
+}

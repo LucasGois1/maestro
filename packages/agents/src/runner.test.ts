@@ -71,7 +71,9 @@ describe('runAgent', () => {
   it('streams deltas, validates output, and emits started + completed', async () => {
     const bus = createEventBus();
     const events: AgentEvent[] = [];
-    bus.on((e) => events.push(e));
+    bus.on((e) => {
+      if (e.type.startsWith('agent.')) events.push(e as AgentEvent);
+    });
 
     const result = await runAgent({
       definition: echoAgent,
