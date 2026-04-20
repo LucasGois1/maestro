@@ -13,6 +13,7 @@
     "templates"
   ],
   "dependencies": {
+    "@maestro/config": "workspace:*",
     "@maestro/tui": "workspace:*",
     "commander": "^14.0.1",
     "ink": "7.0.1",

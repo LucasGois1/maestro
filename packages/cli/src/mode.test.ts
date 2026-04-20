@@ -14,4 +14,13 @@ describe('resolveCliMode', () => {
   it('detects the help flag', () => {
     expect(resolveCliMode(['--help'])).toBe('help');
   });
+
+  it('routes known subcommands to commander', () => {
+    expect(resolveCliMode(['config', 'list'])).toBe('command');
+    expect(resolveCliMode(['config', 'get', 'permissions.mode'])).toBe('command');
+  });
+
+  it('stays in app mode for unknown first args', () => {
+    expect(resolveCliMode(['some-prompt'])).toBe('app');
+  });
 });

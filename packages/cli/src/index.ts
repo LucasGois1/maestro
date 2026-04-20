@@ -6,6 +6,7 @@ import { render } from 'ink';
 import { HelloWorld } from '@maestro/tui';
 import { createElement } from 'react';
 
+import { createConfigCommand } from './commands/config.js';
 import { resolveCliMode } from './mode.js';
 
 const CLI_PACKAGE_NAME = '@maestro/cli';
@@ -37,10 +38,14 @@ function renderInkApp(version: string, stdoutIsTTY: boolean) {
 }
 
 function createProgram(version: string) {
-  return new Command()
+  const program = new Command()
     .name('maestro')
     .description('Multi-agent coding orchestrator')
     .version(version);
+
+  program.addCommand(createConfigCommand());
+
+  return program;
 }
 
 export function runCli(args: string[], options: RunCliOptions = {}) {
