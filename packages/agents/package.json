@@ -16,5 +16,15 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@ai-sdk/provider": "^3.0.8",
+    "@maestro/config": "workspace:*",
+    "@maestro/core": "workspace:*",
+    "@maestro/provider": "workspace:*",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "ai": "^6.0.168"
+  }
 }
