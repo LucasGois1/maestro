@@ -1,0 +1,23 @@
+{
+  "name": "@maestro/state",
+  "version": "0.0.1",
+  "description": "File-based run state, checkpoints, and resume support for Maestro",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "zod": "^4.3.6"
+  }
+}

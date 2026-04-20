@@ -7,6 +7,7 @@ import { HelloWorld } from '@maestro/tui';
 import { createElement } from 'react';
 
 import { createConfigCommand } from './commands/config.js';
+import { createRunsCommand } from './commands/runs.js';
 import { resolveCliMode } from './mode.js';
 
 const CLI_PACKAGE_NAME = '@maestro/cli';
@@ -44,6 +45,7 @@ function createProgram(version: string) {
     .version(version);
 
   program.addCommand(createConfigCommand());
+  program.addCommand(createRunsCommand());
 
   return program;
 }
