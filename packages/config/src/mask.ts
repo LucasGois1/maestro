@@ -14,7 +14,11 @@ export function maskSecrets<T>(value: T): T {
   }
   const result: Record<string, unknown> = {};
   for (const [key, nested] of Object.entries(value)) {
-    if (SECRET_KEYS.has(key) && typeof nested === 'string' && nested.length > 0) {
+    if (
+      SECRET_KEYS.has(key) &&
+      typeof nested === 'string' &&
+      nested.length > 0
+    ) {
       result[key] = MASK_PLACEHOLDER;
       continue;
     }

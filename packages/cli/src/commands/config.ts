@@ -60,7 +60,9 @@ function scopePath(scope: Scope): string {
 }
 
 export function createConfigCommand(io: Io = defaultIo): Command {
-  const config = new Command('config').description('Manage Maestro configuration');
+  const config = new Command('config').description(
+    'Manage Maestro configuration',
+  );
 
   config
     .command('get <path>')
@@ -86,11 +88,7 @@ export function createConfigCommand(io: Io = defaultIo): Command {
     .description('Set a config value (defaults to project scope)')
     .option('--global', 'Write to the global config instead of project')
     .action(
-      async (
-        path: string,
-        rawValue: string,
-        options: { global?: boolean },
-      ) => {
+      async (path: string, rawValue: string, options: { global?: boolean }) => {
         const scope: Scope = options.global ? 'global' : 'project';
         const target = scopePath(scope);
         const existing = (await readConfigFile(target)) ?? {};
@@ -107,7 +105,8 @@ export function createConfigCommand(io: Io = defaultIo): Command {
           io.stderr(
             validation.error.issues
               .map(
-                (issue) => `  - ${issue.path.join('.') || '(root)'}: ${issue.message}`,
+                (issue) =>
+                  `  - ${issue.path.join('.') || '(root)'}: ${issue.message}`,
               )
               .join('\n'),
           );
@@ -116,7 +115,9 @@ export function createConfigCommand(io: Io = defaultIo): Command {
         }
 
         await writeConfigFile(target, next);
-        const displayValue = isSecretPath(path) ? '***masked***' : formatValue(coerced);
+        const displayValue = isSecretPath(path)
+          ? '***masked***'
+          : formatValue(coerced);
         io.stdout(`Set ${path} = ${displayValue} in ${scope} (${target})`);
       },
     );
@@ -142,8 +143,12 @@ export function createConfigCommand(io: Io = defaultIo): Command {
         readConfigFile(paths.global),
         readConfigFile(paths.project),
       ]);
-      io.stdout(`global  ${global !== null ? '[exists]' : '[absent] '}  ${paths.global}`);
-      io.stdout(`project ${project !== null ? '[exists]' : '[absent] '}  ${paths.project}`);
+      io.stdout(
+        `global  ${global !== null ? '[exists]' : '[absent] '}  ${paths.global}`,
+      );
+      io.stdout(
+        `project ${project !== null ? '[exists]' : '[absent] '}  ${paths.project}`,
+      );
     });
 
   config

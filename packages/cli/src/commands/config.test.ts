@@ -113,10 +113,7 @@ describe('maestro config', () => {
 
   it('path lists which config files exist', async () => {
     await mkdir(join(cwd, '.maestro'), { recursive: true });
-    await writeFile(
-      join(cwd, '.maestro', 'config.json'),
-      JSON.stringify({}),
-    );
+    await writeFile(join(cwd, '.maestro', 'config.json'), JSON.stringify({}));
     await run(['path']);
     const joined = stdout.join('\n');
     expect(joined).toMatch(/project.*\[exists\]/);

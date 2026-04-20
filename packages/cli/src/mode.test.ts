@@ -17,7 +17,9 @@ describe('resolveCliMode', () => {
 
   it('routes known subcommands to commander', () => {
     expect(resolveCliMode(['config', 'list'])).toBe('command');
-    expect(resolveCliMode(['config', 'get', 'permissions.mode'])).toBe('command');
+    expect(resolveCliMode(['config', 'get', 'permissions.mode'])).toBe(
+      'command',
+    );
   });
 
   it('stays in app mode for unknown first args', () => {

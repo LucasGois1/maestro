@@ -14,7 +14,9 @@ export type ResolveConfigPathsOptions = {
   readonly home?: string;
 };
 
-export function resolveConfigPaths(options: ResolveConfigPathsOptions = {}): ConfigPaths {
+export function resolveConfigPaths(
+  options: ResolveConfigPathsOptions = {},
+): ConfigPaths {
   const home = options.home ?? homedir();
   const cwd = options.cwd ?? process.cwd();
 

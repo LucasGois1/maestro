@@ -23,8 +23,9 @@ describe('buildEnvOverlay', () => {
   });
 
   it('maps MAESTRO_OLLAMA_BASE_URL to ollama.baseUrl', () => {
-    expect(buildEnvOverlay({ MAESTRO_OLLAMA_BASE_URL: 'http://other:11434' }))
-      .toEqual({ providers: { ollama: { baseUrl: 'http://other:11434' } } });
+    expect(
+      buildEnvOverlay({ MAESTRO_OLLAMA_BASE_URL: 'http://other:11434' }),
+    ).toEqual({ providers: { ollama: { baseUrl: 'http://other:11434' } } });
   });
 
   it('ignores empty env values', () => {

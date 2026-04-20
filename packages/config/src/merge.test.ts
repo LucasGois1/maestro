@@ -25,11 +25,16 @@ describe('deepMerge', () => {
   });
 
   it('replaces arrays instead of merging them', () => {
-    expect(deepMerge({ list: [1, 2, 3] }, { list: [4] })).toEqual({ list: [4] });
+    expect(deepMerge({ list: [1, 2, 3] }, { list: [4] })).toEqual({
+      list: [4],
+    });
   });
 
   it('ignores undefined values in override keys', () => {
-    expect(deepMerge({ a: 1, b: 2 }, { a: undefined, b: 9 })).toEqual({ a: 1, b: 9 });
+    expect(deepMerge({ a: 1, b: 2 }, { a: undefined, b: 9 })).toEqual({
+      a: 1,
+      b: 9,
+    });
   });
 
   it('treats null overrides as absent (no change)', () => {

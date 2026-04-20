@@ -33,7 +33,9 @@ export function setByPath<T extends PlainObject>(
     const segment = segments[index];
     if (segment === undefined) continue;
     const existing = parent[segment];
-    const nextParent: PlainObject = isPlainObject(existing) ? { ...existing } : {};
+    const nextParent: PlainObject = isPlainObject(existing)
+      ? { ...existing }
+      : {};
     parent[segment] = nextParent;
     parent = nextParent;
   }
