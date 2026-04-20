@@ -1,0 +1,59 @@
+export const GIT_PACKAGE_NAME = '@maestro/git';
+
+export {
+  createGitRunner,
+  GitCommandError,
+  runGit,
+  type GitRunner,
+  type GitRunOptions,
+  type GitRunResult,
+} from './runner.js';
+
+export {
+  BranchNameError,
+  CONVENTIONAL_TYPES,
+  computeBranchName,
+  slugify,
+  type BranchContext,
+  type ComputeBranchOptions,
+  type ConventionalType,
+} from './branching.js';
+
+export {
+  createWorktree,
+  defaultWorktreesRoot,
+  listWorktrees,
+  parseWorktreePorcelain,
+  removeWorktree,
+  type CreateWorktreeOptions,
+  type ListWorktreesOptions,
+  type RemoveWorktreeOptions,
+  type WorktreeInfo,
+} from './worktree.js';
+
+export {
+  buildCommitMessage,
+  commitSprint,
+  type CommitOptions,
+} from './commit.js';
+
+export {
+  detectDivergence,
+  type DetectDivergenceOptions,
+  type DivergenceReport,
+} from './divergence.js';
+
+export {
+  buildPrCommand,
+  detectRemote,
+  executePrCommand,
+  renderPrBody,
+  UnsupportedPlatformError,
+  type BuildPrCommandOptions,
+  type DetectRemoteOptions,
+  type ExecPrOptions,
+  type Platform,
+  type PlatformCommand,
+  type PrDescriptor,
+  type RemoteInfo,
+} from './platform.js';

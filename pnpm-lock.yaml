@@ -84,6 +84,9 @@ importers:
       '@maestro/config':
         specifier: workspace:*
         version: link:../config
+      '@maestro/git':
+        specifier: workspace:*
+        version: link:../git
       '@maestro/state':
         specifier: workspace:*
         version: link:../state
@@ -125,6 +128,12 @@ importers:
         version: 4.3.6
 
   packages/core: {}
+
+  packages/git:
+    dependencies:
+      '@maestro/config':
+        specifier: workspace:*
+        version: link:../config
 
   packages/kb: {}
 
