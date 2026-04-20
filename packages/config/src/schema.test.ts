@@ -14,7 +14,9 @@ describe('configSchema', () => {
     expect(result.discovery.enabled).toBe(true);
     expect(result.defaults.planner.model).toBe('anthropic/claude-sonnet-4-6');
     expect(result.defaults.generator.model).toBe('anthropic/claude-opus-4-7');
-    expect(result.defaults['code-reviewer'].model).toBe('anthropic/claude-sonnet-4-6');
+    expect(result.defaults['code-reviewer'].model).toBe(
+      'anthropic/claude-sonnet-4-6',
+    );
   });
 
   it('accepts a fully populated config', () => {
@@ -34,7 +36,10 @@ describe('configSchema', () => {
 
   it('rejects unknown top-level keys', () => {
     expect(() =>
-      configSchema.parse({ unknown: true } as unknown as Record<string, unknown>),
+      configSchema.parse({ unknown: true } as unknown as Record<
+        string,
+        unknown
+      >),
     ).toThrowError();
   });
 
@@ -42,9 +47,9 @@ describe('configSchema', () => {
     const result = configSchema.safeParse({ permissions: { mode: 'wild' } });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues.some((issue) => issue.path.includes('mode'))).toBe(
-        true,
-      );
+      expect(
+        result.error.issues.some((issue) => issue.path.includes('mode')),
+      ).toBe(true);
     }
   });
 

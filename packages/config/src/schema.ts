@@ -12,7 +12,12 @@ export const AGENT_NAMES = [
 
 export type AgentName = (typeof AGENT_NAMES)[number];
 
-export const PROVIDER_NAMES = ['anthropic', 'openai', 'google', 'ollama'] as const;
+export const PROVIDER_NAMES = [
+  'anthropic',
+  'openai',
+  'google',
+  'ollama',
+] as const;
 
 export type ProviderName = (typeof PROVIDER_NAMES)[number];
 
@@ -53,11 +58,21 @@ const agentDefaultSchema = z
 
 const defaultsSchema = z
   .object({
-    planner: agentDefaultSchema.prefault({ model: 'anthropic/claude-sonnet-4-6' }),
-    architect: agentDefaultSchema.prefault({ model: 'anthropic/claude-sonnet-4-6' }),
-    generator: agentDefaultSchema.prefault({ model: 'anthropic/claude-opus-4-7' }),
-    evaluator: agentDefaultSchema.prefault({ model: 'anthropic/claude-opus-4-7' }),
-    merger: agentDefaultSchema.prefault({ model: 'anthropic/claude-haiku-4-5' }),
+    planner: agentDefaultSchema.prefault({
+      model: 'anthropic/claude-sonnet-4-6',
+    }),
+    architect: agentDefaultSchema.prefault({
+      model: 'anthropic/claude-sonnet-4-6',
+    }),
+    generator: agentDefaultSchema.prefault({
+      model: 'anthropic/claude-opus-4-7',
+    }),
+    evaluator: agentDefaultSchema.prefault({
+      model: 'anthropic/claude-opus-4-7',
+    }),
+    merger: agentDefaultSchema.prefault({
+      model: 'anthropic/claude-haiku-4-5',
+    }),
     'code-reviewer': agentDefaultSchema.prefault({
       model: 'anthropic/claude-sonnet-4-6',
     }),
