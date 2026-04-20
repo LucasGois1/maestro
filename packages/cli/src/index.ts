@@ -6,6 +6,7 @@ import { render } from 'ink';
 import { HelloWorld } from '@maestro/tui';
 import { createElement } from 'react';
 
+import { createAbortCommand } from './commands/abort.js';
 import { createConfigCommand } from './commands/config.js';
 import { createGitCommand } from './commands/git.js';
 import { createRunsCommand } from './commands/runs.js';
@@ -45,6 +46,7 @@ function createProgram(version: string) {
     .description('Multi-agent coding orchestrator')
     .version(version);
 
+  program.addCommand(createAbortCommand());
   program.addCommand(createConfigCommand());
   program.addCommand(createGitCommand());
   program.addCommand(createRunsCommand());

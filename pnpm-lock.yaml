@@ -179,6 +179,15 @@ importers:
         specifier: ^3.8.3
         version: 3.8.3(ai@6.0.168(zod@4.3.6))(zod@4.3.6)
 
+  packages/sandbox:
+    dependencies:
+      '@maestro/config':
+        specifier: workspace:*
+        version: link:../config
+      '@maestro/state':
+        specifier: workspace:*
+        version: link:../state
+
   packages/sensors: {}
 
   packages/state:
