@@ -14,4 +14,6 @@ export {
   type PipelineEvent,
   type PipelineEventType,
   type PipelineStageName,
+  type SensorEvent,
+  type SensorEventType,
 } from './events.js';

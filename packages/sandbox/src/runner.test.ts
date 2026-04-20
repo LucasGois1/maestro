@@ -9,6 +9,7 @@ import { composePolicy } from './policy.js';
 import {
   CommandDeniedError,
   CommandRejectedError,
+  CommandTimedOutError,
   runShellCommand,
 } from './runner.js';
 
@@ -116,5 +117,22 @@ describe('runShellCommand', () => {
       // command is synthetic and might exit non-zero; we care about the hook
     }
     expect(added).toContain('customscript *');
+  });
+
+  it('times out long-running commands with the configured timeout', async () => {
+    await expect(
+      runShellCommand({
+        cmd: 'node',
+        args: [
+          '-e',
+          'Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500)',
+        ],
+        cwd: repoRoot,
+        runId: 'r6',
+        repoRoot,
+        policy: composePolicy({ mode: 'yolo' }),
+        timeoutMs: 10,
+      }),
+    ).rejects.toBeInstanceOf(CommandTimedOutError);
   });
 });

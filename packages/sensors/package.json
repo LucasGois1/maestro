@@ -16,5 +16,12 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@maestro/agents": "workspace:^",
+    "@maestro/config": "workspace:^",
+    "@maestro/core": "workspace:^",
+    "@maestro/sandbox": "workspace:^",
+    "zod": "^4.3.6"
+  }
 }

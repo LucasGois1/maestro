@@ -31,6 +31,7 @@ export {
 export {
   CommandDeniedError,
   CommandRejectedError,
+  CommandTimedOutError,
   denyAllPrompter,
   runShellCommand,
   type ApprovalDecision,
@@ -39,3 +40,5 @@ export {
   type RunCommandOptions,
   type RunCommandResult,
 } from './runner.js';
+
+export { parseCommandString } from 'execa';

@@ -16,5 +16,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@maestro/state": "workspace:^"
+  }
 }

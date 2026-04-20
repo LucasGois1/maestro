@@ -15,6 +15,7 @@
   "dependencies": {
     "@maestro/config": "workspace:*",
     "@maestro/git": "workspace:*",
+    "@maestro/kb": "workspace:^",
     "@maestro/state": "workspace:*",
     "@maestro/tui": "workspace:*",
     "commander": "^14.0.1",

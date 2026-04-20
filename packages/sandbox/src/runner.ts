@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { ExecaError, execa } from 'execa';
 
 import { appendAudit, type AuditApprover, type AuditEntry } from './audit.js';
 import { checkCommand, type Policy, type PolicyDecision } from './policy.js';
@@ -22,6 +22,19 @@ export class CommandRejectedError extends Error {
   ) {
     super(message);
     this.name = 'CommandRejectedError';
+  }
+}
+
+export class CommandTimedOutError extends Error {
+  constructor(
+    message: string,
+    public readonly commandLine: string,
+    public readonly timeoutMs: number,
+    public readonly stdout = '',
+    public readonly stderr = '',
+  ) {
+    super(message);
+    this.name = 'CommandTimedOutError';
   }
 }
 
@@ -59,8 +72,8 @@ export type RunCommandOptions = {
   readonly maestroDir?: string;
   readonly policy: Policy;
   readonly approver?: ApprovalPrompter;
-  readonly spawnImpl?: typeof spawn;
   readonly onDynamicAllowlistAdd?: (pattern: string) => void;
+  readonly timeoutMs?: number;
 };
 
 export type RunCommandResult = {
@@ -71,6 +84,16 @@ export type RunCommandResult = {
   readonly decision: PolicyDecision;
   readonly approvedBy: AuditApprover;
 };
+
+function toTextOutput(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value instanceof Uint8Array) {
+    return Buffer.from(value).toString('utf8');
+  }
+  return '';
+}
 
 function approverToAudit(
   decision: PolicyDecision,
@@ -85,28 +108,76 @@ function approverToAudit(
 
 async function executeCommand(
   options: RunCommandOptions,
-): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  const impl = options.spawnImpl ?? spawn;
-  return new Promise((resolve, reject) => {
-    const child = impl(options.cmd, [...options.args], {
-      cwd: options.cwd,
-      ...(options.env !== undefined ? { env: options.env } : {}),
-      stdio: options.stdio ?? 'pipe',
-      shell: false,
-    });
-    let stdout = '';
-    let stderr = '';
-    child.stdout?.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString('utf8');
-    });
-    child.stderr?.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString('utf8');
-    });
-    child.on('error', reject);
-    child.on('close', (code) => {
-      resolve({ stdout, stderr, exitCode: code ?? 0 });
-    });
+): Promise<{
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  durationMs: number;
+}> {
+  const commandLine = renderCommandLine(options.cmd, options.args);
+  let timedOut = false;
+  const subprocess = execa(options.cmd, [...options.args], {
+    cwd: options.cwd,
+    ...(options.env !== undefined ? { env: options.env } : {}),
+    stdout: options.stdio ?? 'pipe',
+    stderr: options.stdio ?? 'pipe',
+    stdin: 'ignore',
+    reject: false,
   });
+  const timer =
+    options.timeoutMs !== undefined
+      ? setTimeout(() => {
+          timedOut = true;
+          subprocess.kill('SIGKILL');
+        }, options.timeoutMs)
+      : undefined;
+
+  try {
+    const result = await subprocess;
+    if (timer) {
+      clearTimeout(timer);
+    }
+    if (timedOut) {
+      throw new CommandTimedOutError(
+        `Command "${commandLine}" timed out after ${options.timeoutMs ?? 0}ms.`,
+        commandLine,
+        options.timeoutMs ?? 0,
+        toTextOutput(result.stdout),
+        toTextOutput(result.stderr),
+      );
+    }
+
+    return {
+      stdout: toTextOutput(result.stdout),
+      stderr: toTextOutput(result.stderr),
+      exitCode: result.exitCode ?? 0,
+      durationMs: result.durationMs,
+    };
+  } catch (error) {
+    if (timer) {
+      clearTimeout(timer);
+    }
+    if (timedOut) {
+      const execaError = error as Partial<ExecaError>;
+      throw new CommandTimedOutError(
+        `Command "${commandLine}" timed out after ${options.timeoutMs ?? 0}ms.`,
+        commandLine,
+        options.timeoutMs ?? 0,
+        toTextOutput(execaError.stdout),
+        toTextOutput(execaError.stderr),
+      );
+    }
+    if (error instanceof ExecaError && error.timedOut) {
+      throw new CommandTimedOutError(
+        `Command "${commandLine}" timed out after ${options.timeoutMs ?? 0}ms.`,
+        commandLine,
+        options.timeoutMs ?? 0,
+        toTextOutput(error.stdout),
+        toTextOutput(error.stderr),
+      );
+    }
+    throw error;
+  }
 }
 
 export async function runShellCommand(
@@ -187,9 +258,40 @@ export async function runShellCommand(
     }
   }
 
-  const startedAt = Date.now();
-  const { stdout, stderr, exitCode } = await executeCommand(options);
-  const durationMs = Date.now() - startedAt;
+  let stdout = '';
+  let stderr = '';
+  let exitCode = 0;
+  let durationMs = 0;
+  try {
+    const execution = await executeCommand(options);
+    stdout = execution.stdout;
+    stderr = execution.stderr;
+    exitCode = execution.exitCode;
+    durationMs = execution.durationMs;
+  } catch (error) {
+    if (!(error instanceof CommandTimedOutError)) {
+      throw error;
+    }
+
+    await appendAudit({
+      repoRoot: options.repoRoot,
+      runId: options.runId,
+      ...(options.maestroDir !== undefined
+        ? { maestroDir: options.maestroDir }
+        : {}),
+      entry: {
+        ts: new Date().toISOString(),
+        ...(options.agentId !== undefined ? { agentId: options.agentId } : {}),
+        cmd: options.cmd,
+        args: options.args,
+        cwd: options.cwd,
+        approvedBy: approverToAudit(decision, approvalDecision),
+        durationMs: error.timeoutMs,
+        note: `timed out after ${error.timeoutMs}ms`,
+      },
+    });
+    throw error;
+  }
 
   const approvedBy = approverToAudit(decision, approvalDecision);
   await appendAudit({

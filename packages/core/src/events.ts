@@ -101,10 +101,44 @@ export type PipelineEvent =
       readonly at: PipelineStageName;
     };
 
-export type MaestroEvent = AgentEvent | PipelineEvent;
+export type SensorEvent =
+  | {
+      readonly type: 'sensor.started';
+      readonly sensorId: string;
+      readonly runId: string;
+      readonly kind: 'computational' | 'inferential';
+    }
+  | {
+      readonly type: 'sensor.progress';
+      readonly sensorId: string;
+      readonly runId: string;
+      readonly message: string;
+    }
+  | {
+      readonly type: 'sensor.completed';
+      readonly sensorId: string;
+      readonly runId: string;
+      readonly status:
+        | 'passed'
+        | 'failed'
+        | 'warned'
+        | 'skipped'
+        | 'timeout'
+        | 'error';
+      readonly durationMs: number;
+    }
+  | {
+      readonly type: 'sensor.failed';
+      readonly sensorId: string;
+      readonly runId: string;
+      readonly error: string;
+    };
+
+export type MaestroEvent = AgentEvent | PipelineEvent | SensorEvent;
 
 export type AgentEventType = AgentEvent['type'];
 export type PipelineEventType = PipelineEvent['type'];
+export type SensorEventType = SensorEvent['type'];
 export type MaestroEventType = MaestroEvent['type'];
 
 export type AgentEventListener = (event: AgentEvent) => void;

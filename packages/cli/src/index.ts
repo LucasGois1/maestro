@@ -9,6 +9,7 @@ import { createElement } from 'react';
 import { createAbortCommand } from './commands/abort.js';
 import { createConfigCommand } from './commands/config.js';
 import { createGitCommand } from './commands/git.js';
+import { createKBCommand } from './commands/kb.js';
 import { createRunsCommand } from './commands/runs.js';
 import { resolveCliMode } from './mode.js';
 
@@ -49,6 +50,7 @@ function createProgram(version: string) {
   program.addCommand(createAbortCommand());
   program.addCommand(createConfigCommand());
   program.addCommand(createGitCommand());
+  program.addCommand(createKBCommand());
   program.addCommand(createRunsCommand());
 
   return program;
