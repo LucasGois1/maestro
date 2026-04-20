@@ -8,4 +8,10 @@ export {
   type AgentEventListener,
   type AgentEventType,
   type EventBus,
+  type MaestroEvent,
+  type MaestroEventListener,
+  type MaestroEventType,
+  type PipelineEvent,
+  type PipelineEventType,
+  type PipelineStageName,
 } from './events.js';

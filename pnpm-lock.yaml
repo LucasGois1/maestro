@@ -128,6 +128,24 @@ importers:
 
   packages/kb: {}
 
+  packages/pipeline:
+    dependencies:
+      '@maestro/agents':
+        specifier: workspace:*
+        version: link:../agents
+      '@maestro/config':
+        specifier: workspace:*
+        version: link:../config
+      '@maestro/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@maestro/core':
+        specifier: workspace:*
+        version: link:../core
+      '@maestro/state':
+        specifier: workspace:*
+        version: link:../state
+
   packages/provider:
     dependencies:
       '@ai-sdk/anthropic':
