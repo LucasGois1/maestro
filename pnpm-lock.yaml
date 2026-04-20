@@ -84,6 +84,9 @@ importers:
       '@maestro/config':
         specifier: workspace:*
         version: link:../config
+      '@maestro/state':
+        specifier: workspace:*
+        version: link:../state
       '@maestro/tui':
         specifier: workspace:*
         version: link:../tui
@@ -150,6 +153,12 @@ importers:
         version: 3.8.3(ai@6.0.168(zod@4.3.6))(zod@4.3.6)
 
   packages/sensors: {}
+
+  packages/state:
+    dependencies:
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
 
   packages/tui:
     dependencies:
