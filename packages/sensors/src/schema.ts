@@ -2,16 +2,15 @@ import { z } from 'zod';
 
 import { SENSOR_KINDS, SENSOR_ON_FAIL, SENSOR_PARSERS } from './types.js';
 
-const sensorBaseSchema = z
-  .object({
-    id: z.string().min(1),
-    onFail: z.enum(SENSOR_ON_FAIL).default('block'),
-    appliesTo: z.array(z.string().min(1)).default([]),
-  })
-  .strict();
+const sensorBaseFields = {
+  id: z.string().min(1),
+  appliesTo: z.array(z.string().min(1)).default([]),
+} as const;
 
-const computationalSensorSchema = sensorBaseSchema
-  .extend({
+const computationalSensorSchema = z
+  .object({
+    ...sensorBaseFields,
+    onFail: z.enum(SENSOR_ON_FAIL).default('block'),
     kind: z.literal(SENSOR_KINDS[0]),
     command: z.string().min(1),
     args: z.array(z.string()).default([]),
@@ -22,8 +21,10 @@ const computationalSensorSchema = sensorBaseSchema
   })
   .strict();
 
-const inferentialSensorSchema = sensorBaseSchema
-  .extend({
+const inferentialSensorSchema = z
+  .object({
+    ...sensorBaseFields,
+    onFail: z.enum(SENSOR_ON_FAIL).default('warn'),
     kind: z.literal(SENSOR_KINDS[1]),
     agent: z.string().min(1),
     criteria: z.array(z.string().min(1)).default([]),

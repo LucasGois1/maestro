@@ -42,3 +42,12 @@ export {
   type Violation,
   type ViolationSeverity,
 } from './types.js';
+
+export {
+  codeReviewOutputSchema,
+  codeReviewViolationCategorySchema,
+  codeReviewViolationSchema,
+  codeReviewViolationSeveritySchema,
+  type CodeReviewOutput,
+  type CodeReviewViolation,
+} from './code-review-output.schema.js';

@@ -220,11 +220,19 @@ describe('runSensor', () => {
   it('marks inferential approve runs without findings as passed', async () => {
     const agentRunner = vi.fn(
       async (): Promise<{
-        output: { verdict: 'approve'; findings: [] };
+        output: {
+          violations: [];
+          summary: string;
+          pass: boolean;
+        };
         text: string;
         durationMs: number;
       }> => ({
-        output: { verdict: 'approve', findings: [] },
+        output: {
+          violations: [],
+          summary: 'No issues.',
+          pass: true,
+        },
         text: '',
         durationMs: 4,
       }),
@@ -347,5 +355,112 @@ describe('runSensor', () => {
         },
       ),
     ).rejects.toThrow(/Unknown inferential sensor agent/iu);
+  });
+
+  it('maps DSFT-95 code-review output with SQL error to failed when onFail is block', async () => {
+    const agentRunner = vi.fn(
+      async (): Promise<{
+        output: {
+          violations: Array<{
+            severity: 'error';
+            category: 'security';
+            file: string;
+            line: number;
+            message: string;
+            suggestion: string;
+          }>;
+          summary: string;
+          pass: boolean;
+        };
+        text: string;
+        durationMs: number;
+      }> => ({
+        output: {
+          violations: [
+            {
+              severity: 'error',
+              category: 'security',
+              file: 'api.py',
+              line: 2,
+              message: 'SQL injection risk',
+              suggestion: 'Use parameters',
+            },
+          ],
+          summary: 'Security issue',
+          pass: false,
+        },
+        text: '',
+        durationMs: 2,
+      }),
+    ) as AgentRunner;
+
+    const result = await runSensor(
+      {
+        id: 'code-review',
+        kind: 'inferential',
+        agent: 'code-reviewer',
+        criteria: [],
+        timeoutSec: 60,
+        onFail: 'block',
+        appliesTo: [],
+      },
+      {
+        runId: 'r-sql',
+        repoRoot: '/repo',
+        diff: 'diff --git a/api.py b/api.py',
+        bus: createEventBus(),
+        agentRunner,
+        config: {} as MaestroConfig,
+      },
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.violations[0]?.severity).toBe('error');
+    expect(result.violations[0]?.path).toBe('api.py');
+  });
+
+  it('maps pristine DSFT-95 output to passed', async () => {
+    const agentRunner = vi.fn(
+      async (): Promise<{
+        output: {
+          violations: [];
+          summary: string;
+          pass: boolean;
+        };
+        text: string;
+        durationMs: number;
+      }> => ({
+        output: {
+          violations: [],
+          summary: 'LGTM',
+          pass: true,
+        },
+        text: '',
+        durationMs: 1,
+      }),
+    ) as AgentRunner;
+
+    const result = await runSensor(
+      {
+        id: 'code-review',
+        kind: 'inferential',
+        agent: 'code-reviewer',
+        criteria: [],
+        timeoutSec: 60,
+        onFail: 'warn',
+        appliesTo: [],
+      },
+      {
+        runId: 'r-clean',
+        repoRoot: '/repo',
+        diff: '+ok',
+        bus: createEventBus(),
+        agentRunner,
+        config: {} as MaestroConfig,
+      },
+    );
+
+    expect(result.status).toBe('passed');
+    expect(result.violations).toHaveLength(0);
   });
 });

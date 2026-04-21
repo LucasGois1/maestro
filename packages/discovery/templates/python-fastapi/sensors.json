@@ -10,6 +10,13 @@
       "id": "pytest",
       "kind": "computational",
       "command": "pytest -q"
+    },
+    {
+      "id": "code-review",
+      "kind": "inferential",
+      "agent": "code-reviewer",
+      "onFail": "warn",
+      "appliesTo": ["**/*.{py,ts,tsx,js,jsx,go,rs,java}"]
     }
   ]
 }

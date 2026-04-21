@@ -3,19 +3,27 @@ import {
   architectModelOutputSchema,
   architectNotesForPlanEmbed,
   evaluatorAgent,
+  evaluatorFailuresForGenerator,
   finalizeArchitectOutput,
   generatorAgent,
   generatorModelOutputSchema,
+  inferLabelsFromPaths,
   mergerAgent,
+  mergerInputSchema,
+  mergerModelOutputSchema,
   normalizePlannerModelOutput,
   plannerAgent,
   renderArchitectNotesMarkdown,
   type AgentContext,
   type AgentDefinition,
   type AgentRegistry,
+  type EvaluatorModelOutput,
+  type GeneratorInput,
+  type MergerModelOutput,
   type PlannerOutput,
 } from '@maestro/agents';
 import type { MaestroConfig } from '@maestro/config';
+import { detectRemote, getWorkingTreeDiff, removeWorktree } from '@maestro/git';
 import {
   sprintContractFrontmatterSchema,
   writeSprintContract,
@@ -23,8 +31,13 @@ import {
 } from '@maestro/contract';
 import type { EventBus, PipelineStageName } from '@maestro/core';
 import {
+  appendProjectLog,
+  completedExecPlanRelativePath,
+  feedbackPath,
   handoffPath,
   maestroRoot,
+  runPlanPath,
+  writeCompletedExecPlan,
   writeHandoff,
   writeSprintSelfEval,
   type RunState,
@@ -45,13 +58,11 @@ import { serializePlanMarkdown } from './plan-markdown.js';
 
 export const DEFAULT_RETRIES = 3;
 
-export type { PlannerOutput } from '@maestro/agents';
-
-type EvaluatorOutput = {
-  readonly pass: boolean;
-  readonly failures: readonly string[];
-  readonly coverage?: number;
-};
+export type {
+  EvaluatorModelOutput,
+  MergerModelOutput,
+  PlannerOutput,
+} from '@maestro/agents';
 
 export type PipelineRunOptions = {
   readonly runId: string;
@@ -70,6 +81,10 @@ export type PipelineRunOptions = {
   readonly maestroDir?: string;
   readonly userAgent?: string;
   readonly resume?: boolean;
+  /** Sobrepõe `config.merger.removeWorktreeOnSuccess`. */
+  readonly removeWorktreeOnSuccess?: boolean;
+  /** Sobrepõe `config.merger.requireDraftPr`. */
+  readonly requireDraftPr?: boolean;
 };
 
 export type PipelineRunResult = {
@@ -79,9 +94,9 @@ export type PipelineRunResult = {
     readonly sprintIdx: number;
     readonly attempts: number;
     readonly generator: unknown;
-    readonly evaluator: EvaluatorOutput;
+    readonly evaluator: EvaluatorModelOutput;
   }>;
-  readonly merger: unknown;
+  readonly merger: MergerModelOutput;
 };
 
 type AgentRef<I, O> = AgentDefinition<I, O>;
@@ -117,6 +132,97 @@ function contextFor(
     workingDir: repoRoot,
     metadata: extra,
   };
+}
+
+type SprintOutcomeAccum = {
+  readonly sprintIdx: number;
+  readonly attempts: number;
+  readonly generator: unknown;
+  readonly evaluator: EvaluatorModelOutput;
+};
+
+function slugifyForExecPlan(feature: string, runId: string): string {
+  const raw = `${feature}-${runId}`.toLowerCase();
+  const slug = raw
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^-+|-+$/gu, '');
+  return (slug.length > 0 ? slug : 'exec-plan').slice(0, 120);
+}
+
+function renderCompletedExecPlanMarkdown(options: {
+  readonly runId: string;
+  readonly branch: string;
+  readonly plan: PlannerOutput;
+  readonly sprintOutcomes: readonly SprintOutcomeAccum[];
+  readonly mergerSummary?: string;
+}): string {
+  const lines: string[] = [];
+  lines.push(`# Exec plan — ${options.plan.feature}`);
+  lines.push('');
+  lines.push(`- **Run ID:** \`${options.runId}\``);
+  lines.push(`- **Branch:** \`${options.branch}\``);
+  lines.push('');
+  if (options.mergerSummary?.trim()) {
+    lines.push('## Merger');
+    lines.push('');
+    lines.push(options.mergerSummary.trim());
+    lines.push('');
+  }
+  lines.push('## Plan summary');
+  lines.push('');
+  lines.push(options.plan.summary);
+  lines.push('');
+  lines.push('## Sprints');
+  lines.push('');
+  for (const o of options.sprintOutcomes) {
+    const sprint = options.plan.sprints[o.sprintIdx];
+    const title = sprint?.name ?? `Sprint ${(o.sprintIdx + 1).toString()}`;
+    lines.push(`### ${title}`);
+    lines.push('');
+    lines.push(`- **Evaluator:** ${o.evaluator.decision}`);
+    lines.push(`- **Attempts:** ${o.attempts.toString()}`);
+    if (sprint?.acceptance.length) {
+      lines.push('- **Acceptance:**');
+      for (const c of sprint.acceptance) {
+        lines.push(`  - ${c}`);
+      }
+    }
+    lines.push('');
+  }
+  lines.push('## Aggregated acceptance');
+  lines.push('');
+  for (const c of options.plan.sprints.flatMap((s) => s.acceptance)) {
+    lines.push(`- ${c}`);
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+async function writeEvaluatorFeedbackMarkdown(
+  options: PipelineRunOptions,
+  sprintNumber: number,
+  iteration: number,
+  output: EvaluatorModelOutput,
+  maestroDir: string | undefined,
+): Promise<void> {
+  const path = feedbackPath({
+    repoRoot: options.repoRoot,
+    runId: options.runId,
+    ...(maestroDir !== undefined ? { maestroDir } : {}),
+    sprint: sprintNumber,
+    iteration,
+  });
+  await mkdir(dirname(path), { recursive: true });
+  const fm = [
+    '---',
+    `decision: ${output.decision}`,
+    `runId: ${options.runId}`,
+    `sprint: ${sprintNumber.toString()}`,
+    `iteration: ${iteration.toString()}`,
+    '---',
+    '',
+  ].join('\n');
+  await writeFile(path, `${fm}${output.structuredFeedback}`, 'utf8');
 }
 
 async function writePlanFile(
@@ -223,7 +329,7 @@ export async function runPipeline(
     sprintIdx: number;
     attempts: number;
     generator: unknown;
-    evaluator: EvaluatorOutput;
+    evaluator: EvaluatorModelOutput;
   }> = [];
 
   try {
@@ -376,8 +482,10 @@ export async function runPipeline(
 
       let attempts = 0;
       let generatorOutput: unknown;
-      let evaluatorOutput: EvaluatorOutput | undefined;
-      let lastEvaluatorFailures: readonly string[] = [];
+      let evaluatorOutput: EvaluatorModelOutput | undefined;
+      let pendingEvaluatorFeedback:
+        | GeneratorInput['evaluatorFeedback']
+        | undefined;
       while (attempts < retries) {
         assertNotAborted(options.abortSignal, 'generating');
         attempts += 1;
@@ -405,15 +513,14 @@ export async function runPipeline(
             planFull: plan,
             architectNotes: architectNotesText,
             previousHandoff,
-            ...(lastEvaluatorFailures.length > 0
-              ? {
-                  evaluatorFeedback: {
-                    failures: [...lastEvaluatorFailures],
-                  },
-                }
+            ...(pendingEvaluatorFeedback !== undefined
+              ? { evaluatorFeedback: pendingEvaluatorFeedback }
               : {}),
           },
-          context: contextFor('generator', options.runId, options.repoRoot),
+          context: contextFor('generator', options.runId, options.repoRoot, {
+            worktreeRoot: options.worktreePath,
+            ...(maestroDir !== undefined ? { maestroDir } : {}),
+          }),
           bus: options.bus,
           config: options.config,
         });
@@ -423,22 +530,84 @@ export async function runPipeline(
           currentSprintIdx: sprintIdx,
           retriesRemaining: retries - attempts,
         });
+        const codeDiffText = await getWorkingTreeDiff(options.worktreePath);
         const evaluator = resolveAgent(options.registry, evaluatorAgent);
         evaluatorOutput = (await executor({
           definition: evaluator,
-          input: { sprint, acceptance: sprint.acceptance as string[] },
-          context: contextFor('evaluator', options.runId, options.repoRoot),
+          input: {
+            runId: options.runId,
+            sprintIdx: sprint.idx,
+            repoRoot: options.repoRoot,
+            worktreeRoot: options.worktreePath,
+            iteration: attempts,
+            sprintContract: contractText,
+            generatorOutput,
+            codeDiff: codeDiffText,
+            sprint,
+            acceptance: [...sprint.acceptance],
+          },
+          context: contextFor('evaluator', options.runId, options.repoRoot, {
+            worktreeRoot: options.worktreePath,
+            ...(maestroDir !== undefined ? { maestroDir } : {}),
+          }),
           bus: options.bus,
           config: options.config,
-        })) as EvaluatorOutput;
+        })) as EvaluatorModelOutput;
 
-        if (evaluatorOutput.pass) break;
-        lastEvaluatorFailures = evaluatorOutput.failures;
+        await writeEvaluatorFeedbackMarkdown(
+          options,
+          sprint.idx,
+          attempts,
+          evaluatorOutput,
+          maestroDir,
+        );
+
+        if (evaluatorOutput.decision === 'passed') {
+          pendingEvaluatorFeedback = undefined;
+          break;
+        }
+
+        if (evaluatorOutput.decision === 'escalated') {
+          const reason =
+            evaluatorOutput.suggestedActions[0] ??
+            evaluatorOutput.structuredFeedback
+              .split('\n')
+              .find((l) => l.trim().length > 0) ??
+            'Evaluator escalated';
+          options.bus.emit({
+            type: 'pipeline.sprint_escalated',
+            runId: options.runId,
+            sprintIdx,
+            reason,
+          });
+          await options.store.update(options.runId, {
+            phase: 'escalated',
+            status: 'paused',
+            escalation: { sprintIdx, reason },
+            pausedAt: new Date().toISOString(),
+          });
+          throw new PipelineEscalationError(
+            `Sprint ${sprintIdx + 1} escalated by evaluator: ${reason}`,
+            sprintIdx,
+            reason,
+          );
+        }
+
+        pendingEvaluatorFeedback = {
+          failures: [...evaluatorFailuresForGenerator(evaluatorOutput)],
+          structuredFeedback: evaluatorOutput.structuredFeedback,
+          suggestedActions: [...evaluatorOutput.suggestedActions],
+          decision: 'failed',
+        };
       }
 
-      if (!evaluatorOutput || !evaluatorOutput.pass) {
+      if (!evaluatorOutput || evaluatorOutput.decision !== 'passed') {
         const reason =
-          evaluatorOutput?.failures?.[0] ?? 'Retry budget exhausted';
+          evaluatorOutput?.suggestedActions?.[0] ??
+          evaluatorOutput?.structuredFeedback
+            ?.split('\n')
+            .find((l) => l.trim().length > 0) ??
+          'Retry budget exhausted';
         options.bus.emit({
           type: 'pipeline.sprint_escalated',
           runId: options.runId,
@@ -493,12 +662,141 @@ export async function runPipeline(
     assertNotAborted(options.abortSignal, 'merging');
     await updatePhase(options, 'merging');
     const merger = resolveAgent(options.registry, mergerAgent);
-    const mergerOutput = await executor({
+
+    const planMarkdown =
+      (await readOptionalUtf8(
+        runPlanPath({
+          repoRoot: options.repoRoot,
+          runId: options.runId,
+          ...(maestroDir !== undefined ? { maestroDir } : {}),
+        }),
+      )) ?? '';
+    if (planMarkdown.length === 0) {
+      throw new Error(
+        `Missing plan markdown for run ${options.runId} (expected plan.md under the maestro run directory).`,
+      );
+    }
+
+    const remoteInfo = await detectRemote({ cwd: options.worktreePath });
+    const remote = remoteInfo
+      ? {
+          platform: remoteInfo.platform,
+          url: remoteInfo.url,
+          name: remoteInfo.name,
+        }
+      : null;
+
+    const allPaths: string[] = [];
+    for (const o of sprintOutcomes) {
+      allPaths.push(...extractChangedFiles(o.generator));
+    }
+    const inferred = inferLabelsFromPaths(allPaths);
+    const suggestedLabels = [
+      ...new Set([...inferred, 'maestro', 'ai-generated']),
+    ].sort();
+
+    const execPlanFileName = `${slugifyForExecPlan(plan.feature, options.runId)}.md`;
+    const execPlanRelativePath = completedExecPlanRelativePath(execPlanFileName);
+
+    const mergerCfg = options.config.merger;
+    const requireDraftPr =
+      options.requireDraftPr ?? mergerCfg.requireDraftPr;
+
+    const mergerInput = mergerInputSchema.parse({
+      runId: options.runId,
+      repoRoot: options.repoRoot,
+      worktreeRoot: options.worktreePath,
+      branch: options.branch,
+      planMarkdown,
+      planSummary: plan.summary,
+      featureName: plan.feature,
+      sprintOutcomes: sprintOutcomes.map((o) => {
+        const sprint = plan.sprints[o.sprintIdx];
+        return {
+          sprintIdx: o.sprintIdx,
+          name: sprint?.name ?? `Sprint ${(o.sprintIdx + 1).toString()}`,
+          objective: sprint?.objective,
+          filesChanged: [...extractChangedFiles(o.generator)],
+          evaluatorDecision: o.evaluator.decision,
+          attempts: o.attempts,
+        };
+      }),
+      aggregatedAcceptance: plan.sprints.flatMap((s) => s.acceptance),
+      remote,
+      requireDraftPr,
+      pipelineStartedAt: new Date(startedAt).toISOString(),
+      durationMs: Date.now() - startedAt,
+      suggestedLabels,
+      execPlanRelativePath,
+      ...(mergerCfg.coAuthoredByLine !== undefined
+        ? { coAuthoredByLine: mergerCfg.coAuthoredByLine }
+        : {}),
+    });
+
+    const rawMerger = await executor({
       definition: merger,
-      input: { branch: options.branch, summary: plan.summary },
-      context: contextFor('merger', options.runId, options.repoRoot),
+      input: mergerInput,
+      context: contextFor('merger', options.runId, options.repoRoot, {
+        worktreeRoot: options.worktreePath,
+        ...(maestroDir !== undefined ? { maestroDir } : {}),
+      }),
       bus: options.bus,
       config: options.config,
+    });
+
+    const parsedMerger = mergerModelOutputSchema.parse(rawMerger);
+
+    const execPlanMarkdown = renderCompletedExecPlanMarkdown({
+      runId: options.runId,
+      branch: options.branch,
+      plan,
+      sprintOutcomes,
+      ...(parsedMerger.summary !== undefined
+        ? { mergerSummary: parsedMerger.summary }
+        : {}),
+    });
+
+    const { relativePathPosix } = await writeCompletedExecPlan({
+      repoRoot: options.repoRoot,
+      ...(maestroDir !== undefined ? { maestroDir } : {}),
+      fileName: execPlanFileName,
+      markdown: execPlanMarkdown,
+    });
+
+    let cleanupDone = parsedMerger.cleanupDone;
+    const removeWt =
+      options.removeWorktreeOnSuccess ?? mergerCfg.removeWorktreeOnSuccess;
+    if (
+      removeWt &&
+      parsedMerger.runStatus === 'completed' &&
+      options.worktreePath !== options.repoRoot
+    ) {
+      await removeWorktree({
+        repoRoot: options.repoRoot,
+        worktreePath: options.worktreePath,
+        force: true,
+      });
+      cleanupDone = true;
+    }
+
+    const mergerOutput: MergerModelOutput = {
+      ...parsedMerger,
+      execPlanPath: relativePathPosix,
+      cleanupDone,
+    };
+
+    await appendProjectLog({
+      repoRoot: options.repoRoot,
+      ...(maestroDir !== undefined ? { maestroDir } : {}),
+      entry: {
+        runId: options.runId,
+        event: 'pipeline.completed',
+        detail: mergerOutput.prUrl
+          ? `PR ${mergerOutput.prUrl}`
+          : remote
+            ? 'Merge phase finished (no PR URL in model output).'
+            : 'Merge phase finished (no git remote detected).',
+      },
     });
 
     const completedAt = new Date().toISOString();

@@ -35,6 +35,9 @@ export type Violation = {
   readonly line?: number;
   readonly column?: number;
   readonly source?: string;
+  /** Categoria semântica (ex.: code review inferencial). */
+  readonly category?: string;
+  readonly suggestion?: string;
 };
 
 export type SensorResult = {

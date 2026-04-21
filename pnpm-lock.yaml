@@ -83,6 +83,9 @@ importers:
       '@maestro/sensors':
         specifier: workspace:*
         version: link:../sensors
+      '@maestro/state':
+        specifier: workspace:*
+        version: link:../state
       ai:
         specifier: ^6.0.168
         version: 6.0.168(zod@4.3.6)
@@ -208,6 +211,9 @@ importers:
       '@maestro/core':
         specifier: workspace:*
         version: link:../core
+      '@maestro/git':
+        specifier: workspace:*
+        version: link:../git
       '@maestro/state':
         specifier: workspace:*
         version: link:../state
@@ -253,9 +259,6 @@ importers:
 
   packages/sensors:
     dependencies:
-      '@maestro/agents':
-        specifier: workspace:^
-        version: link:../agents
       '@maestro/config':
         specifier: workspace:^
         version: link:../config
@@ -268,6 +271,10 @@ importers:
       zod:
         specifier: ^4.3.6
         version: 4.3.6
+    devDependencies:
+      '@maestro/agents':
+        specifier: workspace:^
+        version: link:../agents
 
   packages/state:
     dependencies:

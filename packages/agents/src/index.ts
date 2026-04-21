@@ -91,6 +91,66 @@ export {
   type GeneratorModelOutput,
 } from './generator/generator-output.schema.js';
 export {
+  EVALUATOR_FEW_SHOT_EXAMPLES,
+  resolvedEvaluatorSystemPrompt,
+} from './evaluator/calibration.js';
+export { EVALUATOR_SYSTEM_PROMPT } from './evaluator/system-prompt.js';
+export {
+  evaluatorInputSchema,
+  type EvaluatorInput,
+} from './evaluator/evaluator-input.schema.js';
+export {
+  evaluatorFailuresForGenerator,
+  evaluatorModelOutputSchema,
+  evaluatorPassFromDecision,
+  type EvaluatorDecision,
+  type EvaluatorModelOutput,
+} from './evaluator/evaluator-output.schema.js';
+export {
+  MERGER_FEW_SHOT_EXAMPLES,
+  resolvedMergerSystemPrompt,
+} from './merger/calibration.js';
+export { inferLabelsFromPaths } from './merger/infer-labels.js';
+export {
+  mergerInputSchema,
+  type MergerInput,
+  type MergerSprintOutcomeSummary,
+} from './merger/merger-input.schema.js';
+export {
+  mergerModelOutputSchema,
+  mergerRunStatusSchema,
+  type MergerModelOutput,
+  type MergerRunStatus,
+} from './merger/merger-output.schema.js';
+export { MERGER_SYSTEM_PROMPT } from './merger/system-prompt.js';
+export {
+  createMergerToolSet,
+  type MergerToolContext,
+  type MergerToolHooks,
+} from './merger-tools.js';
+export {
+  CODE_REVIEWER_FEW_SHOT_EXAMPLES,
+  resolvedCodeReviewerSystemPrompt,
+} from './code-reviewer/calibration.js';
+export {
+  codeReviewInputSchema,
+  type CodeReviewInput,
+} from './code-reviewer/code-review-input.schema.js';
+export {
+  codeReviewOutputSchema,
+  codeReviewViolationCategorySchema,
+  codeReviewViolationSchema,
+  codeReviewViolationSeveritySchema,
+  type CodeReviewOutput,
+  type CodeReviewViolation,
+} from '@maestro/sensors';
+export { CODE_REVIEWER_SYSTEM_PROMPT } from './code-reviewer/system-prompt.js';
+export {
+  createEvaluatorToolSet,
+  type EvaluatorToolContext,
+  type EvaluatorToolHooks,
+} from './evaluator-tools.js';
+export {
   isPlannerEscalation,
   plannerModelOutputSchema,
   plannerSprintRawSchema,

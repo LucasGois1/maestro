@@ -5,11 +5,11 @@ import type { MaestroConfig } from '@maestro/config';
 import type { EventBus } from '@maestro/core';
 import { commitSprint } from '@maestro/git';
 import { composePolicy, denyAllPrompter, runShellCommand } from '@maestro/sandbox';
-import { loadSensorsFile, runSensor } from '@maestro/sensors';
 import { tool, type ToolSet } from 'ai';
 import { z } from 'zod';
 
 import { resolvePathUnderRepo } from './planner/safe-repo-path.js';
+import { executeRunSensorTool } from './run-sensor-tool.js';
 import {
   createPlannerToolSet,
   readRepoFileContent,
@@ -176,43 +176,19 @@ export function createGeneratorToolSet(
     description:
       'Executa um sensor registado (computacional ou inferencial) por id.',
     inputSchema: runSensorInput,
-    execute: async ({ id }) => {
-      if (hooks?.runSensor) {
-        return hooks.runSensor(id);
-      }
-      try {
-        const file = await loadSensorsFile({
+    execute: async ({ id }) =>
+      executeRunSensorTool(
+        {
           repoRoot: ctx.repoRoot,
-          ...(ctx.maestroDir !== undefined ? { maestroDir: ctx.maestroDir } : {}),
-        });
-        const sensor = file.sensors.find((s) => s.id === id);
-        if (!sensor) {
-          return `Sensor "${id}" não encontrado em sensors.json`;
-        }
-        const result = await runSensor(sensor, {
           runId: ctx.runId,
-          repoRoot: ctx.repoRoot,
           bus: ctx.bus,
           ...(ctx.maestroDir !== undefined ? { maestroDir: ctx.maestroDir } : {}),
           policy,
           config: ctx.config,
-        });
-        return JSON.stringify(
-          {
-            sensorId: result.sensorId,
-            status: result.status,
-            durationMs: result.durationMs,
-            stdout: result.stdout.slice(0, 8000),
-            stderr: result.stderr.slice(0, 4000),
-            violations: result.violations,
-          },
-          null,
-          2,
-        ).slice(0, 24_000);
-      } catch (e) {
-        return `Erro no sensor: ${e instanceof Error ? e.message : String(e)}`;
-      }
-    },
+        },
+        id,
+        hooks?.runSensor,
+      ),
   });
 
   const gitCommitTool = tool({

@@ -109,6 +109,14 @@ const discoverySchema = z
   })
   .strict();
 
+const mergerSchema = z
+  .object({
+    removeWorktreeOnSuccess: z.boolean().default(false),
+    coAuthoredByLine: z.string().optional(),
+    requireDraftPr: z.boolean().default(false),
+  })
+  .strict();
+
 export const configSchema = z
   .object({
     version: z.literal(1).default(1),
@@ -117,6 +125,7 @@ export const configSchema = z
     permissions: permissionsSchema.prefault({}),
     branching: branchingSchema.prefault({}),
     discovery: discoverySchema.prefault({}),
+    merger: mergerSchema.prefault({}),
   })
   .strict();
 

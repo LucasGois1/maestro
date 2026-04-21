@@ -17,8 +17,13 @@
     "typecheck": "tsc --noEmit"
   },
   "license": "MIT",
+  "peerDependencies": {
+    "@maestro/agents": "workspace:^"
+  },
+  "devDependencies": {
+    "@maestro/agents": "workspace:^"
+  },
   "dependencies": {
-    "@maestro/agents": "workspace:^",
     "@maestro/config": "workspace:^",
     "@maestro/core": "workspace:^",
     "@maestro/sandbox": "workspace:^",

@@ -14,6 +14,9 @@ export const generatorInputSchema = z.object({
   evaluatorFeedback: z
     .object({
       failures: z.array(z.string()),
+      structuredFeedback: z.string().optional(),
+      suggestedActions: z.array(z.string()).optional(),
+      decision: z.enum(['failed', 'escalated']).optional(),
     })
     .optional(),
 });

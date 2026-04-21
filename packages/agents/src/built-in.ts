@@ -8,9 +8,21 @@ import { GENERATOR_FEW_SHOT_EXAMPLES as GENERATOR_CALIBRATION } from './generato
 import { generatorInputSchema } from './generator/generator-input.schema.js';
 import { generatorModelOutputSchema } from './generator/generator-output.schema.js';
 import { GENERATOR_SYSTEM_PROMPT } from './generator/system-prompt.js';
+import { EVALUATOR_FEW_SHOT_EXAMPLES as EVALUATOR_CALIBRATION } from './evaluator/calibration.js';
+import { evaluatorInputSchema } from './evaluator/evaluator-input.schema.js';
+import { evaluatorModelOutputSchema } from './evaluator/evaluator-output.schema.js';
+import { EVALUATOR_SYSTEM_PROMPT } from './evaluator/system-prompt.js';
+import { MERGER_FEW_SHOT_EXAMPLES as MERGER_CALIBRATION } from './merger/calibration.js';
+import { mergerInputSchema } from './merger/merger-input.schema.js';
+import { mergerModelOutputSchema } from './merger/merger-output.schema.js';
+import { MERGER_SYSTEM_PROMPT } from './merger/system-prompt.js';
 import { PLANNER_FEW_SHOT_EXAMPLES } from './planner/calibration.js';
 import { plannerModelOutputSchema } from './planner/plan-output.schema.js';
 import { PLANNER_SYSTEM_PROMPT } from './planner/system-prompt.js';
+import { CODE_REVIEWER_FEW_SHOT_EXAMPLES as CODE_REVIEWER_CALIBRATION } from './code-reviewer/calibration.js';
+import { codeReviewInputSchema } from './code-reviewer/code-review-input.schema.js';
+import { codeReviewOutputSchema } from '@maestro/sensors';
+import { CODE_REVIEWER_SYSTEM_PROMPT } from './code-reviewer/system-prompt.js';
 
 const textInputSchema = z.object({ prompt: z.string().min(1) });
 
@@ -19,30 +31,6 @@ const architectInputSchema = z.object({
   architecture: z.string().min(1),
   sprint: z.unknown(),
   sprintIdx: z.number().int().nonnegative(),
-});
-
-const evaluatorOutputSchema = z.object({
-  pass: z.boolean(),
-  failures: z.array(z.string()).default([]),
-  coverage: z.number().min(0).max(1).optional(),
-});
-
-const mergerOutputSchema = z.object({
-  branch: z.string(),
-  prUrl: z.string().url().optional(),
-  summary: z.string(),
-});
-
-const codeReviewerOutputSchema = z.object({
-  verdict: z.enum(['approve', 'request-changes', 'comment']),
-  findings: z.array(
-    z.object({
-      path: z.string(),
-      line: z.number().int().nonnegative().optional(),
-      message: z.string(),
-      severity: z.enum(['info', 'warn', 'error']),
-    }),
-  ),
 });
 
 const docGardenerOutputSchema = z.object({
@@ -209,47 +197,62 @@ export const generatorAgent: AgentDefinition<
 };
 
 export const evaluatorAgent: AgentDefinition<
-  { sprint: unknown; acceptance: string[] },
-  z.infer<typeof evaluatorOutputSchema>
+  z.infer<typeof evaluatorInputSchema>,
+  z.infer<typeof evaluatorModelOutputSchema>
 > = {
   id: 'evaluator',
   role: 'pipeline',
   stage: 4,
-  systemPrompt:
-    'You are the Maestro Evaluator. Validate the sprint outcome against its acceptance criteria. Reply with JSON {pass, failures[], coverage?}.',
-  inputSchema: z.object({
-    sprint: z.unknown(),
-    acceptance: z.array(z.string()),
-  }),
-  outputSchema: evaluatorOutputSchema,
+  systemPrompt: EVALUATOR_SYSTEM_PROMPT,
+  inputSchema: evaluatorInputSchema,
+  outputSchema: evaluatorModelOutputSchema,
+  tools: [
+    'readFile',
+    'runShell',
+    'runSensor',
+    'navigateBrowser',
+    'querySqlite',
+    'callApi',
+  ],
+  calibration: {
+    fewShotExamples: EVALUATOR_CALIBRATION,
+  },
 };
 
 export const mergerAgent: AgentDefinition<
-  { branch: string; summary: string },
-  z.infer<typeof mergerOutputSchema>
+  z.infer<typeof mergerInputSchema>,
+  z.infer<typeof mergerModelOutputSchema>
 > = {
   id: 'merger',
   role: 'pipeline',
   stage: 5,
-  systemPrompt:
-    'You are the Maestro Merger. Package approved changes into a PR. Reply with JSON {branch, prUrl?, summary}.',
-  inputSchema: z.object({
-    branch: z.string(),
-    summary: z.string(),
-  }),
-  outputSchema: mergerOutputSchema,
+  systemPrompt: MERGER_SYSTEM_PROMPT,
+  inputSchema: mergerInputSchema,
+  outputSchema: mergerModelOutputSchema,
+  tools: [
+    'readFile',
+    'writeFile',
+    'appendFile',
+    'runShell',
+    'gitLog',
+  ],
+  calibration: {
+    fewShotExamples: MERGER_CALIBRATION,
+  },
 };
 
 export const codeReviewerAgent: AgentDefinition<
-  { diff: string },
-  z.infer<typeof codeReviewerOutputSchema>
+  z.infer<typeof codeReviewInputSchema>,
+  z.infer<typeof codeReviewOutputSchema>
 > = {
   id: 'code-reviewer',
   role: 'sensor',
-  systemPrompt:
-    'You are the Maestro Code Reviewer. Read the diff and produce findings. Reply with JSON {verdict, findings[]}.',
-  inputSchema: z.object({ diff: z.string() }),
-  outputSchema: codeReviewerOutputSchema,
+  systemPrompt: CODE_REVIEWER_SYSTEM_PROMPT,
+  inputSchema: codeReviewInputSchema,
+  outputSchema: codeReviewOutputSchema,
+  calibration: {
+    fewShotExamples: CODE_REVIEWER_CALIBRATION,
+  },
 };
 
 export const docGardenerAgent: AgentDefinition<

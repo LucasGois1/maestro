@@ -26,6 +26,7 @@
     "@maestro/provider": "workspace:*",
     "@maestro/sandbox": "workspace:*",
     "@maestro/sensors": "workspace:*",
+    "@maestro/state": "workspace:*",
     "ai": "^6.0.168",
     "jsonrepair": "^3.14.0",
     "zod": "^4.3.6"

@@ -12,7 +12,7 @@
   },
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "build": "pnpm -r --if-present build",
+    "build": "pnpm --filter @maestro/sensors run build && pnpm -r --if-present --sequential --filter '!@maestro/sensors' run build",
     "test": "pnpm -r --if-present test",
     "test:coverage": "pnpm -r --if-present test:coverage",
     "lint": "eslint .",

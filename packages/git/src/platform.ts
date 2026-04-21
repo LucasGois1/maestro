@@ -88,6 +88,8 @@ export type BuildPrCommandOptions = {
   readonly pr: PrDescriptor;
   readonly baseBranch?: string;
   readonly head?: string;
+  /** Rascunho (GitHub: `--draft`; GitLab: `--draft` quando suportado). */
+  readonly draft?: boolean;
 };
 
 export type PlatformCommand = {
@@ -116,6 +118,9 @@ export function buildPrCommand(
     if (options.head) {
       args.push('--head', options.head);
     }
+    if (options.draft === true) {
+      args.push('--draft');
+    }
     for (const label of labels) args.push('--label', label);
     return { program: 'gh', args };
   }
@@ -135,6 +140,9 @@ export function buildPrCommand(
     if (options.head) {
       args.push('--source-branch', options.head);
     }
+    if (options.draft === true) {
+      args.push('--draft');
+    }
     if (labels.length > 0) {
       args.push('--label', labels.join(','));
     }
@@ -149,6 +157,27 @@ export type ExecPrOptions = {
   readonly cwd: string;
   readonly spawnImpl?: typeof spawn;
 };
+
+/** Extrai URL / número de PR ou MR a partir da saída típica de `gh` / `glab`. */
+export function parsePrUrlFromCliOutput(stdout: string): {
+  readonly prUrl?: string;
+  readonly prNumber?: number;
+} {
+  const text = stdout.trim();
+  const gh = /(https:\/\/github\.com\/[^\s]+\/pull\/(\d+))/u.exec(text);
+  if (gh?.[1] !== undefined && gh[2] !== undefined) {
+    return { prUrl: gh[1], prNumber: Number(gh[2]) };
+  }
+  const gl = /(https:\/\/[^\s]+\/-\/merge_requests\/(\d+))/u.exec(text);
+  if (gl?.[1] !== undefined && gl[2] !== undefined) {
+    return { prUrl: gl[1], prNumber: Number(gl[2]) };
+  }
+  const loose = /(https:\/\/[^\s]+)/u.exec(text);
+  if (loose?.[1] !== undefined) {
+    return { prUrl: loose[1] };
+  }
+  return {};
+}
 
 export function executePrCommand(
   options: ExecPrOptions,

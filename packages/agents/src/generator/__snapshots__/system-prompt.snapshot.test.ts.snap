@@ -12,6 +12,7 @@ Rules:
 - runShell may be denied by policy; prefer project scripts from package.json when possible.
 - Be honest in selfEval: list missing criteria or concerns if anything is incomplete.
 - If the contract is ambiguous, set selfEval.concerns accordingly and do not invent requirements.
+- When evaluatorFeedback is present (pipeline retry), fix the listed failures first; follow structuredFeedback and suggestedActions from the evaluator.
 
 Required JSON shape:
 {"sprintIdx":number,"filesChanged":[{"path":"string","changeType":"added"|"modified"|"deleted"}],"commits":[{"sha":"string","message":"string"}],"selfEval":{"coversAllCriteria":boolean,"missingCriteria":["string"],"concerns":["string"]},"handoffNotes":"string"}
@@ -33,7 +34,7 @@ INPUT: {"sprintIdx":1,"sprintName":"Partial delivery"}
 OUTPUT: {"sprintIdx":1,"filesChanged":[{"path":"src/a.ts","changeType":"modified"}],"commits":[{"sha":"1111111","message":"fix(core): patch edge case"}],"selfEval":{"coversAllCriteria":false,"missingCriteria":["Add regression test for empty input"],"concerns":["Tests not green locally until follow-up commit"]},"handoffNotes":"Core fix landed; tests still need tightening."}
 
 ### Example 4 // retry com feedback do evaluator
-INPUT: {"sprintIdx":2,"sprintName":"Retry after QA","evaluatorFeedback":{"failures":["Acceptance: error message not user-friendly"]}}
+INPUT: {"sprintIdx":2,"sprintName":"Retry after QA","evaluatorFeedback":{"failures":["Acceptance: error message not user-friendly"],"structuredFeedback":"## Gap\\nError copy still generic in \`errors.ts\`.","suggestedActions":["Use ValidationError with user-safe messages."],"decision":"failed"}}
 OUTPUT: {"sprintIdx":2,"filesChanged":[{"path":"src/errors.ts","changeType":"modified"}],"commits":[{"sha":"2222222","message":"fix(errors): clarify user-facing message"}],"selfEval":{"coversAllCriteria":true,"missingCriteria":[],"concerns":[]},"handoffNotes":"Addressed evaluator feedback on error copy."}
 
 ### Example 5 // ambiguidade — não inventar; concerns explícitos

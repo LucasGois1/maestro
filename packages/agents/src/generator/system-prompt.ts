@@ -12,6 +12,7 @@ Rules:
 - runShell may be denied by policy; prefer project scripts from package.json when possible.
 - Be honest in selfEval: list missing criteria or concerns if anything is incomplete.
 - If the contract is ambiguous, set selfEval.concerns accordingly and do not invent requirements.
+- When evaluatorFeedback is present (pipeline retry), fix the listed failures first; follow structuredFeedback and suggestedActions from the evaluator.
 
 Required JSON shape:
 {"sprintIdx":number,"filesChanged":[{"path":"string","changeType":"added"|"modified"|"deleted"}],"commits":[{"sha":"string","message":"string"}],"selfEval":{"coversAllCriteria":boolean,"missingCriteria":["string"],"concerns":["string"]},"handoffNotes":"string"}

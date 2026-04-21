@@ -9,7 +9,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
   ArchitectModelOutput,
+  EvaluatorModelOutput,
   GeneratorModelOutput,
+  MergerModelOutput,
   PlannerModelOutput,
 } from '@maestro/agents';
 
@@ -143,6 +145,27 @@ function mockGeneratorOk(input: unknown): GeneratorModelOutput {
   };
 }
 
+function mockEvaluatorPassed(): EvaluatorModelOutput {
+  return {
+    decision: 'passed',
+    structuredFeedback: '## Summary\nStub evaluator OK.',
+    sensorsRun: [],
+    artifacts: [],
+    suggestedActions: [],
+  };
+}
+
+function mockMergerModelOutput(branch: string): MergerModelOutput {
+  return {
+    runStatus: 'completed',
+    branch,
+    commitCount: 1,
+    execPlanPath: '.maestro/docs/exec-plans/completed/placeholder.md',
+    cleanupDone: false,
+    summary: 'ok',
+  };
+}
+
 afterEach(async () => {
   await rm(repoRoot, { recursive: true, force: true });
 });
@@ -175,11 +198,8 @@ describe('runPipeline (happy path)', () => {
       planner: () => plannerModelOutput,
       architect: (input) => mockArchitectOk(input),
       generator: (input) => mockGeneratorOk(input),
-      evaluator: () => ({ pass: true, failures: [] }),
-      merger: () => ({
-        branch: 'maestro/demo',
-        summary: 'ok',
-      }),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () => mockMergerModelOutput('maestro/demo'),
     });
 
     const result = await runPipeline({
@@ -198,6 +218,20 @@ describe('runPipeline (happy path)', () => {
     expect(result.state.phase).toBe('completed');
     expect(result.sprintOutcomes).toHaveLength(2);
     expect(result.sprintOutcomes[0]?.attempts).toBe(1);
+
+    const feedbackMd = await readFile(
+      join(
+        repoRoot,
+        '.maestro',
+        'runs',
+        'r1',
+        'feedback',
+        'sprint-1-eval-1.md',
+      ),
+      'utf8',
+    );
+    expect(feedbackMd).toContain('decision: passed');
+    expect(feedbackMd).toContain('Stub evaluator OK.');
     expectNormalizedPlan(result.plan);
 
     const types = env.events.map((e) => e.type);
@@ -261,14 +295,84 @@ describe('runPipeline (happy path)', () => {
     );
   });
 
+  it('appends project log and writes completed exec-plan after merger', async () => {
+    const env = makeEnv();
+    const executor = buildExecutor({
+      planner: () => plannerModelOutput,
+      architect: (input) => mockArchitectOk(input),
+      generator: (input) => mockGeneratorOk(input),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () => mockMergerModelOutput('maestro/demo'),
+    });
+
+    const result = await runPipeline({
+      runId: 'r-exec',
+      prompt: 'ship auth',
+      branch: 'maestro/demo',
+      worktreePath: repoRoot,
+      repoRoot,
+      store: env.store,
+      bus: env.bus,
+      config: env.config,
+      executor,
+    });
+
+    const logText = await readFile(
+      join(repoRoot, '.maestro', 'log.md'),
+      'utf8',
+    );
+    expect(logText).toContain('pipeline.completed');
+    expect(logText).toContain('r-exec');
+
+    expect(result.merger.execPlanPath).toContain('exec-plans/completed');
+    const execAbs = join(repoRoot, result.merger.execPlanPath);
+    await expect(readFile(execAbs, 'utf8')).resolves.toContain('# Exec plan');
+    await expect(readFile(execAbs, 'utf8')).resolves.toContain('Auth');
+  });
+
+  it('passes requireDraftPr from config into merger input', async () => {
+    const env = makeEnv();
+    let captured: unknown;
+    const config = configSchema.parse({
+      merger: {
+        removeWorktreeOnSuccess: false,
+        requireDraftPr: true,
+      },
+    });
+    const executor = buildExecutor({
+      planner: () => plannerModelOutput,
+      architect: (input) => mockArchitectOk(input),
+      generator: (input) => mockGeneratorOk(input),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: (input) => {
+        captured = input;
+        return mockMergerModelOutput('maestro/demo');
+      },
+    });
+
+    await runPipeline({
+      runId: 'r-draft',
+      prompt: 'ship',
+      branch: 'maestro/demo',
+      worktreePath: repoRoot,
+      repoRoot,
+      store: env.store,
+      bus: env.bus,
+      config,
+      executor,
+    });
+
+    expect(captured).toMatchObject({ requireDraftPr: true });
+  });
+
   it('runs architect for three sprints and writes three design-note files', async () => {
     const env = makeEnv();
     const executor = buildExecutor({
       planner: () => plannerModelOutputThreeSprints,
       architect: (input) => mockArchitectOk(input),
       generator: (input) => mockGeneratorOk(input),
-      evaluator: () => ({ pass: true, failures: [] }),
-      merger: () => ({ branch: 'maestro/demo', summary: 'ok' }),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () => mockMergerModelOutput('maestro/demo'),
     });
 
     await runPipeline({
@@ -328,11 +432,18 @@ describe('runPipeline (happy path)', () => {
       evaluator: () => {
         evalCalls += 1;
         if (evalCalls < 2) {
-          return { pass: false, failures: ['need more work'] };
+          return {
+            decision: 'failed' as const,
+            structuredFeedback:
+              '## Gap\nLINE:42 user-facing message still generic.',
+            sensorsRun: [],
+            artifacts: [],
+            suggestedActions: ['need more work'],
+          };
         }
-        return { pass: true, failures: [] };
+        return mockEvaluatorPassed();
       },
-      merger: () => ({ branch: 'maestro/demo', summary: 'ok' }),
+      merger: () => mockMergerModelOutput('maestro/demo'),
     });
 
     await runPipeline({
@@ -350,7 +461,13 @@ describe('runPipeline (happy path)', () => {
 
     expect(generatorInputs).toHaveLength(2);
     expect(generatorInputs[1]).toMatchObject({
-      evaluatorFeedback: { failures: ['need more work'] },
+      evaluatorFeedback: {
+        failures: ['need more work'],
+        structuredFeedback:
+          '## Gap\nLINE:42 user-facing message still generic.',
+        suggestedActions: ['need more work'],
+        decision: 'failed',
+      },
     });
   });
 
@@ -382,8 +499,8 @@ describe('runPipeline (happy path)', () => {
           handoffNotes: 'Three files added.',
         };
       },
-      evaluator: () => ({ pass: true, failures: [] }),
-      merger: () => ({ branch: 'maestro/demo', summary: 'ok' }),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () => mockMergerModelOutput('maestro/demo'),
     });
 
     await runPipeline({
@@ -427,8 +544,14 @@ describe('runPipeline (retry + escalation)', () => {
         attemptsBySprint[0] = (attemptsBySprint[0] ?? 0) + 1;
         return mockGeneratorOk(input);
       },
-      evaluator: () => ({ pass: false, failures: ['acceptance missing'] }),
-      merger: () => ({ branch: 'x', summary: 'y' }),
+      evaluator: () => ({
+        decision: 'failed' as const,
+        structuredFeedback: '## Summary\nacceptance missing',
+        sensorsRun: [],
+        artifacts: [],
+        suggestedActions: ['acceptance missing'],
+      }),
+      merger: () => mockMergerModelOutput('x'),
     });
 
     await expect(
@@ -475,8 +598,8 @@ describe('runPipeline (graceful pause)', () => {
         return mockArchitectOk(input);
       },
       generator: (input) => mockGeneratorOk(input),
-      evaluator: () => ({ pass: true, failures: [] }),
-      merger: () => ({ branch: 'x', summary: 'y' }),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () => mockMergerModelOutput('x'),
     });
 
     await expect(
@@ -513,8 +636,8 @@ describe('resumePipeline', () => {
         return mockArchitectOk(input);
       },
       generator: (input) => mockGeneratorOk(input),
-      evaluator: () => ({ pass: true, failures: [] }),
-      merger: () => ({ branch: 'x', summary: 'y' }),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () => mockMergerModelOutput('x'),
     });
 
     await expect(
@@ -540,8 +663,8 @@ describe('resumePipeline', () => {
       planner: () => plannerModelOutput,
       architect: (input) => mockArchitectOk(input),
       generator: (input) => mockGeneratorOk(input),
-      evaluator: () => ({ pass: true, failures: [] }),
-      merger: () => ({ branch: 'x', summary: 'y' }),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () => mockMergerModelOutput('x'),
     });
 
     const result = await resumePipeline({

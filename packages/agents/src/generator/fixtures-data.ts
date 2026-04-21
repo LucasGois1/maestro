@@ -80,7 +80,12 @@ export const WITH_EVALUATOR_FEEDBACK: {
   input: {
     sprintIdx: 2,
     sprintName: 'Retry after QA',
-    evaluatorFeedback: { failures: ['Acceptance: error message not user-friendly'] },
+    evaluatorFeedback: {
+      failures: ['Acceptance: error message not user-friendly'],
+      structuredFeedback: '## Gap\nError copy still generic in `errors.ts`.',
+      suggestedActions: ['Use ValidationError with user-safe messages.'],
+      decision: 'failed',
+    },
   },
   output: {
     sprintIdx: 2,

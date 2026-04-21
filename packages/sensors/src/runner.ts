@@ -1,10 +1,12 @@
+/// <reference path="./maestro-agents-shim.d.ts" />
 import { resolve } from 'node:path';
 
+import { mapCodeReviewModelToViolations } from './code-review-mapper.js';
 import type {
-  AgentContext,
-  AgentRegistry,
-  AnyAgentDefinition,
-} from '@maestro/agents';
+  InferentialAgentContext as AgentContext,
+  InferentialAgentRegistry as AgentRegistry,
+  InferentialAnyAgentDefinition as AnyAgentDefinition,
+} from './inferential-agent-types.js';
 import type { MaestroConfig } from '@maestro/config';
 import type { EventBus } from '@maestro/core';
 import {
@@ -46,6 +48,11 @@ export type SensorRunContext = {
   readonly bus: EventBus;
   readonly maestroDir?: string;
   readonly diff?: string;
+  /** Texto do contrato do sprint (markdown). */
+  readonly sprintContract?: string;
+  readonly goldenPrinciples?: readonly string[];
+  /** Conteúdo de AGENTS.md ou equivalente. */
+  readonly agentsMd?: string;
   readonly policy?: Policy;
   readonly approver?: ApprovalPrompter;
   readonly shellRunner?: ShellRunner;
@@ -163,7 +170,22 @@ function resolveCwd(sensor: ComputationalSensorDefinition, repoRoot: string): st
   return resolve(repoRoot, sensor.cwd);
 }
 
-function resolveInferentialOutput(
+function buildInferentialAgentInput(
+  definition: AnyAgentDefinition,
+  context: SensorRunContext,
+): unknown {
+  if (definition.id === 'code-reviewer') {
+    return {
+      diff: context.diff ?? '',
+      sprintContract: context.sprintContract ?? '',
+      goldenPrinciples: context.goldenPrinciples ?? [],
+      agentsMd: context.agentsMd ?? '',
+    };
+  }
+  return { diff: context.diff ?? '' };
+}
+
+function resolveLegacyVerdictFindingsOutput(
   output: unknown,
 ): { status: 'passed' | 'failed'; violations: readonly Violation[] } {
   if (
@@ -201,6 +223,32 @@ function resolveInferentialOutput(
   }
 
   return { status: 'passed', violations: [] };
+}
+
+function resolveInferentialOutput(
+  agentId: string,
+  output: unknown,
+): {
+  status: 'passed' | 'failed';
+  violations: readonly Violation[];
+  parsedForResult?: unknown;
+} {
+  if (agentId === 'code-reviewer') {
+    try {
+      const mapped = mapCodeReviewModelToViolations(output);
+      return {
+        status: mapped.logicalFailed ? 'failed' : 'passed',
+        violations: mapped.violations,
+        parsedForResult: mapped.parsed,
+      };
+    } catch {
+      return {
+        ...resolveLegacyVerdictFindingsOutput(output),
+      };
+    }
+  }
+
+  return resolveLegacyVerdictFindingsOutput(output);
 }
 
 async function runComputationalSensor(
@@ -365,9 +413,10 @@ async function runInferentialSensor(
   });
 
   try {
+    const def = definition as AnyAgentDefinition;
     const execution = await agentRunner({
-      definition: definition as AnyAgentDefinition,
-      input: { diff: context.diff ?? '' },
+      definition: def,
+      input: buildInferentialAgentInput(def, context),
       context: {
         agentId: sensor.agent,
         runId: context.runId,
@@ -381,7 +430,7 @@ async function runInferentialSensor(
       ...(context.config !== undefined ? { config: context.config } : {}),
     });
 
-    const normalized = resolveInferentialOutput(execution.output);
+    const normalized = resolveInferentialOutput(sensor.agent, execution.output);
     const status =
       normalized.status === 'passed'
         ? 'passed'
@@ -393,7 +442,7 @@ async function runInferentialSensor(
       durationMs: execution.durationMs,
       stdout: execution.text,
       stderr: '',
-      parsed: execution.output,
+      parsed: normalized.parsedForResult ?? execution.output,
       violations: normalized.violations,
     };
     emitCompleted(

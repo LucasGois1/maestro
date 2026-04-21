@@ -15,7 +15,10 @@ import type {
 import { generateText, stepCountIs, type ToolSet } from 'ai';
 
 import { appendCalibrationSection } from './calibration-format.js';
+import type { EvaluatorInput } from './evaluator/evaluator-input.schema.js';
+import { createEvaluatorToolSet } from './evaluator-tools.js';
 import { createGeneratorToolSet } from './generator-tools.js';
+import { createMergerToolSet } from './merger-tools.js';
 import {
   createArchitectToolSet,
   createPlannerToolSet,
@@ -254,28 +257,70 @@ export async function runAgent<TInput, TOutput>(
 
     let text = '';
 
-    const toolAugmented =
-      definition.id === 'planner'
-        ? {
-            tools: createPlannerToolSet(context.workingDir),
-            maxSteps: 12,
-          }
-        : definition.id === 'architect'
-          ? {
-              tools: createArchitectToolSet(context.workingDir),
-              maxSteps: 12,
-            }
-          : definition.id === 'generator'
-            ? {
-                tools: createGeneratorToolSet({
-                  repoRoot: context.workingDir,
-                  config,
-                  runId: context.runId,
-                  bus,
-                }),
-                maxSteps: 28,
-              }
-            : null;
+    const meta = context.metadata;
+    const worktreeRoot =
+      typeof meta.worktreeRoot === 'string' && meta.worktreeRoot.length > 0
+        ? meta.worktreeRoot
+        : context.workingDir;
+    const maestroDirMeta =
+      typeof meta.maestroDir === 'string' ? meta.maestroDir : undefined;
+
+    let toolAugmented: { tools: ToolSet; maxSteps: number } | null = null;
+    if (definition.id === 'planner') {
+      toolAugmented = {
+        tools: createPlannerToolSet(context.workingDir),
+        maxSteps: 12,
+      };
+    } else if (definition.id === 'architect') {
+      toolAugmented = {
+        tools: createArchitectToolSet(context.workingDir),
+        maxSteps: 12,
+      };
+    } else if (definition.id === 'generator') {
+      toolAugmented = {
+        tools: createGeneratorToolSet({
+          repoRoot: context.workingDir,
+          config,
+          runId: context.runId,
+          bus,
+          ...(maestroDirMeta !== undefined
+            ? { maestroDir: maestroDirMeta }
+            : {}),
+        }),
+        maxSteps: 28,
+      };
+    } else if (definition.id === 'evaluator') {
+      const evInput = inputParse.data as EvaluatorInput;
+      toolAugmented = {
+        tools: createEvaluatorToolSet({
+          repoRoot: context.workingDir,
+          worktreeRoot,
+          config,
+          runId: context.runId,
+          bus,
+          ...(maestroDirMeta !== undefined
+            ? { maestroDir: maestroDirMeta }
+            : {}),
+          codeDiff: evInput.codeDiff,
+          sprintContract: evInput.sprintContract,
+        }),
+        maxSteps: 22,
+      };
+    } else if (definition.id === 'merger') {
+      toolAugmented = {
+        tools: createMergerToolSet({
+          repoRoot: context.workingDir,
+          worktreeRoot,
+          config,
+          runId: context.runId,
+          bus,
+          ...(maestroDirMeta !== undefined
+            ? { maestroDir: maestroDirMeta }
+            : {}),
+        }),
+        maxSteps: 20,
+      };
+    }
 
     if (toolAugmented) {
       text = await generateToolAugmentedAgentText({

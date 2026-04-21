@@ -30,6 +30,19 @@ describe('sensorDefinitionSchema', () => {
     ).toThrow(/agent/i);
   });
 
+  it('defaults inferential sensors to onFail warn', () => {
+    const sensor = sensorDefinitionSchema.parse({
+      id: 'review',
+      kind: 'inferential',
+      agent: 'code-reviewer',
+    });
+    expect(sensor.kind).toBe('inferential');
+    if (sensor.kind !== 'inferential') {
+      throw new Error('expected inferential sensor');
+    }
+    expect(sensor.onFail).toBe('warn');
+  });
+
   it('rejects empty appliesTo entries', () => {
     expect(() =>
       sensorDefinitionSchema.parse({

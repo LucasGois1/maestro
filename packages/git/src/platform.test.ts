@@ -82,6 +82,23 @@ describe('buildPrCommand', () => {
     expect(cmd.args.join(' ')).toContain('maestro,ai-generated');
   });
 
+  it('adds --draft for GitHub and GitLab when draft is true', () => {
+    const gh = buildPrCommand({
+      platform: 'github',
+      pr,
+      baseBranch: 'main',
+      draft: true,
+    });
+    expect(gh.args).toContain('--draft');
+    const glab = buildPrCommand({
+      platform: 'gitlab',
+      pr,
+      baseBranch: 'main',
+      draft: true,
+    });
+    expect(glab.args).toContain('--draft');
+  });
+
   it('throws for unknown platforms', () => {
     expect(() => buildPrCommand({ platform: 'unknown', pr })).toThrow(
       UnsupportedPlatformError,

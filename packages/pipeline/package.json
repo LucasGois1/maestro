@@ -19,6 +19,7 @@
   "license": "MIT",
   "dependencies": {
     "yaml": "^2.8.3",
+    "@maestro/git": "workspace:*",
     "@maestro/agents": "workspace:*",
     "@maestro/config": "workspace:*",
     "@maestro/contract": "workspace:*",

@@ -15,6 +15,8 @@ export {
 export {
   CHECKPOINTS_DIR,
   CONTRACTS_DIR,
+  completedExecPlanRelativePath,
+  EXEC_PLANS_RELATIVE_SEGMENTS,
   FEEDBACK_DIR,
   LOGS_DIR,
   MAESTRO_DIR,
@@ -23,6 +25,8 @@ export {
   PROJECT_LOG_FILE,
   RUNS_DIR,
   STATE_FILE,
+  execPlansActiveDir,
+  execPlansCompletedDir,
   feedbackPath,
   handoffPath,
   selfEvalPath,
@@ -70,3 +74,8 @@ export {
   type ProjectLogEntry,
   type ProjectLogLevel,
 } from './project-log.js';
+
+export {
+  writeCompletedExecPlan,
+  type WriteCompletedExecPlanOptions,
+} from './exec-plan.js';

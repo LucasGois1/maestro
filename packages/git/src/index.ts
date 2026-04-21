@@ -49,10 +49,18 @@ export {
   type DivergenceReport,
 } from './divergence.js';
 
+export { getWorkingTreeDiff } from './working-tree-diff.js';
+
+export {
+  getGitLogOneline,
+  type GitLogOnelineOptions,
+} from './git-log.js';
+
 export {
   buildPrCommand,
   detectRemote,
   executePrCommand,
+  parsePrUrlFromCliOutput,
   renderPrBody,
   UnsupportedPlatformError,
   type BuildPrCommandOptions,
