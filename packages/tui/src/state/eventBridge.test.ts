@@ -75,6 +75,99 @@ describe('bridgeBusToStore', () => {
       expect(store.getState().sprints[0]?.status).toBe('escalated');
     });
 
+    it('accumulates history with closed previous stages on stage_entered', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      const times = [100, 250, 400];
+      let i = 0;
+      bridgeBusToStore(bus, store, { clock: () => times[i++] ?? 0 });
+
+      bus.emit({
+        type: 'pipeline.stage_entered',
+        runId: 'r',
+        stage: 'planning',
+      });
+      bus.emit({
+        type: 'pipeline.stage_entered',
+        runId: 'r',
+        stage: 'generating',
+      });
+      bus.emit({ type: 'pipeline.completed', runId: 'r', durationMs: 10 });
+
+      const history = store.getState().pipeline.history;
+      expect(history).toHaveLength(2);
+      expect(history[0]).toEqual({
+        stage: 'planning',
+        startedAt: 100,
+        endedAt: 250,
+      });
+      expect(history[1]).toEqual({
+        stage: 'generating',
+        startedAt: 250,
+        endedAt: 400,
+      });
+    });
+
+    it('closes running sprints when a new sprint_started arrives', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({
+        type: 'pipeline.sprint_started',
+        runId: 'r',
+        sprintIdx: 1,
+        totalSprints: 2,
+      });
+      bus.emit({
+        type: 'pipeline.sprint_started',
+        runId: 'r',
+        sprintIdx: 2,
+        totalSprints: 2,
+      });
+
+      const sprints = store.getState().sprints;
+      expect(sprints[0]).toMatchObject({ idx: 1, status: 'done' });
+      expect(sprints[1]).toMatchObject({ idx: 2, status: 'running' });
+    });
+
+    it('completes all running sprints on pipeline.completed', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({
+        type: 'pipeline.sprint_started',
+        runId: 'r',
+        sprintIdx: 1,
+        totalSprints: 1,
+      });
+      bus.emit({ type: 'pipeline.completed', runId: 'r', durationMs: 5 });
+
+      expect(store.getState().sprints[0]?.status).toBe('done');
+    });
+
+    it('marks the active sprint as failed on pipeline.failed', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({
+        type: 'pipeline.sprint_started',
+        runId: 'r',
+        sprintIdx: 2,
+        totalSprints: 2,
+      });
+      bus.emit({
+        type: 'pipeline.failed',
+        runId: 'r',
+        error: 'kaboom',
+        at: 'generating',
+      });
+
+      expect(store.getState().sprints[0]?.status).toBe('failed');
+    });
+
     it('reflects pause, resume, completion and failure', () => {
       const bus = createEventBus();
       const store = createTuiStore();
@@ -177,29 +270,80 @@ describe('bridgeBusToStore', () => {
       expect(clock).toHaveBeenCalled();
     });
 
-    it('ignores tool_call and tool_result events', () => {
+    it('appends tool_call to messageLog and ignores tool_result', () => {
       const bus = createEventBus();
       const store = createTuiStore();
-      bridgeBusToStore(bus, store);
+      bridgeBusToStore(bus, store, { clock: () => 7 });
 
       bus.emit({
         type: 'agent.tool_call',
         agentId: 'a',
         runId: 'r',
-        tool: 'x',
+        tool: 'write_file',
         args: {},
       });
       bus.emit({
         type: 'agent.tool_result',
         agentId: 'a',
         runId: 'r',
-        tool: 'x',
+        tool: 'write_file',
         result: {},
       });
 
       const state = store.getState();
-      expect(state.agent.activeAgentId).toBeNull();
       expect(state.agent.decisions).toEqual([]);
+      expect(state.agent.messageLog).toEqual([
+        { kind: 'tool_call', agentId: 'a', at: 7, text: 'write_file' },
+      ]);
+    });
+
+    it('appends deltas and decisions to messageLog with buffering', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      const clockSeq = [1, 2, 3, 4, 5];
+      let i = 0;
+      bridgeBusToStore(bus, store, {
+        agentLogBufferSize: 3,
+        clock: () => clockSeq[i++] ?? 99,
+      });
+
+      bus.emit({ type: 'agent.started', agentId: 'p', runId: 'r' });
+      bus.emit({ type: 'agent.delta', agentId: 'p', runId: 'r', chunk: 'a' });
+      bus.emit({
+        type: 'agent.decision',
+        agentId: 'p',
+        runId: 'r',
+        message: 'go',
+      });
+      bus.emit({
+        type: 'agent.tool_call',
+        agentId: 'p',
+        runId: 'r',
+        tool: 't',
+        args: {},
+      });
+      bus.emit({ type: 'agent.delta', agentId: 'p', runId: 'r', chunk: 'b' });
+
+      const log = store.getState().agent.messageLog;
+      expect(log).toHaveLength(3);
+      expect(log[0]?.kind).toBe('decision');
+      expect(log[1]?.kind).toBe('tool_call');
+      expect(log[2]?.kind).toBe('delta');
+      expect(log[2]?.text).toBe('b');
+    });
+
+    it('clears messageLog and lastDelta on agent.started', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({ type: 'agent.started', agentId: 'p1', runId: 'r' });
+      bus.emit({ type: 'agent.delta', agentId: 'p1', runId: 'r', chunk: 'x' });
+      expect(store.getState().agent.messageLog).toHaveLength(1);
+
+      bus.emit({ type: 'agent.started', agentId: 'p2', runId: 'r' });
+      expect(store.getState().agent.messageLog).toEqual([]);
+      expect(store.getState().agent.lastDelta).toBe('');
     });
 
     it('clears the active agent on complete and records errors on failure', () => {

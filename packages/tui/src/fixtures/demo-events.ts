@@ -17,6 +17,14 @@ const RUN_ID = 'demo-run';
 export const DEMO_SCRIPT: readonly DemoStep[] = [
   { delayMs: 0, event: { type: 'pipeline.started', runId: RUN_ID } },
   {
+    delayMs: 30,
+    event: {
+      type: 'pipeline.stage_entered',
+      runId: RUN_ID,
+      stage: 'discovering',
+    },
+  },
+  {
     delayMs: 50,
     event: {
       type: 'pipeline.stage_entered',
@@ -25,24 +33,63 @@ export const DEMO_SCRIPT: readonly DemoStep[] = [
     },
   },
   {
-    delayMs: 50,
-    event: {
-      type: 'agent.started',
-      runId: RUN_ID,
-      agentId: 'planner',
-    },
+    delayMs: 30,
+    event: { type: 'agent.started', runId: RUN_ID, agentId: 'planner' },
   },
   {
-    delayMs: 100,
+    delayMs: 50,
     event: {
       type: 'agent.delta',
       runId: RUN_ID,
       agentId: 'planner',
-      chunk: 'Planning sprints…',
+      chunk: 'Breaking scope into sprints…',
     },
   },
   {
-    delayMs: 100,
+    delayMs: 50,
+    event: {
+      type: 'agent.decision',
+      runId: RUN_ID,
+      agentId: 'planner',
+      message: 'Split auth work into 3 sprints',
+    },
+  },
+  {
+    delayMs: 50,
+    event: {
+      type: 'pipeline.stage_entered',
+      runId: RUN_ID,
+      stage: 'architecting',
+    },
+  },
+  {
+    delayMs: 40,
+    event: {
+      type: 'agent.started',
+      runId: RUN_ID,
+      agentId: 'architect',
+    },
+  },
+  {
+    delayMs: 50,
+    event: {
+      type: 'agent.tool_call',
+      runId: RUN_ID,
+      agentId: 'architect',
+      tool: 'read_repo_layout',
+      args: {},
+    },
+  },
+  {
+    delayMs: 50,
+    event: {
+      type: 'pipeline.stage_entered',
+      runId: RUN_ID,
+      stage: 'contracting',
+    },
+  },
+  {
+    delayMs: 60,
     event: {
       type: 'pipeline.sprint_started',
       runId: RUN_ID,
@@ -60,24 +107,30 @@ export const DEMO_SCRIPT: readonly DemoStep[] = [
     },
   },
   {
-    delayMs: 100,
-    event: {
-      type: 'agent.started',
-      runId: RUN_ID,
-      agentId: 'generator',
-    },
+    delayMs: 40,
+    event: { type: 'agent.started', runId: RUN_ID, agentId: 'generator' },
   },
   {
-    delayMs: 100,
+    delayMs: 60,
     event: {
       type: 'agent.delta',
       runId: RUN_ID,
       agentId: 'generator',
-      chunk: 'writing module A…',
+      chunk: 'Implementing auth/jwt.py…',
     },
   },
   {
     delayMs: 50,
+    event: {
+      type: 'agent.tool_call',
+      runId: RUN_ID,
+      agentId: 'generator',
+      tool: 'write_file',
+      args: { path: 'auth/jwt.py' },
+    },
+  },
+  {
+    delayMs: 40,
     event: {
       type: 'sensor.started',
       runId: RUN_ID,
@@ -86,16 +139,7 @@ export const DEMO_SCRIPT: readonly DemoStep[] = [
     },
   },
   {
-    delayMs: 100,
-    event: {
-      type: 'sensor.progress',
-      runId: RUN_ID,
-      sensorId: 'ruff',
-      message: 'checking imports',
-    },
-  },
-  {
-    delayMs: 100,
+    delayMs: 60,
     event: {
       type: 'sensor.completed',
       runId: RUN_ID,
@@ -105,6 +149,31 @@ export const DEMO_SCRIPT: readonly DemoStep[] = [
     },
   },
   {
+    delayMs: 40,
+    event: {
+      type: 'pipeline.stage_entered',
+      runId: RUN_ID,
+      stage: 'evaluating',
+      sprintIdx: 1,
+    },
+  },
+  {
+    delayMs: 40,
+    event: {
+      type: 'pipeline.paused',
+      runId: RUN_ID,
+      at: 'evaluating',
+    },
+  },
+  {
+    delayMs: 40,
+    event: {
+      type: 'pipeline.resumed',
+      runId: RUN_ID,
+      from: 'evaluating',
+    },
+  },
+  {
     delayMs: 50,
     event: {
       type: 'pipeline.sprint_started',
@@ -114,7 +183,16 @@ export const DEMO_SCRIPT: readonly DemoStep[] = [
     },
   },
   {
-    delayMs: 100,
+    delayMs: 40,
+    event: {
+      type: 'pipeline.stage_entered',
+      runId: RUN_ID,
+      stage: 'generating',
+      sprintIdx: 2,
+    },
+  },
+  {
+    delayMs: 50,
     event: {
       type: 'sensor.started',
       runId: RUN_ID,
@@ -123,7 +201,7 @@ export const DEMO_SCRIPT: readonly DemoStep[] = [
     },
   },
   {
-    delayMs: 200,
+    delayMs: 80,
     event: {
       type: 'sensor.failed',
       runId: RUN_ID,
@@ -132,7 +210,7 @@ export const DEMO_SCRIPT: readonly DemoStep[] = [
     },
   },
   {
-    delayMs: 100,
+    delayMs: 40,
     event: {
       type: 'pipeline.sprint_retried',
       runId: RUN_ID,
@@ -141,7 +219,7 @@ export const DEMO_SCRIPT: readonly DemoStep[] = [
     },
   },
   {
-    delayMs: 100,
+    delayMs: 40,
     event: {
       type: 'agent.decision',
       runId: RUN_ID,
@@ -150,7 +228,16 @@ export const DEMO_SCRIPT: readonly DemoStep[] = [
     },
   },
   {
-    delayMs: 200,
+    delayMs: 50,
+    event: {
+      type: 'pipeline.sprint_escalated',
+      runId: RUN_ID,
+      sprintIdx: 2,
+      reason: 'persistent type errors',
+    },
+  },
+  {
+    delayMs: 60,
     event: {
       type: 'pipeline.sprint_started',
       runId: RUN_ID,
@@ -159,7 +246,16 @@ export const DEMO_SCRIPT: readonly DemoStep[] = [
     },
   },
   {
-    delayMs: 150,
+    delayMs: 40,
+    event: {
+      type: 'pipeline.stage_entered',
+      runId: RUN_ID,
+      stage: 'merging',
+      sprintIdx: 3,
+    },
+  },
+  {
+    delayMs: 80,
     event: {
       type: 'pipeline.completed',
       runId: RUN_ID,

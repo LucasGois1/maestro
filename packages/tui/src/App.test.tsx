@@ -50,7 +50,7 @@ describe('App', () => {
     const frame = app.lastFrame() ?? '';
     expect(frame).toContain('run');
     expect(frame).toContain('sprint 2/4');
-    expect(frame).toContain('stage: generating');
+    expect(frame).toContain('⟳ Generating');
     expect(frame).toContain('[p] pause');
     app.unmount();
   });
@@ -133,6 +133,137 @@ describe('App', () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(store.getState().focus.panelId).toBe('diff');
 
+    app.unmount();
+  });
+
+  it('selects a sprint when digit keys are pressed on the sprints panel', async () => {
+    const store = createTuiStore();
+    const bus = createEventBus();
+    const app = render(
+      <App store={store} bus={bus} terminalSize={SIZE_WIDE} />,
+    );
+
+    act(() => {
+      bus.emit({
+        type: 'pipeline.sprint_started',
+        runId: 'r',
+        sprintIdx: 1,
+        totalSprints: 2,
+      });
+      bus.emit({
+        type: 'pipeline.sprint_started',
+        runId: 'r',
+        sprintIdx: 2,
+        totalSprints: 2,
+      });
+    });
+
+    act(() => {
+      store.setState((state) => ({
+        ...state,
+        focus: { ...state.focus, panelId: 'sprints' },
+      }));
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    app.stdin.write('2');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(store.getState().focus.selectedSprintIdx).toBe(2);
+    app.unmount();
+  });
+
+  it('ignores digit keys when target sprint does not exist', async () => {
+    const store = createTuiStore();
+    const app = render(<App store={store} terminalSize={SIZE_WIDE} />);
+
+    act(() => {
+      store.setState((state) => ({
+        ...state,
+        focus: { ...state.focus, panelId: 'sprints' },
+      }));
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    app.stdin.write('5');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(store.getState().focus.selectedSprintIdx).toBeNull();
+    app.unmount();
+  });
+
+  it('opens the agent log overlay with [l] when activeAgent is focused', async () => {
+    const store = createTuiStore();
+    const app = render(<App store={store} terminalSize={SIZE_WIDE} />);
+
+    act(() => {
+      store.setState((state) => ({
+        ...state,
+        focus: { ...state.focus, panelId: 'activeAgent' },
+        agent: {
+          ...state.agent,
+          activeAgentId: 'gen',
+          messageLog: [
+            { kind: 'delta', agentId: 'gen', at: 1, text: 'hi' },
+          ],
+        },
+      }));
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    app.stdin.write('l');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const frame = app.lastFrame() ?? '';
+    expect(frame).toContain('Logs completos');
+    app.unmount();
+  });
+
+  it('keeps the pipeline panel with 7 stages under rapid updates (non-flicker)', () => {
+    const store = createTuiStore();
+    const bus = createEventBus();
+    const app = render(
+      <App store={store} bus={bus} terminalSize={SIZE_WIDE} />,
+    );
+
+    act(() => {
+      const stages = [
+        'discovering',
+        'planning',
+        'architecting',
+        'contracting',
+        'generating',
+        'evaluating',
+        'merging',
+      ] as const;
+      bus.emit({ type: 'pipeline.started', runId: 'r' });
+      for (const stage of stages) {
+        bus.emit({
+          type: 'pipeline.stage_entered',
+          runId: 'r',
+          stage,
+        });
+        bus.emit({
+          type: 'agent.delta',
+          agentId: 'gen',
+          runId: 'r',
+          chunk: `${stage}-x`,
+        });
+      }
+    });
+
+    const frame = app.lastFrame() ?? '';
+    for (const label of [
+      'Discovering',
+      'Planning',
+      'Architecting',
+      'Contracting',
+      'Generating',
+      'Evaluating',
+      'Merging',
+    ]) {
+      expect(frame).toContain(label);
+    }
     app.unmount();
   });
 });

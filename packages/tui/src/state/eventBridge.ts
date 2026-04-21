@@ -6,16 +6,24 @@ import type {
   SensorEvent,
 } from '@maestro/core';
 
-import type { TuiSensorStatus, TuiSprintState, TuiStore } from './store.js';
+import type {
+  TuiAgentLogEntry,
+  TuiSensorStatus,
+  TuiSprintState,
+  TuiStageRecord,
+  TuiStore,
+} from './store.js';
 
 export interface BridgeBusOptions {
   readonly agentDeltaBufferChars?: number;
   readonly agentDecisionBufferSize?: number;
+  readonly agentLogBufferSize?: number;
   readonly clock?: () => number;
 }
 
 const DEFAULT_DELTA_BUFFER_CHARS = 8_000;
 const DEFAULT_DECISION_BUFFER_SIZE = 200;
+const DEFAULT_LOG_BUFFER_SIZE = 120;
 
 export function bridgeBusToStore(
   bus: EventBus,
@@ -25,16 +33,18 @@ export function bridgeBusToStore(
   const deltaCap = options.agentDeltaBufferChars ?? DEFAULT_DELTA_BUFFER_CHARS;
   const decisionCap =
     options.agentDecisionBufferSize ?? DEFAULT_DECISION_BUFFER_SIZE;
+  const logCap = options.agentLogBufferSize ?? DEFAULT_LOG_BUFFER_SIZE;
   const clock = options.clock ?? Date.now;
 
   return bus.on((event) => {
-    handleEvent(event, store, { deltaCap, decisionCap, clock });
+    handleEvent(event, store, { deltaCap, decisionCap, logCap, clock });
   });
 }
 
 interface InternalConfig {
   readonly deltaCap: number;
   readonly decisionCap: number;
+  readonly logCap: number;
   readonly clock: () => number;
 }
 
@@ -44,7 +54,7 @@ function handleEvent(
   config: InternalConfig,
 ): void {
   if (isPipelineEvent(event)) {
-    handlePipelineEvent(event, store);
+    handlePipelineEvent(event, store, config);
     return;
   }
   if (isAgentEvent(event)) {
@@ -62,7 +72,34 @@ function isAgentEvent(event: MaestroEvent): event is AgentEvent {
   return event.type.startsWith('agent.');
 }
 
-function handlePipelineEvent(event: PipelineEvent, store: TuiStore): void {
+function closeOpenStage(
+  history: readonly TuiStageRecord[],
+  at: number,
+): readonly TuiStageRecord[] {
+  if (history.length === 0) {
+    return history;
+  }
+  const last = history[history.length - 1];
+  if (!last || last.endedAt !== null) {
+    return history;
+  }
+  const next = history.slice();
+  next[next.length - 1] = { ...last, endedAt: at };
+  return next;
+}
+
+function appendStageRecord(
+  history: readonly TuiStageRecord[],
+  record: TuiStageRecord,
+): readonly TuiStageRecord[] {
+  return [...history, record];
+}
+
+function handlePipelineEvent(
+  event: PipelineEvent,
+  store: TuiStore,
+  config: InternalConfig,
+): void {
   switch (event.type) {
     case 'pipeline.started':
       store.setState((state) => ({
@@ -75,42 +112,61 @@ function handlePipelineEvent(event: PipelineEvent, store: TuiStore): void {
           stage: null,
           sprintIdx: null,
           retryCount: 0,
+          history: [],
         },
       }));
       return;
     case 'pipeline.stage_entered':
-      store.setState((state) => ({
-        ...state,
-        pipeline: {
-          ...state.pipeline,
+      store.setState((state) => {
+        const now = config.clock();
+        const closed = closeOpenStage(state.pipeline.history, now);
+        const withNew = appendStageRecord(closed, {
           stage: event.stage,
-          sprintIdx: event.sprintIdx ?? state.pipeline.sprintIdx,
-        },
-        header:
-          event.sprintIdx === undefined
-            ? state.header
-            : { ...state.header, sprintIdx: event.sprintIdx },
-      }));
+          startedAt: now,
+          endedAt: null,
+        });
+        return {
+          ...state,
+          pipeline: {
+            ...state.pipeline,
+            stage: event.stage,
+            sprintIdx: event.sprintIdx ?? state.pipeline.sprintIdx,
+            history: withNew,
+          },
+          header:
+            event.sprintIdx === undefined
+              ? state.header
+              : { ...state.header, sprintIdx: event.sprintIdx },
+        };
+      });
       return;
     case 'pipeline.sprint_started':
-      store.setState((state) => ({
-        ...state,
-        pipeline: {
-          ...state.pipeline,
-          sprintIdx: event.sprintIdx,
-          retryCount: 0,
-        },
-        header: {
-          ...state.header,
-          sprintIdx: event.sprintIdx,
-          totalSprints: event.totalSprints,
-        },
-        sprints: upsertSprint(state.sprints, {
-          idx: event.sprintIdx,
-          status: 'running',
-          retries: 0,
-        }),
-      }));
+      store.setState((state) => {
+        const previousIdx = state.pipeline.sprintIdx;
+        const sprints = upsertSprint(
+          closePreviousRunningSprints(state.sprints, event.sprintIdx),
+          {
+            idx: event.sprintIdx,
+            status: 'running',
+            retries: 0,
+          },
+        );
+        return {
+          ...state,
+          pipeline: {
+            ...state.pipeline,
+            sprintIdx: event.sprintIdx,
+            retryCount:
+              previousIdx === event.sprintIdx ? state.pipeline.retryCount : 0,
+          },
+          header: {
+            ...state.header,
+            sprintIdx: event.sprintIdx,
+            totalSprints: event.totalSprints,
+          },
+          sprints,
+        };
+      });
       return;
     case 'pipeline.sprint_retried':
       store.setState((state) => ({
@@ -157,25 +213,59 @@ function handlePipelineEvent(event: PipelineEvent, store: TuiStore): void {
       }));
       return;
     case 'pipeline.completed':
-      store.setState((state) => ({
-        ...state,
-        pipeline: {
-          ...state.pipeline,
-          status: 'completed',
-        },
-      }));
+      store.setState((state) => {
+        const now = config.clock();
+        const closed = closeOpenStage(state.pipeline.history, now);
+        return {
+          ...state,
+          pipeline: {
+            ...state.pipeline,
+            status: 'completed',
+            history: closed,
+          },
+          sprints: state.sprints.map((sprint) =>
+            sprint.status === 'running' ? { ...sprint, status: 'done' } : sprint,
+          ),
+        };
+      });
       return;
     case 'pipeline.failed':
-      store.setState((state) => ({
-        ...state,
-        pipeline: {
-          ...state.pipeline,
-          status: 'failed',
-          stage: event.at,
-          error: event.error,
-        },
-      }));
+      store.setState((state) => {
+        const now = config.clock();
+        const closed = closeOpenStage(state.pipeline.history, now);
+        const activeIdx = state.pipeline.sprintIdx;
+        return {
+          ...state,
+          pipeline: {
+            ...state.pipeline,
+            status: 'failed',
+            stage: event.at,
+            error: event.error,
+            history: closed,
+          },
+          sprints:
+            activeIdx === null
+              ? state.sprints
+              : state.sprints.map((sprint) =>
+                  sprint.idx === activeIdx
+                    ? { ...sprint, status: 'failed' }
+                    : sprint,
+                ),
+        };
+      });
   }
+}
+
+function appendAgentLog(
+  log: readonly TuiAgentLogEntry[],
+  entry: TuiAgentLogEntry,
+  cap: number,
+): readonly TuiAgentLogEntry[] {
+  const next = [...log, entry];
+  if (next.length <= cap) {
+    return next;
+  }
+  return next.slice(next.length - cap);
 }
 
 function handleAgentEvent(
@@ -191,6 +281,7 @@ function handleAgentEvent(
           ...state.agent,
           activeAgentId: event.agentId,
           lastDelta: '',
+          messageLog: [],
           error: null,
         },
       }));
@@ -202,31 +293,80 @@ function handleAgentEvent(
           next.length > config.deltaCap
             ? next.slice(next.length - config.deltaCap)
             : next;
+        const entry: TuiAgentLogEntry = {
+          kind: 'delta',
+          agentId: event.agentId,
+          at: config.clock(),
+          text: event.chunk,
+        };
         return {
           ...state,
-          agent: { ...state.agent, lastDelta: trimmed },
+          agent: {
+            ...state.agent,
+            lastDelta: trimmed,
+            messageLog: appendAgentLog(
+              state.agent.messageLog,
+              entry,
+              config.logCap,
+            ),
+          },
         };
       });
       return;
     case 'agent.decision':
       store.setState((state) => {
+        const at = config.clock();
         const decision = {
           agentId: event.agentId,
           message: event.message,
-          at: config.clock(),
+          at,
         };
-        const next = [...state.agent.decisions, decision];
-        const trimmed =
-          next.length > config.decisionCap
-            ? next.slice(next.length - config.decisionCap)
-            : next;
+        const nextDecisions = [...state.agent.decisions, decision];
+        const trimmedDecisions =
+          nextDecisions.length > config.decisionCap
+            ? nextDecisions.slice(nextDecisions.length - config.decisionCap)
+            : nextDecisions;
+        const entry: TuiAgentLogEntry = {
+          kind: 'decision',
+          agentId: event.agentId,
+          at,
+          text: event.message,
+        };
         return {
           ...state,
-          agent: { ...state.agent, decisions: trimmed },
+          agent: {
+            ...state.agent,
+            decisions: trimmedDecisions,
+            messageLog: appendAgentLog(
+              state.agent.messageLog,
+              entry,
+              config.logCap,
+            ),
+          },
         };
       });
       return;
     case 'agent.tool_call':
+      store.setState((state) => {
+        const entry: TuiAgentLogEntry = {
+          kind: 'tool_call',
+          agentId: event.agentId,
+          at: config.clock(),
+          text: event.tool,
+        };
+        return {
+          ...state,
+          agent: {
+            ...state.agent,
+            messageLog: appendAgentLog(
+              state.agent.messageLog,
+              entry,
+              config.logCap,
+            ),
+          },
+        };
+      });
+      return;
     case 'agent.tool_result':
       return;
     case 'agent.completed':
@@ -321,6 +461,18 @@ function handleSensorEvent(event: SensorEvent, store: TuiStore): void {
   }
 }
 
+function closePreviousRunningSprints(
+  sprints: readonly TuiSprintState[],
+  newIdx: number,
+): readonly TuiSprintState[] {
+  return sprints.map((sprint) => {
+    if (sprint.idx < newIdx && sprint.status === 'running') {
+      return { ...sprint, status: 'done' };
+    }
+    return sprint;
+  });
+}
+
 function upsertSprint(
   sprints: readonly TuiSprintState[],
   next: TuiSprintState,
@@ -330,6 +482,9 @@ function upsertSprint(
     return [...sprints, next].sort((a, b) => a.idx - b.idx);
   }
   const copy = sprints.slice();
-  copy[existingIndex] = { ...copy[existingIndex], ...next };
+  const existing = copy[existingIndex];
+  if (existing) {
+    copy[existingIndex] = { ...existing, ...next };
+  }
   return copy;
 }

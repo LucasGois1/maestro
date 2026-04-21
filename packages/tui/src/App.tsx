@@ -1,5 +1,5 @@
 import { Box } from 'ink';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import type { EventBus } from '@maestro/core';
 
 import { Footer, deriveFooterState } from './components/Footer.js';
@@ -12,6 +12,7 @@ import {
 import {
   KeybindingProvider,
   useKeybinding,
+  useKeybindingContext,
   type KeybindingRouter,
 } from './keybindings/index.js';
 import { LayoutGrid } from './layout/LayoutGrid.js';
@@ -21,6 +22,10 @@ import {
   type TerminalSize,
 } from './layout/useTerminalSize.js';
 import { ActiveAgentPanel } from './panels/ActiveAgentPanel.js';
+import {
+  AGENT_LOG_OVERLAY_ID,
+  createAgentLogOverlay,
+} from './panels/AgentLogOverlay.js';
 import { DiffPreviewPanel } from './panels/DiffPreviewPanel.js';
 import { nextPanelId, previousPanelId } from './panels/PanelId.js';
 import { PipelinePanel } from './panels/PipelinePanel.js';
@@ -150,6 +155,41 @@ function AppShell({ store }: { readonly store: TuiStore }) {
     overlayHost.pop();
   });
 
+  const selectSprint = useCallback(
+    (idx: number) => {
+      store.setState((state) => {
+        if (!state.sprints.some((sprint) => sprint.idx === idx)) {
+          return state;
+        }
+        return {
+          ...state,
+          focus: { ...state.focus, selectedSprintIdx: idx },
+        };
+      });
+    },
+    [store],
+  );
+
+  useSprintDigitKeybindings(selectSprint);
+
+  const openAgentLog = useCallback(() => {
+    const alreadyOpen = overlayHost.overlays.some(
+      (overlay) => overlay.id === AGENT_LOG_OVERLAY_ID,
+    );
+    if (alreadyOpen) {
+      return;
+    }
+    overlayHost.push(
+      createAgentLogOverlay(store.getState().agent, colorMode),
+    );
+  }, [colorMode, overlayHost, store]);
+
+  useKeybinding(
+    { kind: 'panel', panelId: 'activeAgent' },
+    { key: 'l' },
+    openAgentLog,
+  );
+
   return (
     <Box flexDirection="column" width={size.columns}>
       <Header mode={mode} header={header} colorMode={colorMode} />
@@ -174,6 +214,7 @@ function AppShell({ store }: { readonly store: TuiStore }) {
           sprints: (
             <SprintsPanel
               sprints={sprints}
+              selectedSprintIdx={focus.selectedSprintIdx}
               focused={focus.panelId === 'sprints'}
               colorMode={colorMode}
             />
@@ -198,4 +239,26 @@ function AppShell({ store }: { readonly store: TuiStore }) {
       <Footer state={footerState} colorMode={colorMode} />
     </Box>
   );
+}
+
+const SPRINT_DIGITS: readonly string[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+function useSprintDigitKeybindings(onSelect: (idx: number) => void): void {
+  const context = useKeybindingContext();
+  useEffect(() => {
+    const unregisters = SPRINT_DIGITS.map((digit) =>
+      context.router.register({
+        scope: { kind: 'panel', panelId: 'sprints' },
+        binding: { key: digit },
+        handler: () => {
+          onSelect(Number.parseInt(digit, 10));
+        },
+      }),
+    );
+    return () => {
+      for (const unregister of unregisters) {
+        unregister();
+      }
+    };
+  }, [context.router, onSelect]);
 }

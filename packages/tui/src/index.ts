@@ -6,11 +6,19 @@ export { formatHelloMessage } from './message.js';
 export { App } from './App.js';
 
 export {
+  computeStageDurations,
+  computeStageStatuses,
   createInitialTuiState,
   createTuiStore,
   DEFAULT_AGENT_DECISION_BUFFER,
+  DEFAULT_AGENT_LOG_BUFFER,
   PANEL_FOCUS_ORDER,
+  PIPELINE_STAGE_ORDER,
+  selectStageDurations,
+  selectStageStatuses,
   type TuiAgentDecision,
+  type TuiAgentLogEntry,
+  type TuiAgentLogKind,
   type TuiAgentState,
   type TuiColorMode,
   type TuiDiffPreviewState,
@@ -23,6 +31,10 @@ export {
   type TuiSensorState,
   type TuiSensorStatus,
   type TuiSprintState,
+  type TuiStageDurationMap,
+  type TuiStageRecord,
+  type TuiStageStatus,
+  type TuiStageStatusMap,
   type TuiState,
   type TuiStateUpdater,
   type TuiStore,
@@ -53,6 +65,24 @@ export {
   nextPanelId,
   previousPanelId,
 } from './panels/PanelId.js';
+export { PipelinePanel } from './panels/PipelinePanel.js';
+export { ActiveAgentPanel } from './panels/ActiveAgentPanel.js';
+export { SprintsPanel } from './panels/SprintsPanel.js';
+export { SensorsPanel } from './panels/SensorsPanel.js';
+export { DiffPreviewPanel } from './panels/DiffPreviewPanel.js';
+export {
+  AGENT_LOG_OVERLAY_ID,
+  AgentLogOverlay,
+  createAgentLogOverlay,
+} from './panels/AgentLogOverlay.js';
+export {
+  SPRINT_ICONS,
+  STAGE_ICONS,
+  stageLabel,
+  type StageIcon,
+  type SprintListStatus,
+} from './panels/stageIcons.js';
+export { formatDurationMs } from './panels/formatDuration.js';
 
 export {
   createKeybindingRouter,

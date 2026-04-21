@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createInitialTuiState, createTuiStore } from './store.js';
+import {
+  computeStageDurations,
+  computeStageStatuses,
+  createInitialTuiState,
+  createTuiStore,
+  DEFAULT_AGENT_LOG_BUFFER,
+  PIPELINE_STAGE_ORDER,
+  selectStageDurations,
+  selectStageStatuses,
+} from './store.js';
 
 describe('createTuiStore', () => {
   it('returns the initial state with defaults', () => {
@@ -134,5 +143,171 @@ describe('createTuiStore', () => {
     store.setState((state) => ({ ...state, mode: 'run' }));
 
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('initial state includes new DSFT-87 fields with safe defaults', () => {
+    const state = createInitialTuiState();
+    expect(state.pipeline.history).toEqual([]);
+    expect(state.agent.messageLog).toEqual([]);
+    expect(state.focus.selectedSprintIdx).toBeNull();
+  });
+});
+
+describe('PIPELINE_STAGE_ORDER', () => {
+  it('lists the 7 canonical pipeline stages in order', () => {
+    expect(PIPELINE_STAGE_ORDER).toEqual([
+      'discovering',
+      'planning',
+      'architecting',
+      'contracting',
+      'generating',
+      'evaluating',
+      'merging',
+    ]);
+  });
+});
+
+describe('DEFAULT_AGENT_LOG_BUFFER', () => {
+  it('is exposed as a constant', () => {
+    expect(DEFAULT_AGENT_LOG_BUFFER).toBe(120);
+  });
+});
+
+describe('computeStageStatuses', () => {
+  it('returns all pending for idle pipelines', () => {
+    const state = createInitialTuiState();
+    const statuses = computeStageStatuses(state.pipeline, state.sprints);
+    for (const stage of PIPELINE_STAGE_ORDER) {
+      expect(statuses[stage]).toBe('pending');
+    }
+  });
+
+  it('marks earlier stages as passed and current as running', () => {
+    const statuses = computeStageStatuses(
+      {
+        status: 'running',
+        stage: 'generating',
+        sprintIdx: 1,
+        retryCount: 0,
+        error: null,
+        history: [
+          { stage: 'planning', startedAt: 0, endedAt: 100 },
+          { stage: 'architecting', startedAt: 100, endedAt: 200 },
+        ],
+      },
+      [{ idx: 1, status: 'running', retries: 0 }],
+    );
+    expect(statuses.planning).toBe('passed');
+    expect(statuses.architecting).toBe('passed');
+    expect(statuses.contracting).toBe('passed');
+    expect(statuses.generating).toBe('running');
+    expect(statuses.merging).toBe('pending');
+  });
+
+  it('marks current stage as failed when pipeline fails', () => {
+    const statuses = computeStageStatuses(
+      {
+        status: 'failed',
+        stage: 'evaluating',
+        sprintIdx: 1,
+        retryCount: 1,
+        error: 'oops',
+        history: [],
+      },
+      [],
+    );
+    expect(statuses.evaluating).toBe('failed');
+  });
+
+  it('marks current stage as paused when pipeline is paused', () => {
+    const statuses = computeStageStatuses(
+      {
+        status: 'paused',
+        stage: 'generating',
+        sprintIdx: 1,
+        retryCount: 0,
+        error: null,
+        history: [],
+      },
+      [],
+    );
+    expect(statuses.generating).toBe('paused');
+  });
+
+  it('marks current stage as escalated when a sprint is escalated', () => {
+    const statuses = computeStageStatuses(
+      {
+        status: 'running',
+        stage: 'generating',
+        sprintIdx: 1,
+        retryCount: 3,
+        error: null,
+        history: [],
+      },
+      [{ idx: 1, status: 'escalated', retries: 3 }],
+    );
+    expect(statuses.generating).toBe('escalated');
+  });
+
+  it('marks all stages as passed on completion', () => {
+    const statuses = computeStageStatuses(
+      {
+        status: 'completed',
+        stage: 'merging',
+        sprintIdx: 3,
+        retryCount: 0,
+        error: null,
+        history: [
+          { stage: 'discovering', startedAt: 0, endedAt: 10 },
+          { stage: 'planning', startedAt: 10, endedAt: 20 },
+          { stage: 'architecting', startedAt: 20, endedAt: 30 },
+          { stage: 'contracting', startedAt: 30, endedAt: 40 },
+          { stage: 'generating', startedAt: 40, endedAt: 50 },
+          { stage: 'evaluating', startedAt: 50, endedAt: 60 },
+          { stage: 'merging', startedAt: 60, endedAt: 70 },
+        ],
+      },
+      [],
+    );
+    expect(statuses.merging).toBe('passed');
+    expect(statuses.discovering).toBe('passed');
+  });
+});
+
+describe('computeStageDurations', () => {
+  it('returns null durations when history is empty', () => {
+    const durations = computeStageDurations(createInitialTuiState().pipeline);
+    expect(durations.planning).toBeNull();
+  });
+
+  it('sums durations per stage', () => {
+    const durations = computeStageDurations({
+      status: 'running',
+      stage: 'generating',
+      sprintIdx: 1,
+      retryCount: 0,
+      error: null,
+      history: [
+        { stage: 'generating', startedAt: 0, endedAt: 500 },
+        { stage: 'evaluating', startedAt: 500, endedAt: 700 },
+        { stage: 'generating', startedAt: 700, endedAt: 900 },
+        { stage: 'merging', startedAt: 900, endedAt: null },
+      ],
+    });
+    expect(durations.generating).toBe(700);
+    expect(durations.evaluating).toBe(200);
+    expect(durations.merging).toBeNull();
+  });
+});
+
+describe('selectStageStatuses/selectStageDurations', () => {
+  it('delegates to the compute helpers', () => {
+    const state = createInitialTuiState();
+    expect(selectStageStatuses(state)).toEqual(
+      computeStageStatuses(state.pipeline, state.sprints),
+    );
+    expect(selectStageDurations(state)).toEqual(
+      computeStageDurations(state.pipeline),
+    );
   });
 });

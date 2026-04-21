@@ -20,6 +20,29 @@ export type TuiSensorStatus =
 
 export type TuiColorMode = 'color' | 'no-color';
 
+export type TuiStageStatus =
+  | 'pending'
+  | 'running'
+  | 'passed'
+  | 'failed'
+  | 'paused'
+  | 'escalated';
+
+export interface TuiStageRecord {
+  readonly stage: PipelineStageName;
+  readonly startedAt: number;
+  readonly endedAt: number | null;
+}
+
+export type TuiAgentLogKind = 'delta' | 'decision' | 'tool_call';
+
+export interface TuiAgentLogEntry {
+  readonly kind: TuiAgentLogKind;
+  readonly agentId: string;
+  readonly at: number;
+  readonly text: string;
+}
+
 export interface TuiHeaderState {
   readonly repoName: string | null;
   readonly branch: string | null;
@@ -35,6 +58,7 @@ export interface TuiPipelineState {
   readonly sprintIdx: number | null;
   readonly retryCount: number;
   readonly error: string | null;
+  readonly history: readonly TuiStageRecord[];
 }
 
 export interface TuiSprintState {
@@ -53,6 +77,7 @@ export interface TuiAgentState {
   readonly activeAgentId: string | null;
   readonly lastDelta: string;
   readonly decisions: readonly TuiAgentDecision[];
+  readonly messageLog: readonly TuiAgentLogEntry[];
   readonly error: string | null;
 }
 
@@ -66,6 +91,7 @@ export interface TuiSensorState {
 export interface TuiFocusState {
   readonly panelId: TuiPanelId;
   readonly overlayStack: readonly string[];
+  readonly selectedSprintIdx: number | null;
 }
 
 export type TuiPanelId =
@@ -113,6 +139,17 @@ export const PANEL_FOCUS_ORDER: readonly TuiPanelId[] = [
 ];
 
 export const DEFAULT_AGENT_DECISION_BUFFER = 200;
+export const DEFAULT_AGENT_LOG_BUFFER = 120;
+
+export const PIPELINE_STAGE_ORDER: readonly PipelineStageName[] = [
+  'discovering',
+  'planning',
+  'architecting',
+  'contracting',
+  'generating',
+  'evaluating',
+  'merging',
+];
 
 export function createInitialTuiState(
   overrides: Partial<TuiState> = {},
@@ -133,18 +170,21 @@ export function createInitialTuiState(
       sprintIdx: null,
       retryCount: 0,
       error: null,
+      history: [],
     },
     sprints: [],
     agent: {
       activeAgentId: null,
       lastDelta: '',
       decisions: [],
+      messageLog: [],
       error: null,
     },
     sensors: {},
     focus: {
       panelId: 'pipeline',
       overlayStack: [],
+      selectedSprintIdx: null,
     },
     diffPreview: { mode: 'diff' },
     colorMode: 'color',
@@ -202,4 +242,107 @@ export function createTuiStore(
       };
     },
   };
+}
+
+export type TuiStageStatusMap = Readonly<
+  Record<PipelineStageName, TuiStageStatus>
+>;
+
+export type TuiStageDurationMap = Readonly<
+  Record<PipelineStageName, number | null>
+>;
+
+export function computeStageStatuses(
+  pipeline: TuiPipelineState,
+  sprints: readonly TuiSprintState[],
+): TuiStageStatusMap {
+  const statuses: Record<PipelineStageName, TuiStageStatus> = {
+    discovering: 'pending',
+    planning: 'pending',
+    architecting: 'pending',
+    contracting: 'pending',
+    generating: 'pending',
+    evaluating: 'pending',
+    merging: 'pending',
+  };
+
+  const currentIndex =
+    pipeline.stage === null
+      ? -1
+      : PIPELINE_STAGE_ORDER.indexOf(pipeline.stage);
+
+  if (currentIndex !== -1) {
+    for (let i = 0; i < currentIndex; i += 1) {
+      const stage = PIPELINE_STAGE_ORDER[i];
+      if (stage) {
+        statuses[stage] = 'passed';
+      }
+    }
+  }
+
+  for (const record of pipeline.history) {
+    if (record.endedAt !== null) {
+      statuses[record.stage] = 'passed';
+    }
+  }
+
+  if (pipeline.stage !== null) {
+    const hasEscalated = sprints.some(
+      (sprint) => sprint.status === 'escalated',
+    );
+    if (pipeline.status === 'failed') {
+      statuses[pipeline.stage] = 'failed';
+    } else if (pipeline.status === 'paused') {
+      statuses[pipeline.stage] = 'paused';
+    } else if (hasEscalated && pipeline.status === 'running') {
+      statuses[pipeline.stage] = 'escalated';
+    } else if (pipeline.status === 'running') {
+      statuses[pipeline.stage] = 'running';
+    } else if (pipeline.status === 'completed') {
+      statuses[pipeline.stage] = 'passed';
+    }
+  }
+
+  if (pipeline.status === 'completed') {
+    for (const stage of PIPELINE_STAGE_ORDER) {
+      if (statuses[stage] === 'running') {
+        statuses[stage] = 'passed';
+      }
+    }
+  }
+
+  return statuses;
+}
+
+export function computeStageDurations(
+  pipeline: TuiPipelineState,
+): TuiStageDurationMap {
+  const durations: Record<PipelineStageName, number | null> = {
+    discovering: null,
+    planning: null,
+    architecting: null,
+    contracting: null,
+    generating: null,
+    evaluating: null,
+    merging: null,
+  };
+
+  for (const record of pipeline.history) {
+    if (record.endedAt === null) {
+      continue;
+    }
+    const elapsed = record.endedAt - record.startedAt;
+    const existing = durations[record.stage];
+    durations[record.stage] = existing === null ? elapsed : existing + elapsed;
+  }
+
+  return durations;
+}
+
+export function selectStageStatuses(state: TuiState): TuiStageStatusMap {
+  return computeStageStatuses(state.pipeline, state.sprints);
+}
+
+export function selectStageDurations(state: TuiState): TuiStageDurationMap {
+  return computeStageDurations(state.pipeline);
 }
