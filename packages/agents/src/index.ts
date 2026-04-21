@@ -48,11 +48,30 @@ export {
 } from './built-in.js';
 
 export {
+  ARCHITECT_FEW_SHOT_EXAMPLES,
+  resolvedArchitectSystemPrompt,
+} from './architect/calibration.js';
+export { ARCHITECT_SYSTEM_PROMPT } from './architect/system-prompt.js';
+export {
+  architectModelOutputSchema,
+  finalizeArchitectOutput,
+  type ArchitectModelOutput,
+  type ArchitectPipelineResult,
+} from './architect/architect-output.schema.js';
+export {
+  architectNotesForPlanEmbed,
+  renderArchitectNotesMarkdown,
+} from './architect/format-notes.js';
+export {
   PLANNER_FEW_SHOT_EXAMPLES,
   resolvedPlannerSystemPrompt,
 } from './planner/calibration.js';
 export { PLANNER_SYSTEM_PROMPT } from './planner/system-prompt.js';
-export { createPlannerToolSet } from './planner/tools.js';
+export {
+  createArchitectToolSet,
+  createPlannerToolSet,
+  summarizeDependencies,
+} from './repo-tools.js';
 export {
   isPlannerEscalation,
   plannerModelOutputSchema,

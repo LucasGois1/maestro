@@ -1,16 +1,20 @@
 import { z } from 'zod';
 
 import type { AgentDefinition } from './definition.js';
+import { architectModelOutputSchema } from './architect/architect-output.schema.js';
+import { ARCHITECT_FEW_SHOT_EXAMPLES as ARCHITECT_CALIBRATION } from './architect/calibration.js';
+import { ARCHITECT_SYSTEM_PROMPT } from './architect/system-prompt.js';
 import { PLANNER_FEW_SHOT_EXAMPLES } from './planner/calibration.js';
 import { plannerModelOutputSchema } from './planner/plan-output.schema.js';
 import { PLANNER_SYSTEM_PROMPT } from './planner/system-prompt.js';
 
 const textInputSchema = z.object({ prompt: z.string().min(1) });
 
-const architectOutputSchema = z.object({
-  approved: z.boolean(),
-  violations: z.array(z.string()).default([]),
-  notes: z.string().optional(),
+const architectInputSchema = z.object({
+  plan: z.unknown(),
+  architecture: z.string().min(1),
+  sprint: z.unknown(),
+  sprintIdx: z.number().int().nonnegative(),
 });
 
 const generatorOutputSchema = z.object({
@@ -160,19 +164,25 @@ export const plannerAgent: AgentDefinition<
 };
 
 export const architectAgent: AgentDefinition<
-  { plan: unknown; architecture: string },
-  z.infer<typeof architectOutputSchema>
+  z.infer<typeof architectInputSchema>,
+  z.infer<typeof architectModelOutputSchema>
 > = {
   id: 'architect',
   role: 'pipeline',
   stage: 2,
-  systemPrompt:
-    'You are the Maestro Architect. Validate the provided plan against ARCHITECTURE.md. Respond with a JSON object {approved, violations[], notes?}.',
-  inputSchema: z.object({
-    plan: z.unknown(),
-    architecture: z.string(),
-  }),
-  outputSchema: architectOutputSchema,
+  systemPrompt: ARCHITECT_SYSTEM_PROMPT,
+  inputSchema: architectInputSchema,
+  outputSchema: architectModelOutputSchema,
+  tools: [
+    'readKB',
+    'listDirectory',
+    'searchCode',
+    'readFile',
+    'getDependencies',
+  ],
+  calibration: {
+    fewShotExamples: ARCHITECT_CALIBRATION,
+  },
 };
 
 export const generatorAgent: AgentDefinition<

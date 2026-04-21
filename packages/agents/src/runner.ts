@@ -12,9 +12,13 @@ import type {
   AgentDefinition,
   AnyAgentDefinition,
 } from './definition.js';
+import { generateText, stepCountIs, type ToolSet } from 'ai';
+
 import { appendCalibrationSection } from './calibration-format.js';
-import { createPlannerToolSet } from './planner/tools.js';
-import { generateText, stepCountIs } from 'ai';
+import {
+  createArchitectToolSet,
+  createPlannerToolSet,
+} from './repo-tools.js';
 
 function formatZodIssues(issues: readonly ZodIssue[]): string {
   return issues
@@ -150,7 +154,7 @@ function stringifyInput(input: unknown): string {
   return JSON.stringify(input, null, 2);
 }
 
-async function generatePlannerAgentText(options: {
+async function generateToolAugmentedAgentText(options: {
   readonly model: LanguageModelV3;
   readonly system: string;
   readonly prompt: string;
@@ -158,14 +162,15 @@ async function generatePlannerAgentText(options: {
   readonly agentId: string;
   readonly runId: string;
   readonly workingDir: string;
+  readonly tools: ToolSet;
+  readonly maxSteps: number;
 }): Promise<string> {
-  const tools = createPlannerToolSet(options.workingDir);
   const gen = await generateText({
     model: options.model,
     system: options.system,
     prompt: options.prompt,
-    tools,
-    stopWhen: stepCountIs(12),
+    tools: options.tools,
+    stopWhen: stepCountIs(options.maxSteps),
     experimental_onToolCallStart: ({ toolCall }) => {
       options.bus.emit({
         type: 'agent.tool_call',
@@ -248,8 +253,21 @@ export async function runAgent<TInput, TOutput>(
 
     let text = '';
 
-    if (definition.id === 'planner') {
-      text = await generatePlannerAgentText({
+    const toolAugmented =
+      definition.id === 'planner'
+        ? {
+            tools: createPlannerToolSet(context.workingDir),
+            maxSteps: 12,
+          }
+        : definition.id === 'architect'
+          ? {
+              tools: createArchitectToolSet(context.workingDir),
+              maxSteps: 12,
+            }
+          : null;
+
+    if (toolAugmented) {
+      text = await generateToolAugmentedAgentText({
         model,
         system,
         prompt,
@@ -257,6 +275,8 @@ export async function runAgent<TInput, TOutput>(
         agentId: definition.id,
         runId: context.runId,
         workingDir: context.workingDir,
+        tools: toolAugmented.tools,
+        maxSteps: toolAugmented.maxSteps,
       });
     } else {
       const result = streamText({

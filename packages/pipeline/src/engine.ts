@@ -1,10 +1,14 @@
 import {
   architectAgent,
+  architectModelOutputSchema,
+  architectNotesForPlanEmbed,
   evaluatorAgent,
+  finalizeArchitectOutput,
   generatorAgent,
   mergerAgent,
   normalizePlannerModelOutput,
   plannerAgent,
+  renderArchitectNotesMarkdown,
   type AgentContext,
   type AgentDefinition,
   type AgentRegistry,
@@ -24,6 +28,11 @@ import { dirname, join } from 'node:path';
 import type { AgentExecutor } from './executor.js';
 import { defaultAgentExecutor } from './executor.js';
 import { PipelineEscalationError, PipelinePauseError } from './errors.js';
+import {
+  loadArchitectureDocument,
+  patchPlanFileWithArchitectNotes,
+  writeDesignNotesSprintFile,
+} from './plan-architect-notes.js';
 import { serializePlanMarkdown } from './plan-markdown.js';
 
 export const DEFAULT_RETRIES = 3;
@@ -227,6 +236,12 @@ export async function runPipeline(
     });
     await writePlanFile(options.repoRoot, options.runId, plan, maestroDir);
 
+    const architectureDoc = await loadArchitectureDocument(
+      options.repoRoot,
+      options.architecture,
+      maestroDir,
+    );
+
     // per-sprint loop
     for (let sprintIdx = 0; sprintIdx < plan.sprints.length; sprintIdx += 1) {
       assertNotAborted(options.abortSignal, 'architecting');
@@ -244,13 +259,67 @@ export async function runPipeline(
         currentSprintIdx: sprintIdx,
       });
       const architect = resolveAgent(options.registry, architectAgent);
-      await executor({
+      const rawArchitect = await executor({
         definition: architect,
-        input: { plan, architecture: options.architecture ?? '' },
+        input: {
+          plan,
+          architecture: architectureDoc,
+          sprint,
+          sprintIdx,
+        },
         context: contextFor('architect', options.runId, options.repoRoot),
         bus: options.bus,
         config: options.config,
       });
+      const parsedArchitect = architectModelOutputSchema.parse(rawArchitect);
+      const architectResult = finalizeArchitectOutput(parsedArchitect);
+      if (architectResult.sprintIdx !== sprint.idx) {
+        options.bus.emit({
+          type: 'agent.decision',
+          agentId: 'architect',
+          runId: options.runId,
+          message: `Architect sprintIdx ${architectResult.sprintIdx.toString()} != plan sprint.idx ${sprint.idx.toString()}; using plan idx for artifacts.`,
+        });
+      }
+      const designDoc = renderArchitectNotesMarkdown(architectResult, sprint.name);
+      await writeDesignNotesSprintFile(
+        options.repoRoot,
+        options.runId,
+        sprint.idx,
+        designDoc,
+        maestroDir,
+      );
+      const embed = architectNotesForPlanEmbed(architectResult, sprint.name);
+      await patchPlanFileWithArchitectNotes(
+        options.repoRoot,
+        options.runId,
+        sprint.idx,
+        embed,
+        maestroDir,
+      );
+      if (!architectResult.approved) {
+        const reason =
+          architectResult.escalation?.reason ??
+          architectResult.boundaryNotes ??
+          architectResult.boundaryCheck;
+        options.bus.emit({
+          type: 'pipeline.sprint_escalated',
+          runId: options.runId,
+          sprintIdx,
+          reason: `Architect: ${reason}`,
+        });
+        await options.store.update(options.runId, {
+          phase: 'escalated',
+          status: 'paused',
+          escalation: { sprintIdx, reason: `Architect: ${reason}` },
+          pausedAt: new Date().toISOString(),
+        });
+        throw new PipelineEscalationError(
+          `Sprint ${sprintIdx + 1} blocked by Architect: ${reason}`,
+          sprintIdx,
+          reason,
+        );
+      }
 
       // contracting (minimal: seed a contract file; negotiation comes when we wire contract pkg in v0.2)
       assertNotAborted(options.abortSignal, 'contracting');

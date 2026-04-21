@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -7,7 +7,7 @@ import { createEventBus, type MaestroEvent } from '@maestro/core';
 import { createStateStore } from '@maestro/state';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { PlannerModelOutput } from '@maestro/agents';
+import type { ArchitectModelOutput, PlannerModelOutput } from '@maestro/agents';
 
 import { runPipeline, type PlannerOutput } from './engine.js';
 import { PipelineEscalationError, PipelinePauseError } from './errors.js';
@@ -57,6 +57,47 @@ const plannerModelOutput: PlannerModelOutput = {
   ],
 };
 
+/** Three sprints for architect integration coverage. */
+const plannerModelOutputThreeSprints: PlannerModelOutput = {
+  feature: 'Payments',
+  overview: 'End-to-end payments.',
+  userStories: [
+    { id: 1, role: 'user', action: 'pay', value: 'checkout' },
+    { id: 2, role: 'admin', action: 'reconcile', value: 'reports' },
+    { id: 3, role: 'ops', action: 'audit', value: 'compliance' },
+  ],
+  aiFeatures: [],
+  sprints: [
+    {
+      idx: 1,
+      name: 'Checkout API',
+      objective: 'API',
+      userStoryIds: [1],
+      dependsOn: [],
+      complexity: 'medium',
+      keyFeatures: ['API'],
+    },
+    {
+      idx: 2,
+      name: 'Reconciliation',
+      objective: 'Recon',
+      userStoryIds: [2],
+      dependsOn: [1],
+      complexity: 'high',
+      keyFeatures: ['Batch'],
+    },
+    {
+      idx: 3,
+      name: 'Audit log',
+      objective: 'Audit',
+      userStoryIds: [3],
+      dependsOn: [2],
+      complexity: 'low',
+      keyFeatures: ['Log'],
+    },
+  ],
+};
+
 function expectNormalizedPlan(p: PlannerOutput): void {
   expect(p.sprints.length).toBe(2);
   expect(p.summary.length).toBeGreaterThan(0);
@@ -64,7 +105,24 @@ function expectNormalizedPlan(p: PlannerOutput): void {
 
 beforeEach(async () => {
   repoRoot = await mkdtemp(join(tmpdir(), 'maestro-pipeline-'));
+  await mkdir(join(repoRoot, '.maestro'), { recursive: true });
+  await writeFile(
+    join(repoRoot, '.maestro', 'ARCHITECTURE.md'),
+    '# Architecture\n\nModule boundaries and layers as documented.\n',
+    'utf8',
+  );
 });
+
+function mockArchitectOk(input: unknown): ArchitectModelOutput {
+  const i = input as { sprint: { idx: number } };
+  return {
+    sprintIdx: i.sprint.idx,
+    scopeTecnico: { newFiles: [], filesToTouch: [], testFiles: [] },
+    patternsToFollow: ['Follow repo conventions.'],
+    libraries: [],
+    boundaryCheck: 'ok',
+  };
+}
 
 afterEach(async () => {
   await rm(repoRoot, { recursive: true, force: true });
@@ -96,7 +154,7 @@ describe('runPipeline (happy path)', () => {
 
     const executor = buildExecutor({
       planner: () => plannerModelOutput,
-      architect: () => ({ approved: true, violations: [] }),
+      architect: (input) => mockArchitectOk(input),
       generator: () => ({
         summary: 'done',
         changedFiles: ['a.ts'],
@@ -140,6 +198,18 @@ describe('runPipeline (happy path)', () => {
     expect(planText).toContain('run_id');
     expect(planText).toContain('Auth');
     expect(planText).toContain('## User stories principais');
+    expect(planText).toContain('### Architect notes');
+    expect(planText).toContain('## Boundary check');
+
+    const dn1 = join(
+      repoRoot,
+      '.maestro',
+      'runs',
+      'r1',
+      'design-notes',
+      'design-notes-sprint-1.md',
+    );
+    await expect(readFile(dn1, 'utf8')).resolves.toContain('Design notes');
 
     const contractPath = join(
       repoRoot,
@@ -163,6 +233,59 @@ describe('runPipeline (happy path)', () => {
       /Sprint 1 — Handoff/,
     );
   });
+
+  it('runs architect for three sprints and writes three design-note files', async () => {
+    const env = makeEnv();
+    const executor = buildExecutor({
+      planner: () => plannerModelOutputThreeSprints,
+      architect: (input) => mockArchitectOk(input),
+      generator: () => ({
+        summary: 'done',
+        changedFiles: ['a.ts'],
+        followUps: [],
+      }),
+      evaluator: () => ({ pass: true, failures: [] }),
+      merger: () => ({ branch: 'maestro/demo', summary: 'ok' }),
+    });
+
+    await runPipeline({
+      runId: 'r3',
+      prompt: 'payments',
+      branch: 'maestro/demo',
+      worktreePath: repoRoot,
+      repoRoot,
+      store: env.store,
+      bus: env.bus,
+      config: env.config,
+      executor,
+    });
+
+    for (const n of [1, 2, 3]) {
+      const p = join(
+        repoRoot,
+        '.maestro',
+        'runs',
+        'r3',
+        'design-notes',
+        `design-notes-sprint-${n.toString()}.md`,
+      );
+      await expect(readFile(p, 'utf8')).resolves.toContain('Design notes');
+    }
+
+    const planPath = join(repoRoot, '.maestro', 'runs', 'r3', 'plan.md');
+    const planText = await readFile(planPath, 'utf8');
+    const architectNoteHeadings = planText.match(/### Architect notes/gu);
+    expect(architectNoteHeadings?.length).toBe(3);
+    expect(planText).toMatch(
+      /### Sprint 1 — Checkout API[\s\S]*?### Architect notes/u,
+    );
+    expect(planText).toMatch(
+      /### Sprint 2 — Reconciliation[\s\S]*?### Architect notes/u,
+    );
+    expect(planText).toMatch(
+      /### Sprint 3 — Audit log[\s\S]*?### Architect notes/u,
+    );
+  });
 });
 
 describe('runPipeline (retry + escalation)', () => {
@@ -172,7 +295,7 @@ describe('runPipeline (retry + escalation)', () => {
 
     const executor = buildExecutor({
       planner: () => plannerModelOutput,
-      architect: () => ({ approved: true, violations: [] }),
+      architect: (input) => mockArchitectOk(input),
       generator: () => {
         attemptsBySprint[0] = (attemptsBySprint[0] ?? 0) + 1;
         return { summary: '', changedFiles: [], followUps: [] };
@@ -220,9 +343,9 @@ describe('runPipeline (graceful pause)', () => {
 
     const executor = buildExecutor({
       planner: () => plannerModelOutput,
-      architect: () => {
+      architect: (input) => {
         controller.abort();
-        return { approved: true, violations: [] };
+        return mockArchitectOk(input);
       },
       generator: () => ({
         summary: '',
@@ -262,9 +385,9 @@ describe('resumePipeline', () => {
 
     const firstExecutor = buildExecutor({
       planner: () => plannerModelOutput,
-      architect: () => {
+      architect: (input) => {
         controller.abort();
-        return { approved: true, violations: [] };
+        return mockArchitectOk(input);
       },
       generator: () => ({ summary: '', changedFiles: [], followUps: [] }),
       evaluator: () => ({ pass: true, failures: [] }),
@@ -292,7 +415,7 @@ describe('resumePipeline', () => {
 
     const finishExecutor = buildExecutor({
       planner: () => plannerModelOutput,
-      architect: () => ({ approved: true, violations: [] }),
+      architect: (input) => mockArchitectOk(input),
       generator: () => ({ summary: '', changedFiles: [], followUps: [] }),
       evaluator: () => ({ pass: true, failures: [] }),
       merger: () => ({ branch: 'x', summary: 'y' }),
