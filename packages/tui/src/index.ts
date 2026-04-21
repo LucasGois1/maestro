@@ -12,6 +12,8 @@ export {
   createTuiStore,
   DEFAULT_AGENT_DECISION_BUFFER,
   DEFAULT_AGENT_LOG_BUFFER,
+  DEFAULT_DIFF_VIEWPORT_LINES,
+  DEFAULT_FEEDBACK_HISTORY_CAP,
   PANEL_FOCUS_ORDER,
   PIPELINE_STAGE_ORDER,
   selectStageDurations,
@@ -22,6 +24,7 @@ export {
   type TuiAgentState,
   type TuiColorMode,
   type TuiDiffPreviewState,
+  type TuiFeedbackEntry,
   type TuiFocusState,
   type TuiHeaderState,
   type TuiMode,
@@ -75,6 +78,17 @@ export {
   AgentLogOverlay,
   createAgentLogOverlay,
 } from './panels/AgentLogOverlay.js';
+export {
+  FEEDBACK_HISTORY_OVERLAY_ID,
+  FeedbackHistoryOverlay,
+  createFeedbackHistoryOverlay,
+} from './panels/FeedbackHistoryOverlay.js';
+export {
+  SENSORS_DETAIL_OVERLAY_ID,
+  SensorsDetailOverlay,
+  createSensorsDetailOverlay,
+} from './panels/SensorsDetailOverlay.js';
+export { diffLineInkProps, sliceDiffWindow } from './panels/diffLineStyle.js';
 export {
   SPRINT_ICONS,
   STAGE_ICONS,

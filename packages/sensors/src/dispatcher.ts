@@ -63,6 +63,16 @@ export async function dispatchSensors(
   let nextIndex = 0;
   const running = new Set<Promise<void>>();
 
+  for (const sensor of runnable) {
+    options.bus.emit({
+      type: 'sensor.registered',
+      runId: options.runId,
+      sensorId: sensor.id,
+      kind: sensor.kind,
+      onFail: sensor.onFail,
+    });
+  }
+
   const launch = (sensor: SensorDefinition, index: number) => {
     const task = runSensor(sensor, {
       runId: options.runId,

@@ -27,6 +27,14 @@ import {
   createAgentLogOverlay,
 } from './panels/AgentLogOverlay.js';
 import { DiffPreviewPanel } from './panels/DiffPreviewPanel.js';
+import {
+  FEEDBACK_HISTORY_OVERLAY_ID,
+  createFeedbackHistoryOverlay,
+} from './panels/FeedbackHistoryOverlay.js';
+import {
+  SENSORS_DETAIL_OVERLAY_ID,
+  createSensorsDetailOverlay,
+} from './panels/SensorsDetailOverlay.js';
 import { nextPanelId, previousPanelId } from './panels/PanelId.js';
 import { PipelinePanel } from './panels/PipelinePanel.js';
 import { SensorsPanel } from './panels/SensorsPanel.js';
@@ -188,6 +196,91 @@ function AppShell({ store }: { readonly store: TuiStore }) {
     { kind: 'panel', panelId: 'activeAgent' },
     { key: 'l' },
     openAgentLog,
+  );
+
+  const openSensorsDetail = useCallback(() => {
+    const alreadyOpen = overlayHost.overlays.some(
+      (overlay) => overlay.id === SENSORS_DETAIL_OVERLAY_ID,
+    );
+    if (alreadyOpen) {
+      return;
+    }
+    overlayHost.push(
+      createSensorsDetailOverlay(store.getState().sensors, colorMode),
+    );
+  }, [colorMode, overlayHost, store]);
+
+  useKeybinding(
+    { kind: 'panel', panelId: 'sensors' },
+    { key: 's' },
+    openSensorsDetail,
+  );
+
+  const cycleDiffFile = useCallback(() => {
+    store.setState((state) => {
+      const dp = state.diffPreview;
+      const paths =
+        dp.changedPaths.length > 0
+          ? dp.changedPaths
+          : dp.activePath
+            ? [dp.activePath]
+            : [];
+      if (paths.length === 0) {
+        return state;
+      }
+      const nextIdx = (dp.activeIndex + 1) % paths.length;
+      const nextPath = paths[nextIdx];
+      if (nextPath === undefined) {
+        return state;
+      }
+      const nextUnified = dp.diffByPath[nextPath] ?? '';
+      return {
+        ...state,
+        diffPreview: {
+          ...dp,
+          mode: 'diff',
+          activeIndex: nextIdx,
+          activePath: nextPath,
+          unifiedDiff: nextUnified,
+        },
+      };
+    });
+  }, [store]);
+
+  const setDiffPreviewMode = useCallback(
+    (mode: 'preview' | 'feedback') => {
+      store.setState((state) => ({
+        ...state,
+        diffPreview: { ...state.diffPreview, mode },
+      }));
+    },
+    [store],
+  );
+
+  const openFeedbackHistory = useCallback(() => {
+    const alreadyOpen = overlayHost.overlays.some(
+      (overlay) => overlay.id === FEEDBACK_HISTORY_OVERLAY_ID,
+    );
+    if (alreadyOpen) {
+      return;
+    }
+    setDiffPreviewMode('feedback');
+    overlayHost.push(
+      createFeedbackHistoryOverlay(
+        store.getState().diffPreview.feedbackHistory,
+        colorMode,
+      ),
+    );
+  }, [colorMode, overlayHost, setDiffPreviewMode, store]);
+
+  useKeybinding({ kind: 'panel', panelId: 'diff' }, { key: 'd' }, cycleDiffFile);
+  useKeybinding({ kind: 'panel', panelId: 'diff' }, { key: 'p' }, () => {
+    setDiffPreviewMode('preview');
+  });
+  useKeybinding(
+    { kind: 'panel', panelId: 'diff' },
+    { key: 'r' },
+    openFeedbackHistory,
   );
 
   return (

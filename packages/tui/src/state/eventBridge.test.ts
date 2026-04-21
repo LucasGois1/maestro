@@ -17,6 +17,29 @@ describe('bridgeBusToStore', () => {
       expect(state.mode).toBe('run');
       expect(state.pipeline.status).toBe('running');
       expect(state.pipeline.error).toBeNull();
+      expect(state.diffPreview.unifiedDiff).toBe('');
+      expect(state.diffPreview.feedbackHistory).toEqual([]);
+    });
+
+    it('sets diffPreview mode from pipeline.stage_entered', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({ type: 'pipeline.started', runId: 'r1' });
+      bus.emit({
+        type: 'pipeline.stage_entered',
+        runId: 'r1',
+        stage: 'generating',
+      });
+      expect(store.getState().diffPreview.mode).toBe('diff');
+
+      bus.emit({
+        type: 'pipeline.stage_entered',
+        runId: 'r1',
+        stage: 'evaluating',
+      });
+      expect(store.getState().diffPreview.mode).toBe('preview');
     });
 
     it('tracks stage and sprint progression', () => {
@@ -403,6 +426,25 @@ describe('bridgeBusToStore', () => {
       expect(sensor?.kind).toBe('computational');
       expect(sensor?.status).toBe('passed');
       expect(sensor?.message).toBe('linting…');
+      expect(sensor?.durationMs).toBe(30);
+      expect(sensor?.onFail).toBeNull();
+    });
+
+    it('records sensor.registered as queued with onFail', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({
+        type: 'sensor.registered',
+        sensorId: 'pytest',
+        runId: 'r',
+        kind: 'computational',
+        onFail: 'block',
+      });
+
+      expect(store.getState().sensors['pytest']?.status).toBe('queued');
+      expect(store.getState().sensors['pytest']?.onFail).toBe('block');
     });
 
     it('records sensor failures with error message', () => {
@@ -441,6 +483,51 @@ describe('bridgeBusToStore', () => {
       });
 
       expect(store.getState().sensors['ghost']).toBeUndefined();
+    });
+  });
+
+  describe('context events', () => {
+    it('merges artifact.diff_updated into diffPreview', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({
+        type: 'artifact.diff_updated',
+        runId: 'r',
+        activePath: 'src/a.ts',
+        unifiedDiff: '+line',
+        changedPaths: ['src/a.ts', 'src/b.ts'],
+        activeIndex: 0,
+      });
+
+      const dp = store.getState().diffPreview;
+      expect(dp.mode).toBe('diff');
+      expect(dp.activePath).toBe('src/a.ts');
+      expect(dp.unifiedDiff).toBe('+line');
+      expect(dp.changedPaths).toEqual(['src/a.ts', 'src/b.ts']);
+      expect(dp.diffByPath['src/a.ts']).toBe('+line');
+    });
+
+    it('appends evaluator.feedback and switches mode', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({
+        type: 'evaluator.feedback',
+        runId: 'r',
+        criterion: 'security',
+        failure: 'missing check',
+        file: 'x.ts',
+        line: 10,
+        suggestedAction: 'add guard',
+      });
+
+      const dp = store.getState().diffPreview;
+      expect(dp.mode).toBe('feedback');
+      expect(dp.feedback?.criterion).toBe('security');
+      expect(dp.feedbackHistory).toHaveLength(1);
     });
   });
 

@@ -1,5 +1,6 @@
 import type {
   AgentEvent,
+  ContextEvent,
   EventBus,
   MaestroEvent,
   PipelineEvent,
@@ -8,11 +9,13 @@ import type {
 
 import type {
   TuiAgentLogEntry,
+  TuiFeedbackEntry,
   TuiSensorStatus,
   TuiSprintState,
   TuiStageRecord,
   TuiStore,
 } from './store.js';
+import { DEFAULT_FEEDBACK_HISTORY_CAP } from './store.js';
 
 export interface BridgeBusOptions {
   readonly agentDeltaBufferChars?: number;
@@ -61,6 +64,10 @@ function handleEvent(
     handleAgentEvent(event, store, config);
     return;
   }
+  if (isContextEvent(event)) {
+    handleContextEvent(event, store, config);
+    return;
+  }
   handleSensorEvent(event, store);
 }
 
@@ -70,6 +77,12 @@ function isPipelineEvent(event: MaestroEvent): event is PipelineEvent {
 
 function isAgentEvent(event: MaestroEvent): event is AgentEvent {
   return event.type.startsWith('agent.');
+}
+
+function isContextEvent(event: MaestroEvent): event is ContextEvent {
+  return (
+    event.type === 'artifact.diff_updated' || event.type === 'evaluator.feedback'
+  );
 }
 
 function closeOpenStage(
@@ -114,6 +127,16 @@ function handlePipelineEvent(
           retryCount: 0,
           history: [],
         },
+        diffPreview: {
+          mode: 'diff',
+          activePath: null,
+          unifiedDiff: '',
+          changedPaths: [],
+          activeIndex: 0,
+          diffByPath: {},
+          feedback: null,
+          feedbackHistory: [],
+        },
       }));
       return;
     case 'pipeline.stage_entered':
@@ -125,6 +148,12 @@ function handlePipelineEvent(
           startedAt: now,
           endedAt: null,
         });
+        const nextDiffMode =
+          event.stage === 'generating'
+            ? ('diff' as const)
+            : event.stage === 'evaluating'
+              ? ('preview' as const)
+              : state.diffPreview.mode;
         return {
           ...state,
           pipeline: {
@@ -137,6 +166,10 @@ function handlePipelineEvent(
             event.sprintIdx === undefined
               ? state.header
               : { ...state.header, sprintIdx: event.sprintIdx },
+          diffPreview: {
+            ...state.diffPreview,
+            mode: nextDiffMode,
+          },
         };
       });
       return;
@@ -383,9 +416,71 @@ function handleAgentEvent(
   }
 }
 
+function handleContextEvent(
+  event: ContextEvent,
+  store: TuiStore,
+  config: InternalConfig,
+): void {
+  if (event.type === 'artifact.diff_updated') {
+    store.setState((state) => {
+      const paths =
+        event.changedPaths.length > 0
+          ? event.changedPaths
+          : event.activePath
+            ? [event.activePath]
+            : state.diffPreview.changedPaths;
+      const nextDiffByPath = {
+        ...state.diffPreview.diffByPath,
+        [event.activePath]: event.unifiedDiff,
+      };
+      return {
+        ...state,
+        diffPreview: {
+          ...state.diffPreview,
+          mode: 'diff',
+          activePath: event.activePath,
+          unifiedDiff: event.unifiedDiff,
+          changedPaths: paths,
+          activeIndex: event.activeIndex,
+          diffByPath: nextDiffByPath,
+        },
+      };
+    });
+    return;
+  }
+
+  if (event.type === 'evaluator.feedback') {
+    store.setState((state) => {
+      const at = config.clock();
+      const entry: TuiFeedbackEntry = {
+        at,
+        criterion: event.criterion,
+        failure: event.failure,
+        file: event.file ?? null,
+        line: event.line ?? null,
+        suggestedAction: event.suggestedAction ?? null,
+      };
+      const history = [...state.diffPreview.feedbackHistory, entry];
+      const capped =
+        history.length > DEFAULT_FEEDBACK_HISTORY_CAP
+          ? history.slice(history.length - DEFAULT_FEEDBACK_HISTORY_CAP)
+          : history;
+      return {
+        ...state,
+        diffPreview: {
+          ...state.diffPreview,
+          mode: 'feedback',
+          feedback: entry,
+          feedbackHistory: capped,
+        },
+      };
+    });
+  }
+}
+
 function handleSensorEvent(event: SensorEvent, store: TuiStore): void {
   switch (event.type) {
-    case 'sensor.started':
+    case 'sensor.registered':
       store.setState((state) => ({
         ...state,
         sensors: {
@@ -393,11 +488,33 @@ function handleSensorEvent(event: SensorEvent, store: TuiStore): void {
           [event.sensorId]: {
             sensorId: event.sensorId,
             kind: event.kind,
-            status: 'running',
+            status: 'queued',
             message: null,
+            durationMs: null,
+            onFail: event.onFail,
           },
         },
       }));
+      return;
+    case 'sensor.started':
+      store.setState((state) => {
+        const previous = state.sensors[event.sensorId];
+        const onFail = event.onFail ?? previous?.onFail ?? null;
+        return {
+          ...state,
+          sensors: {
+            ...state.sensors,
+            [event.sensorId]: {
+              sensorId: event.sensorId,
+              kind: event.kind,
+              status: 'running',
+              message: null,
+              durationMs: null,
+              onFail,
+            },
+          },
+        };
+      });
       return;
     case 'sensor.progress':
       store.setState((state) => {
@@ -425,12 +542,18 @@ function handleSensorEvent(event: SensorEvent, store: TuiStore): void {
             kind: 'computational',
             status: 'running',
             message: null,
+            durationMs: null,
+            onFail: null,
           } as const);
         return {
           ...state,
           sensors: {
             ...state.sensors,
-            [event.sensorId]: { ...base, status: nextStatus },
+            [event.sensorId]: {
+              ...base,
+              status: nextStatus,
+              durationMs: event.durationMs,
+            },
           },
         };
       });
@@ -445,6 +568,8 @@ function handleSensorEvent(event: SensorEvent, store: TuiStore): void {
             kind: 'computational',
             status: 'error',
             message: null,
+            durationMs: null,
+            onFail: null,
           } as const);
         return {
           ...state,
@@ -458,6 +583,7 @@ function handleSensorEvent(event: SensorEvent, store: TuiStore): void {
           },
         };
       });
+      return;
   }
 }
 

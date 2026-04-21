@@ -10,6 +10,7 @@ export type TuiPipelineStatus =
   | 'failed';
 
 export type TuiSensorStatus =
+  | 'queued'
   | 'running'
   | 'passed'
   | 'failed'
@@ -86,6 +87,8 @@ export interface TuiSensorState {
   readonly kind: 'computational' | 'inferential';
   readonly status: TuiSensorStatus;
   readonly message: string | null;
+  readonly durationMs: number | null;
+  readonly onFail: 'block' | 'warn' | null;
 }
 
 export interface TuiFocusState {
@@ -101,8 +104,25 @@ export type TuiPanelId =
   | 'sensors'
   | 'diff';
 
+export interface TuiFeedbackEntry {
+  readonly at: number;
+  readonly criterion: string;
+  readonly failure: string;
+  readonly file: string | null;
+  readonly line: number | null;
+  readonly suggestedAction: string | null;
+}
+
 export interface TuiDiffPreviewState {
   readonly mode: 'diff' | 'preview' | 'feedback';
+  readonly activePath: string | null;
+  /** Unified diff text for `activePath` (also keyed in `diffByPath`). */
+  readonly unifiedDiff: string;
+  readonly changedPaths: readonly string[];
+  readonly activeIndex: number;
+  readonly diffByPath: Readonly<Record<string, string>>;
+  readonly feedback: TuiFeedbackEntry | null;
+  readonly feedbackHistory: readonly TuiFeedbackEntry[];
 }
 
 export interface TuiState {
@@ -140,6 +160,8 @@ export const PANEL_FOCUS_ORDER: readonly TuiPanelId[] = [
 
 export const DEFAULT_AGENT_DECISION_BUFFER = 200;
 export const DEFAULT_AGENT_LOG_BUFFER = 120;
+export const DEFAULT_FEEDBACK_HISTORY_CAP = 24;
+export const DEFAULT_DIFF_VIEWPORT_LINES = 32;
 
 export const PIPELINE_STAGE_ORDER: readonly PipelineStageName[] = [
   'discovering',
@@ -186,7 +208,16 @@ export function createInitialTuiState(
       overlayStack: [],
       selectedSprintIdx: null,
     },
-    diffPreview: { mode: 'diff' },
+    diffPreview: {
+      mode: 'diff',
+      activePath: null,
+      unifiedDiff: '',
+      changedPaths: [],
+      activeIndex: 0,
+      diffByPath: {},
+      feedback: null,
+      feedbackHistory: [],
+    },
     colorMode: 'color',
     ...overrides,
   };

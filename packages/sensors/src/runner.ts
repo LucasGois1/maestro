@@ -207,6 +207,7 @@ async function runComputationalSensor(
     runId: context.runId,
     sensorId: sensor.id,
     kind: sensor.kind,
+    onFail: sensor.onFail,
   });
   context.bus.emit({
     type: 'sensor.progress',
@@ -343,6 +344,7 @@ async function runInferentialSensor(
     runId: context.runId,
     sensorId: sensor.id,
     kind: sensor.kind,
+    onFail: sensor.onFail,
   });
   context.bus.emit({
     type: 'sensor.progress',

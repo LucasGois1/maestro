@@ -7,6 +7,8 @@ export {
   type AgentEvent,
   type AgentEventListener,
   type AgentEventType,
+  type ContextEvent,
+  type ContextEventType,
   type EventBus,
   type MaestroEvent,
   type MaestroEventListener,

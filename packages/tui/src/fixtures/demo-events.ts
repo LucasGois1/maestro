@@ -130,12 +130,57 @@ export const DEMO_SCRIPT: readonly DemoStep[] = [
     },
   },
   {
-    delayMs: 40,
+    delayMs: 20,
+    event: {
+      type: 'artifact.diff_updated',
+      runId: RUN_ID,
+      activePath: 'auth/jwt.py',
+      unifiedDiff:
+        '--- a/auth/jwt.py\n+++ b/auth/jwt.py\n@@ -0,0 +1,4 @@\n+from jose import jwt\n+\n+async def verify(token: str) -> dict:\n+    return jwt.decode(token, key="secret", algorithms=["HS256"])\n',
+      changedPaths: ['auth/jwt.py', 'auth/middleware.py'],
+      activeIndex: 0,
+    },
+  },
+  {
+    delayMs: 30,
+    event: {
+      type: 'artifact.diff_updated',
+      runId: RUN_ID,
+      activePath: 'auth/middleware.py',
+      unifiedDiff:
+        '--- a/auth/middleware.py\n+++ b/auth/middleware.py\n@@ -1,2 +1,3 @@\n from starlette.middleware.base import BaseHTTPMiddleware\n+from .jwt import verify\n',
+      changedPaths: ['auth/jwt.py', 'auth/middleware.py'],
+      activeIndex: 1,
+    },
+  },
+  {
+    delayMs: 20,
+    event: {
+      type: 'sensor.registered',
+      runId: RUN_ID,
+      sensorId: 'ruff',
+      kind: 'computational',
+      onFail: 'block',
+    },
+  },
+  {
+    delayMs: 10,
+    event: {
+      type: 'sensor.registered',
+      runId: RUN_ID,
+      sensorId: 'mypy',
+      kind: 'computational',
+      onFail: 'warn',
+    },
+  },
+  {
+    delayMs: 10,
     event: {
       type: 'sensor.started',
       runId: RUN_ID,
       sensorId: 'ruff',
       kind: 'computational',
+      onFail: 'block',
     },
   },
   {
@@ -155,6 +200,18 @@ export const DEMO_SCRIPT: readonly DemoStep[] = [
       runId: RUN_ID,
       stage: 'evaluating',
       sprintIdx: 1,
+    },
+  },
+  {
+    delayMs: 30,
+    event: {
+      type: 'evaluator.feedback',
+      runId: RUN_ID,
+      criterion: 'JWT must validate audience',
+      failure: 'Missing aud claim in verify()',
+      file: 'auth/jwt.py',
+      line: 47,
+      suggestedAction: 'Pass audience= to jwt.decode',
     },
   },
   {
@@ -198,6 +255,7 @@ export const DEMO_SCRIPT: readonly DemoStep[] = [
       runId: RUN_ID,
       sensorId: 'mypy',
       kind: 'computational',
+      onFail: 'warn',
     },
   },
   {

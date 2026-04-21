@@ -18,7 +18,7 @@ describe('App', () => {
     expect(frame).toContain('Pipeline');
     expect(frame).toContain('Active Agent');
     expect(frame).toContain('Sprints');
-    expect(frame).toContain('Sensors');
+    expect(frame).toContain('Sensores');
     expect(frame).toContain('Diff · Preview · Feedback');
     expect(frame).toContain('[i] init');
     app.unmount();
@@ -63,7 +63,7 @@ describe('App', () => {
       'Pipeline',
       'Active Agent',
       'Sprints',
-      'Sensors',
+      'Sensores',
       'Diff · Preview · Feedback',
     ].map((token) => frame.indexOf(token));
 
@@ -264,6 +264,67 @@ describe('App', () => {
     ]) {
       expect(frame).toContain(label);
     }
+    app.unmount();
+  });
+
+  it('opens sensors detail overlay with [s] when sensors panel is focused', async () => {
+    const store = createTuiStore();
+    const app = render(<App store={store} terminalSize={SIZE_WIDE} />);
+
+    act(() => {
+      store.setState((state) => ({
+        ...state,
+        focus: { ...state.focus, panelId: 'sensors' },
+        sensors: {
+          ruff: {
+            sensorId: 'ruff',
+            kind: 'computational',
+            status: 'passed',
+            message: null,
+            durationMs: 5,
+            onFail: 'block',
+          },
+        },
+      }));
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    app.stdin.write('s');
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    expect(app.lastFrame()).toContain('Sensores — detalhe');
+    app.unmount();
+  });
+
+  it('opens feedback history overlay with [r] when diff panel is focused', async () => {
+    const store = createTuiStore();
+    const app = render(<App store={store} terminalSize={SIZE_WIDE} />);
+
+    act(() => {
+      store.setState((state) => ({
+        ...state,
+        focus: { ...state.focus, panelId: 'diff' },
+        diffPreview: {
+          ...state.diffPreview,
+          feedbackHistory: [
+            {
+              at: 1,
+              criterion: 'c',
+              failure: 'f',
+              file: 'a.ts',
+              line: 2,
+              suggestedAction: null,
+            },
+          ],
+        },
+      }));
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    app.stdin.write('r');
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    expect(app.lastFrame()).toContain('Feedback — histórico');
     app.unmount();
   });
 });

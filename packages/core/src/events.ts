@@ -103,10 +103,18 @@ export type PipelineEvent =
 
 export type SensorEvent =
   | {
+      readonly type: 'sensor.registered';
+      readonly sensorId: string;
+      readonly runId: string;
+      readonly kind: 'computational' | 'inferential';
+      readonly onFail: 'block' | 'warn';
+    }
+  | {
       readonly type: 'sensor.started';
       readonly sensorId: string;
       readonly runId: string;
       readonly kind: 'computational' | 'inferential';
+      readonly onFail?: 'block' | 'warn';
     }
   | {
       readonly type: 'sensor.progress';
@@ -134,11 +142,32 @@ export type SensorEvent =
       readonly error: string;
     };
 
-export type MaestroEvent = AgentEvent | PipelineEvent | SensorEvent;
+/** Emitted by tooling / pipeline to drive the contextual diff · preview · feedback slot in the TUI. */
+export type ContextEvent =
+  | {
+      readonly type: 'artifact.diff_updated';
+      readonly runId: string;
+      readonly activePath: string;
+      readonly unifiedDiff: string;
+      readonly changedPaths: readonly string[];
+      readonly activeIndex: number;
+    }
+  | {
+      readonly type: 'evaluator.feedback';
+      readonly runId: string;
+      readonly criterion: string;
+      readonly failure: string;
+      readonly file?: string;
+      readonly line?: number;
+      readonly suggestedAction?: string;
+    };
+
+export type MaestroEvent = AgentEvent | PipelineEvent | SensorEvent | ContextEvent;
 
 export type AgentEventType = AgentEvent['type'];
 export type PipelineEventType = PipelineEvent['type'];
 export type SensorEventType = SensorEvent['type'];
+export type ContextEventType = ContextEvent['type'];
 export type MaestroEventType = MaestroEvent['type'];
 
 export type AgentEventListener = (event: AgentEvent) => void;

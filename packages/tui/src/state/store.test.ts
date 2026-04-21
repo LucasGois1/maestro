@@ -24,6 +24,8 @@ describe('createTuiStore', () => {
     expect(state.focus.panelId).toBe('pipeline');
     expect(state.focus.overlayStack).toEqual([]);
     expect(state.diffPreview.mode).toBe('diff');
+    expect(state.diffPreview.unifiedDiff).toBe('');
+    expect(state.diffPreview.changedPaths).toEqual([]);
     expect(state.colorMode).toBe('color');
   });
 
