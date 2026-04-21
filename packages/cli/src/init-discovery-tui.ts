@@ -10,7 +10,12 @@ import {
   type ComputationalDiscoveryResult,
   type InferentialDiscoveryProgressStep,
 } from '@maestro/discovery';
-import { App, createTuiStore, resolveColorMode } from '@maestro/tui';
+import {
+  App,
+  createInitialTuiState,
+  createTuiStore,
+  resolveColorMode,
+} from '@maestro/tui';
 import { render, type Instance } from 'ink';
 import { createElement } from 'react';
 
@@ -34,6 +39,14 @@ function buildDiffSnippet(path: string, before: string, after: string): string {
   const minus = before.length > 0 ? before.split('\n').map((l) => `-${l}`) : ['- '];
   const plus = after.length > 0 ? after.split('\n').map((l) => `+${l}`) : ['+ '];
   return [`--- ${path}`, ...minus, ...plus].join('\n');
+}
+
+/** Label for Discovery header after provider picker (wireframe B2). */
+export function formatDiscoveryProviderSummary(config: MaestroConfig): string {
+  const model = config.defaults.discovery.model;
+  const slash = model.indexOf('/');
+  const provider = slash >= 0 ? model.slice(0, slash) : model;
+  return `${provider} · ${model}`;
 }
 
 function progressLabel(
@@ -72,6 +85,8 @@ export async function runInitDiscoveryTui(options: {
   readonly repoRoot: string;
   readonly config: MaestroConfig;
   readonly env?: NodeJS.ProcessEnv;
+  /** Shown on DiscoveryScreen after interactive provider setup (B2). */
+  readonly providerSummary?: string | null;
 }): Promise<InitDiscoveryTuiResult> {
   const { repoRoot, config } = options;
   const env = options.env ?? process.env;
@@ -88,9 +103,14 @@ export async function runInitDiscoveryTui(options: {
   const discoveryLog = await createDiscoveryRunLog(repoRoot);
 
   return await new Promise<InitDiscoveryTuiResult>((resolve) => {
+    const baseDiscovery = createInitialTuiState().discovery;
     const store = createTuiStore({
       mode: 'discovery',
       colorMode,
+      discovery: {
+        ...baseDiscovery,
+        providerSummary: options.providerSummary ?? null,
+      },
     });
 
     const finish = (result: InitDiscoveryTuiResult) => {

@@ -38,9 +38,16 @@ export function bridgeBusToStore(
     options.agentDecisionBufferSize ?? DEFAULT_DECISION_BUFFER_SIZE;
   const logCap = options.agentLogBufferSize ?? DEFAULT_LOG_BUFFER_SIZE;
   const clock = options.clock ?? Date.now;
+  const feedbackAttemptByRunSprint = new Map<string, number>();
 
   return bus.on((event) => {
-    handleEvent(event, store, { deltaCap, decisionCap, logCap, clock });
+    handleEvent(event, store, {
+      deltaCap,
+      decisionCap,
+      logCap,
+      clock,
+      feedbackAttemptByRunSprint,
+    });
   });
 }
 
@@ -49,6 +56,7 @@ interface InternalConfig {
   readonly decisionCap: number;
   readonly logCap: number;
   readonly clock: () => number;
+  readonly feedbackAttemptByRunSprint: Map<string, number>;
 }
 
 function handleEvent(
@@ -81,7 +89,9 @@ function isAgentEvent(event: MaestroEvent): event is AgentEvent {
 
 function isContextEvent(event: MaestroEvent): event is ContextEvent {
   return (
-    event.type === 'artifact.diff_updated' || event.type === 'evaluator.feedback'
+    event.type === 'artifact.diff_updated' ||
+    event.type === 'evaluator.feedback' ||
+    event.type === 'kb.file_read'
   );
 }
 
@@ -115,8 +125,11 @@ function handlePipelineEvent(
 ): void {
   switch (event.type) {
     case 'pipeline.started':
+      config.feedbackAttemptByRunSprint.clear();
       store.setState((state) => ({
         ...state,
+        runId: event.runId,
+        kbPathsRead: [],
         mode: 'run',
         pipeline: {
           ...state.pipeline,
@@ -126,6 +139,10 @@ function handlePipelineEvent(
           sprintIdx: null,
           retryCount: 0,
           history: [],
+        },
+        focus: {
+          ...state.focus,
+          focusedSensorId: null,
         },
         diffPreview: {
           mode: 'diff',
@@ -421,6 +438,19 @@ function handleContextEvent(
   store: TuiStore,
   config: InternalConfig,
 ): void {
+  if (event.type === 'kb.file_read') {
+    store.setState((state) => {
+      if (state.kbPathsRead.includes(event.path)) {
+        return state;
+      }
+      return {
+        ...state,
+        kbPathsRead: [...state.kbPathsRead, event.path],
+      };
+    });
+    return;
+  }
+
   if (event.type === 'artifact.diff_updated') {
     store.setState((state) => {
       const paths =
@@ -452,8 +482,21 @@ function handleContextEvent(
   if (event.type === 'evaluator.feedback') {
     store.setState((state) => {
       const at = config.clock();
+      const sprintIdx =
+        event.sprintIdx ?? state.pipeline.sprintIdx ?? state.header.sprintIdx;
+      const attemptKey = `${event.runId}:${sprintIdx !== null ? sprintIdx.toString() : 'na'}`;
+      let attempt: number;
+      if (event.attempt !== undefined) {
+        attempt = event.attempt;
+      } else {
+        const prev = config.feedbackAttemptByRunSprint.get(attemptKey) ?? 0;
+        attempt = prev + 1;
+        config.feedbackAttemptByRunSprint.set(attemptKey, attempt);
+      }
       const entry: TuiFeedbackEntry = {
         at,
+        sprintIdx,
+        attempt,
         criterion: event.criterion,
         failure: event.failure,
         file: event.file ?? null,
@@ -492,6 +535,9 @@ function handleSensorEvent(event: SensorEvent, store: TuiStore): void {
             message: null,
             durationMs: null,
             onFail: event.onFail,
+            stdout: null,
+            stderr: null,
+            violations: [],
           },
         },
       }));
@@ -511,6 +557,9 @@ function handleSensorEvent(event: SensorEvent, store: TuiStore): void {
               message: null,
               durationMs: null,
               onFail,
+              stdout: previous?.stdout ?? null,
+              stderr: previous?.stderr ?? null,
+              violations: previous?.violations ?? [],
             },
           },
         };
@@ -522,11 +571,17 @@ function handleSensorEvent(event: SensorEvent, store: TuiStore): void {
         if (!existing) {
           return state;
         }
+        const prevOut = existing.stdout ?? '';
+        const stdout = prevOut ? `${prevOut}\n${event.message}` : event.message;
         return {
           ...state,
           sensors: {
             ...state.sensors,
-            [event.sensorId]: { ...existing, message: event.message },
+            [event.sensorId]: {
+              ...existing,
+              message: event.message,
+              stdout,
+            },
           },
         };
       });
@@ -544,6 +599,9 @@ function handleSensorEvent(event: SensorEvent, store: TuiStore): void {
             message: null,
             durationMs: null,
             onFail: null,
+            stdout: null,
+            stderr: null,
+            violations: [],
           } as const);
         return {
           ...state,
@@ -570,6 +628,9 @@ function handleSensorEvent(event: SensorEvent, store: TuiStore): void {
             message: null,
             durationMs: null,
             onFail: null,
+            stdout: null,
+            stderr: null,
+            violations: [],
           } as const);
         return {
           ...state,
@@ -579,6 +640,7 @@ function handleSensorEvent(event: SensorEvent, store: TuiStore): void {
               ...base,
               status: 'error',
               message: event.error,
+              stderr: event.error,
             },
           },
         };

@@ -15,6 +15,7 @@
   "dependencies": {
     "@maestro/agents": "workspace:^",
     "@maestro/config": "workspace:*",
+    "@maestro/contract": "workspace:*",
     "@maestro/discovery": "workspace:^",
     "@maestro/core": "workspace:*",
     "@maestro/git": "workspace:*",

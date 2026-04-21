@@ -6,6 +6,7 @@ import {
   createInitialTuiState,
   createTuiStore,
   DEFAULT_AGENT_LOG_BUFFER,
+  getDiscoveryChecklist,
   PIPELINE_STAGE_ORDER,
   selectStageDurations,
   selectStageStatuses,
@@ -19,6 +20,7 @@ describe('createTuiStore', () => {
 
     expect(state.mode).toBe('idle');
     expect(state.discovery.phase).toBe('detecting');
+    expect(state.discovery.providerSummary).toBeNull();
     expect(state.pipeline.status).toBe('idle');
     expect(state.sprints).toEqual([]);
     expect(state.sensors).toEqual({});
@@ -153,6 +155,26 @@ describe('createTuiStore', () => {
     expect(state.pipeline.history).toEqual([]);
     expect(state.agent.messageLog).toEqual([]);
     expect(state.focus.selectedSprintIdx).toBeNull();
+  });
+});
+
+describe('getDiscoveryChecklist', () => {
+  it('marks stack as current while detecting', () => {
+    const rows = getDiscoveryChecklist('detecting');
+    expect(rows[0]?.status).toBe('current');
+    expect(rows[1]?.status).toBe('pending');
+  });
+
+  it('marks infer as failed on error phase', () => {
+    const rows = getDiscoveryChecklist('error');
+    expect(rows[2]?.id).toBe('infer');
+    expect(rows[2]?.status).toBe('failed');
+    expect(rows[3]?.status).toBe('pending');
+  });
+
+  it('marks all done when phase is done', () => {
+    const rows = getDiscoveryChecklist('done');
+    expect(rows.every((r) => r.status === 'done')).toBe(true);
   });
 });
 

@@ -3,7 +3,7 @@ export const TUI_PACKAGE_NAME = '@maestro/tui';
 export { HelloWorld } from './components/HelloWorld.js';
 export { formatHelloMessage } from './message.js';
 
-export { App } from './App.js';
+export { App, type AppProps } from './App.js';
 
 export {
   computeStageDurations,
@@ -23,6 +23,9 @@ export {
   type TuiAgentLogKind,
   type TuiAgentState,
   type TuiColorMode,
+  type DiscoveryChecklistItemStatus,
+  type DiscoveryChecklistRow,
+  getDiscoveryChecklist,
   type TuiDiscoveryPhase,
   type TuiDiscoveryState,
   type TuiDiffPreviewState,
@@ -78,7 +81,11 @@ export { PipelinePanel } from './panels/PipelinePanel.js';
 export { ActiveAgentPanel } from './panels/ActiveAgentPanel.js';
 export { SprintsPanel } from './panels/SprintsPanel.js';
 export { SensorsPanel } from './panels/SensorsPanel.js';
-export { DiscoveryScreen } from './panels/DiscoveryScreen.js';
+export {
+  DISCOVERY_SENSORS_FOOTNOTE,
+  DiscoveryScreen,
+} from './panels/DiscoveryScreen.js';
+export { DiscoveryPhaseChecklist } from './panels/DiscoveryPhaseChecklist.js';
 export { DiffPreviewPanel } from './panels/DiffPreviewPanel.js';
 export {
   AGENT_LOG_OVERLAY_ID,
@@ -91,10 +98,26 @@ export {
   createFeedbackHistoryOverlay,
 } from './panels/FeedbackHistoryOverlay.js';
 export {
+  createHelpOverlay,
+  HelpOverlay,
+  HELP_OVERLAY_ID,
+} from './panels/HelpOverlay.js';
+export {
   SENSORS_DETAIL_OVERLAY_ID,
   SensorsDetailOverlay,
   createSensorsDetailOverlay,
 } from './panels/SensorsDetailOverlay.js';
+export {
+  KB_EXPLORER_OVERLAY_ID,
+  KbExplorerOverlay,
+  createKbExplorerOverlay,
+  type KbExplorerFileEntry,
+} from './panels/KbExplorerOverlay.js';
+export {
+  EDIT_PLAN_OVERLAY_ID,
+  EditPlanOverlay,
+  createEditPlanMessageOverlay,
+} from './panels/EditPlanOverlay.js';
 export { diffLineInkProps, sliceDiffWindow } from './panels/diffLineStyle.js';
 export {
   SPRINT_ICONS,
@@ -105,6 +128,12 @@ export {
 } from './panels/stageIcons.js';
 export { formatDurationMs } from './panels/formatDuration.js';
 
+export {
+  GLOBAL_HOTKEYS,
+  OVERLAY_HOTKEYS,
+  PIPELINE_FOOTER_HINTS,
+  PANEL_HOTKEYS,
+} from './keybindings/hotkeysCatalog.js';
 export {
   createKeybindingRouter,
   KeybindingProvider,

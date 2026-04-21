@@ -81,6 +81,14 @@ export const DEMO_SCRIPT: readonly DemoStep[] = [
     },
   },
   {
+    delayMs: 35,
+    event: {
+      type: 'kb.file_read',
+      runId: RUN_ID,
+      path: '.maestro/AGENTS.md',
+    },
+  },
+  {
     delayMs: 50,
     event: {
       type: 'pipeline.stage_entered',
@@ -212,6 +220,20 @@ export const DEMO_SCRIPT: readonly DemoStep[] = [
       file: 'auth/jwt.py',
       line: 47,
       suggestedAction: 'Pass audience= to jwt.decode',
+      sprintIdx: 1,
+    },
+  },
+  {
+    delayMs: 25,
+    event: {
+      type: 'evaluator.feedback',
+      runId: RUN_ID,
+      criterion: 'JWT must validate audience',
+      failure: 'Still missing aud after first patch',
+      file: 'auth/jwt.py',
+      line: 52,
+      suggestedAction: 'Wire audience through config',
+      sprintIdx: 1,
     },
   },
   {

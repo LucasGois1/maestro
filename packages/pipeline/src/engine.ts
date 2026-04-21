@@ -3,10 +3,12 @@ import {
   evaluatorAgent,
   generatorAgent,
   mergerAgent,
+  normalizePlannerModelOutput,
   plannerAgent,
   type AgentContext,
   type AgentDefinition,
   type AgentRegistry,
+  type PlannerOutput,
 } from '@maestro/agents';
 import type { MaestroConfig } from '@maestro/config';
 import {
@@ -22,17 +24,11 @@ import { dirname, join } from 'node:path';
 import type { AgentExecutor } from './executor.js';
 import { defaultAgentExecutor } from './executor.js';
 import { PipelineEscalationError, PipelinePauseError } from './errors.js';
+import { serializePlanMarkdown } from './plan-markdown.js';
 
 export const DEFAULT_RETRIES = 3;
 
-export type PlannerOutput = {
-  readonly summary: string;
-  readonly sprints: ReadonlyArray<{
-    readonly id: string;
-    readonly description: string;
-    readonly acceptance: readonly string[];
-  }>;
-};
+export type { PlannerOutput } from '@maestro/agents';
 
 type EvaluatorOutput = {
   readonly pass: boolean;
@@ -114,17 +110,7 @@ async function writePlanFile(
 ): Promise<void> {
   const path = join(repoRoot, maestroDir, 'runs', runId, 'plan.md');
   await mkdir(dirname(path), { recursive: true });
-  const body = [
-    '# Plan',
-    '',
-    plan.summary.trim(),
-    '',
-    '## Sprints',
-    '',
-    ...plan.sprints.map((s, i) => `${i + 1}. **${s.id}** — ${s.description}`),
-    '',
-  ].join('\n');
-  await writeFile(path, body, 'utf8');
+  await writeFile(path, serializePlanMarkdown(plan), 'utf8');
 }
 
 async function writeInitialContract(
@@ -136,7 +122,7 @@ async function writeInitialContract(
 ): Promise<SprintContractFrontmatter> {
   const frontmatter = sprintContractFrontmatterSchema.parse({
     sprint: sprintIdx + 1,
-    feature: sprint.description,
+    feature: sprint.name,
     status: 'proposed',
     acceptance_criteria: sprint.acceptance.length
       ? sprint.acceptance.map((description, idx) => ({
@@ -154,7 +140,7 @@ async function writeInitialContract(
     negotiated_by: ['architect'],
     iterations: 0,
   });
-  const body = `# Sprint ${sprintIdx + 1} — ${sprint.id}\n\n${sprint.description}\n`;
+  const body = `# Sprint ${sprintIdx + 1} — ${sprint.name}\n\n${sprint.objective}\n`;
   const serialized = writeSprintContract({ frontmatter, body });
   const path = join(
     repoRoot,
@@ -228,12 +214,16 @@ export async function runPipeline(
     assertNotAborted(options.abortSignal, 'planning');
     await updatePhase(options, 'planning');
     const planner = resolveAgent(options.registry, plannerAgent);
-    const plan = await executor({
+    const rawPlan = await executor({
       definition: planner,
       input: { prompt: options.prompt },
       context: contextFor('planner', options.runId, options.repoRoot),
       bus: options.bus,
       config: options.config,
+    });
+    const plan = normalizePlannerModelOutput(rawPlan, {
+      runId: options.runId,
+      prompt: options.prompt,
     });
     await writePlanFile(options.repoRoot, options.runId, plan, maestroDir);
 
@@ -355,7 +345,7 @@ export async function runPipeline(
         ...(maestroDir !== undefined ? { maestroDir } : {}),
         handoff: {
           sprint: sprintIdx + 1,
-          summary: sprint.description,
+          summary: sprint.objective,
           changedFiles: extractChangedFiles(generatorOutput),
           decisions: [],
           nextSteps: sprint.acceptance.slice(),

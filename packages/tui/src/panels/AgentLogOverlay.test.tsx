@@ -1,6 +1,8 @@
 import { render } from 'ink-testing-library';
+import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 
+import { KeybindingProvider } from '../keybindings/KeybindingProvider.js';
 import { createInitialTuiState } from '../state/store.js';
 
 import {
@@ -9,10 +11,20 @@ import {
   createAgentLogOverlay,
 } from './AgentLogOverlay.js';
 
+function withOverlayKeybindings(node: ReactNode) {
+  return (
+    <KeybindingProvider focusedPanelId="pipeline" overlayOpen>
+      {node}
+    </KeybindingProvider>
+  );
+}
+
 describe('AgentLogOverlay', () => {
   it('shows a placeholder when messageLog is empty', () => {
     const state = createInitialTuiState();
-    const app = render(<AgentLogOverlay agent={state.agent} />);
+    const app = render(
+      withOverlayKeybindings(<AgentLogOverlay agent={state.agent} />),
+    );
 
     expect(app.lastFrame()).toContain('(log vazio)');
     app.unmount();
@@ -21,35 +33,37 @@ describe('AgentLogOverlay', () => {
   it('renders header, delta, tool_call and decision entries', () => {
     const state = createInitialTuiState();
     const app = render(
-      <AgentLogOverlay
-        agent={{
-          ...state.agent,
-          activeAgentId: 'generator',
-          messageLog: [
-            { kind: 'delta', agentId: 'generator', at: 1, text: 'token' },
-            {
-              kind: 'tool_call',
-              agentId: 'generator',
-              at: 2,
-              text: 'write_file',
-            },
-            {
-              kind: 'decision',
-              agentId: 'generator',
-              at: 3,
-              text: 'retry sprint',
-            },
-          ],
-        }}
-      />,
+      withOverlayKeybindings(
+        <AgentLogOverlay
+          agent={{
+            ...state.agent,
+            activeAgentId: 'generator',
+            messageLog: [
+              { kind: 'delta', agentId: 'generator', at: 1, text: 'token' },
+              {
+                kind: 'tool_call',
+                agentId: 'generator',
+                at: 2,
+                text: 'write_file',
+              },
+              {
+                kind: 'decision',
+                agentId: 'generator',
+                at: 3,
+                text: 'retry sprint',
+              },
+            ],
+          }}
+        />,
+      ),
     );
 
     const frame = app.lastFrame() ?? '';
-    expect(frame).toContain('agent: generator');
-    expect(frame).toContain('3 entries');
-    expect(frame).toContain('> token');
-    expect(frame).toContain('► write_file');
-    expect(frame).toContain('★ retry sprint');
+    expect(frame).toContain('active: generator');
+    expect(frame).toContain('shown 3/3');
+    expect(frame).toContain('> [generator] token');
+    expect(frame).toContain('► [generator] write_file');
+    expect(frame).toContain('★ [generator] retry sprint');
     app.unmount();
   });
 

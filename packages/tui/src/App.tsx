@@ -33,6 +33,19 @@ import {
   createFeedbackHistoryOverlay,
 } from './panels/FeedbackHistoryOverlay.js';
 import {
+  HELP_OVERLAY_ID,
+  createHelpOverlay,
+} from './panels/HelpOverlay.js';
+import {
+  KB_EXPLORER_OVERLAY_ID,
+  createKbExplorerOverlay,
+  type KbExplorerFileEntry,
+} from './panels/KbExplorerOverlay.js';
+import {
+  EDIT_PLAN_OVERLAY_ID,
+  createEditPlanMessageOverlay,
+} from './panels/EditPlanOverlay.js';
+import {
   SENSORS_DETAIL_OVERLAY_ID,
   createSensorsDetailOverlay,
 } from './panels/SensorsDetailOverlay.js';
@@ -44,6 +57,7 @@ import { bridgeBusToStore } from './state/eventBridge.js';
 import {
   createTuiStore,
   type TuiColorMode,
+  type TuiState,
   type TuiStore,
 } from './state/store.js';
 import { useStoreSelector } from './state/useStoreSelector.js';
@@ -62,6 +76,16 @@ export interface AppProps {
   readonly discovery?: {
     readonly onChoice: (choice: 'accept' | 'cancel') => void;
   };
+  /** When set (e.g. by CLI), `[k]` opens a `.maestro` file list with read highlights. */
+  readonly kbExplorer?: {
+    readonly repoLabel: string;
+    readonly files: readonly KbExplorerFileEntry[];
+  };
+  /** Resolve sprint contract path and open external editor (CLI unmounts Ink around `onEditPath`). */
+  readonly editPlan?: {
+    readonly resolveContractPath: (state: TuiState) => string | null;
+    readonly onEditPath: (path: string) => void | Promise<void>;
+  };
 }
 
 export function App({
@@ -72,6 +96,8 @@ export function App({
   keybindingRouter,
   initialOverlay,
   discovery,
+  kbExplorer,
+  editPlan,
 }: AppProps) {
   const activeStore = useMemo(
     () => store ?? createTuiStore({ colorMode: colorMode ?? 'color' }),
@@ -96,6 +122,8 @@ export function App({
     store: activeStore,
     ...(keybindingRouter ? { keybindingRouter } : {}),
     ...(discovery ? { discovery } : {}),
+    ...(kbExplorer ? { kbExplorer } : {}),
+    ...(editPlan ? { editPlan } : {}),
   };
   const content = (
     <OverlayHostProvider
@@ -115,9 +143,17 @@ interface AppBodyProps {
   readonly store: TuiStore;
   readonly keybindingRouter?: KeybindingRouter;
   readonly discovery?: AppProps['discovery'];
+  readonly kbExplorer?: AppProps['kbExplorer'];
+  readonly editPlan?: AppProps['editPlan'];
 }
 
-function AppBody({ store, keybindingRouter, discovery }: AppBodyProps) {
+function AppBody({
+  store,
+  keybindingRouter,
+  discovery,
+  kbExplorer,
+  editPlan,
+}: AppBodyProps) {
   const overlayHost = useOverlayHost();
   const focus = useStoreSelector(store, (state) => state.focus);
   const mode = useStoreSelector(store, (state) => state.mode);
@@ -129,7 +165,12 @@ function AppBody({ store, keybindingRouter, discovery }: AppBodyProps) {
   };
   return (
     <KeybindingProvider {...providerProps}>
-      <AppShell store={store} discovery={discovery} />
+      <AppShell
+        store={store}
+        discovery={discovery}
+        kbExplorer={kbExplorer}
+        editPlan={editPlan}
+      />
     </KeybindingProvider>
   );
 }
@@ -137,9 +178,13 @@ function AppBody({ store, keybindingRouter, discovery }: AppBodyProps) {
 function AppShell({
   store,
   discovery,
+  kbExplorer,
+  editPlan,
 }: {
   readonly store: TuiStore;
   readonly discovery?: AppProps['discovery'];
+  readonly kbExplorer?: AppProps['kbExplorer'];
+  readonly editPlan?: AppProps['editPlan'];
 }) {
   const overlayHost = useOverlayHost();
   const mode = useStoreSelector(store, (state) => state.mode);
@@ -177,6 +222,85 @@ function AppShell({
   useKeybinding({ kind: 'overlay' }, { key: 'escape' }, () => {
     overlayHost.pop();
   });
+
+  useKeybinding({ kind: 'overlay' }, { key: 'q' }, () => {
+    overlayHost.pop();
+  });
+
+  const openHelp = useCallback(() => {
+    const alreadyOpen = overlayHost.overlays.some(
+      (overlay) => overlay.id === HELP_OVERLAY_ID,
+    );
+    if (alreadyOpen) {
+      return;
+    }
+    overlayHost.push(createHelpOverlay(colorMode));
+  }, [colorMode, overlayHost]);
+
+  useKeybinding({ kind: 'global' }, { key: '?', shift: true }, openHelp);
+
+  const openKbExplorer = useCallback(() => {
+    const alreadyOpen = overlayHost.overlays.some(
+      (overlay) => overlay.id === KB_EXPLORER_OVERLAY_ID,
+    );
+    if (alreadyOpen) {
+      return;
+    }
+    const label = kbExplorer?.repoLabel ?? '(sem dados do CLI)';
+    const files = kbExplorer?.files ?? [];
+    overlayHost.push(
+      createKbExplorerOverlay(
+        label,
+        files,
+        store.getState().kbPathsRead,
+        colorMode,
+      ),
+    );
+  }, [colorMode, kbExplorer, overlayHost, store]);
+
+  useKeybinding({ kind: 'global' }, { key: 'k' }, openKbExplorer);
+
+  const openEditPlan = useCallback(() => {
+    const alreadyOpen = overlayHost.overlays.some(
+      (overlay) => overlay.id === EDIT_PLAN_OVERLAY_ID,
+    );
+    if (alreadyOpen) {
+      return;
+    }
+    if (!editPlan) {
+      overlayHost.push(
+        createEditPlanMessageOverlay(
+          'Disponível quando o comando maestro for iniciado com integração ao editor (repoRoot + run).',
+          colorMode,
+        ),
+      );
+      return;
+    }
+    const path = editPlan.resolveContractPath(store.getState());
+    if (!path) {
+      overlayHost.push(
+        createEditPlanMessageOverlay(
+          'Sem run/sprint ativo ou contrato ainda não criado.',
+          colorMode,
+        ),
+      );
+      return;
+    }
+    void (async () => {
+      try {
+        await editPlan.onEditPath(path);
+      } catch (e) {
+        overlayHost.push(
+          createEditPlanMessageOverlay(
+            e instanceof Error ? e.message : String(e),
+            colorMode,
+          ),
+        );
+      }
+    })();
+  }, [colorMode, editPlan, overlayHost, store]);
+
+  useKeybinding({ kind: 'global' }, { key: 'e' }, openEditPlan);
 
   const selectSprint = useCallback(
     (idx: number) => {
@@ -220,10 +344,25 @@ function AppShell({
     if (alreadyOpen) {
       return;
     }
+    const st = store.getState();
     overlayHost.push(
-      createSensorsDetailOverlay(store.getState().sensors, colorMode),
+      createSensorsDetailOverlay(
+        st.sensors,
+        colorMode,
+        st.focus.focusedSensorId,
+      ),
     );
   }, [colorMode, overlayHost, store]);
+
+  const setFocusedSensorId = useCallback(
+    (sensorId: string | null) => {
+      store.setState((state) => ({
+        ...state,
+        focus: { ...state.focus, focusedSensorId: sensorId },
+      }));
+    },
+    [store],
+  );
 
   useKeybinding(
     { kind: 'panel', panelId: 'sensors' },
@@ -344,6 +483,8 @@ function AppShell({
           sensors: (
             <SensorsPanel
               sensors={sensors}
+              focusedSensorId={focus.focusedSensorId}
+              onFocusedSensorIdChange={setFocusedSensorId}
               focused={focus.panelId === 'sensors'}
               colorMode={colorMode}
             />

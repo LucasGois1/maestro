@@ -13,7 +13,10 @@ import { createKBManager } from '@maestro/kb';
 import { listInferenceReadyProviders } from '@maestro/provider';
 import { Command } from 'commander';
 
-import { runInitDiscoveryTui } from '../init-discovery-tui.js';
+import {
+  formatDiscoveryProviderSummary,
+  runInitDiscoveryTui,
+} from '../init-discovery-tui.js';
 import {
   resolveDiscoveryConfigNonInteractive,
   runDiscoveryProviderSetupInk,
@@ -170,6 +173,7 @@ export function createInitCommand(options: InitCommandOptions = {}): Command {
           const outcome = await runInitDiscoveryTui({
             repoRoot,
             config: setup.config,
+            providerSummary: formatDiscoveryProviderSummary(setup.config),
           });
           if (!outcome.ok) {
             io.stderr(`Discovery failed: ${outcome.message}`);

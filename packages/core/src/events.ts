@@ -160,6 +160,16 @@ export type ContextEvent =
       readonly file?: string;
       readonly line?: number;
       readonly suggestedAction?: string;
+      /** Sprint index when feedback was produced (optional; TUI falls back to pipeline state). */
+      readonly sprintIdx?: number;
+      /** Evaluation attempt within the sprint (optional; TUI auto-increments per run/sprint). */
+      readonly attempt?: number;
+    }
+  | {
+      readonly type: 'kb.file_read';
+      readonly runId: string;
+      /** Path relative to repo root or normalized key used for KB highlight. */
+      readonly path: string;
     };
 
 export type MaestroEvent = AgentEvent | PipelineEvent | SensorEvent | ContextEvent;

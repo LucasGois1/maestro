@@ -1,10 +1,39 @@
 import { render } from 'ink-testing-library';
 import type { ReactElement } from 'react';
+import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 
+import type { TuiSensorState } from '../state/store.js';
 import { KeybindingProvider } from '../keybindings/index.js';
 
 import { SensorsPanel } from './SensorsPanel.js';
+
+function sensorFixture(
+  partial: Omit<TuiSensorState, 'stdout' | 'stderr' | 'violations'> &
+    Partial<Pick<TuiSensorState, 'stdout' | 'stderr' | 'violations'>>,
+): TuiSensorState {
+  return {
+    ...partial,
+    stdout: partial.stdout ?? null,
+    stderr: partial.stderr ?? null,
+    violations: partial.violations ?? [],
+  };
+}
+
+function SensorsHarness({
+  sensors,
+}: {
+  readonly sensors: Readonly<Record<string, TuiSensorState>>;
+}) {
+  const [focusedSensorId, setFocusedSensorId] = useState<string | null>(null);
+  return (
+    <SensorsPanel
+      sensors={sensors}
+      focusedSensorId={focusedSensorId}
+      onFocusedSensorIdChange={setFocusedSensorId}
+    />
+  );
+}
 
 function renderSensors(ui: ReactElement) {
   return render(
@@ -16,31 +45,39 @@ function renderSensors(ui: ReactElement) {
 
 describe('SensorsPanel', () => {
   it('shows a placeholder when no sensors are present', () => {
-    const app = renderSensors(<SensorsPanel sensors={{}} />);
+    const app = renderSensors(
+      <SensorsPanel
+        sensors={{}}
+        focusedSensorId={null}
+        onFocusedSensorIdChange={() => {
+          /* noop */
+        }}
+      />,
+    );
     expect(app.lastFrame()).toContain('no sensors reporting');
     app.unmount();
   });
 
   it('renders each sensor with id and status', () => {
     const app = renderSensors(
-      <SensorsPanel
+      <SensorsHarness
         sensors={{
-          ruff: {
+          ruff: sensorFixture({
             sensorId: 'ruff',
             kind: 'computational',
             status: 'passed',
             message: null,
             durationMs: 12,
             onFail: 'block',
-          },
-          mypy: {
+          }),
+          mypy: sensorFixture({
             sensorId: 'mypy',
             kind: 'computational',
             status: 'failed',
             message: 'types',
             durationMs: null,
             onFail: 'warn',
-          },
+          }),
         }}
       />,
     );

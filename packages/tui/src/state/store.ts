@@ -10,8 +10,17 @@ export type TuiDiscoveryPhase =
   | 'done'
   | 'error';
 
+/** Visual step for the discovery checklist (derived from `phase` via `getDiscoveryChecklist`). */
+export type DiscoveryChecklistItemStatus =
+  | 'pending'
+  | 'current'
+  | 'done'
+  | 'failed';
+
 export interface TuiDiscoveryState {
   readonly phase: TuiDiscoveryPhase;
+  /** Provider + model ref chosen before this screen (e.g. `openai · openai/gpt-4o-mini`). */
+  readonly providerSummary: string | null;
   readonly stackSummary: string | null;
   readonly structureSummary: string | null;
   /** Short line (e.g. schema validation failed). */
@@ -26,6 +35,96 @@ export interface TuiDiscoveryState {
   readonly agentStreamTail: string | null;
   readonly proposedAgentsMd: string | null;
   readonly proposedArchitectureMd: string | null;
+}
+
+export interface DiscoveryChecklistRow {
+  readonly id: 'stack' | 'structure' | 'infer' | 'preview';
+  readonly label: string;
+  readonly status: DiscoveryChecklistItemStatus;
+}
+
+const DISCOVERY_CHECKLIST_IDS = [
+  'stack',
+  'structure',
+  'infer',
+  'preview',
+] as const;
+
+const DISCOVERY_CHECKLIST_LABELS = [
+  'Detect stack',
+  'Analyse structure',
+  'Infer AGENTS.md & ARCHITECTURE.md (LLM)',
+  'Preview & apply',
+] as const;
+
+function discoveryChecklistRow(
+  index: 0 | 1 | 2 | 3,
+  status: DiscoveryChecklistItemStatus,
+): DiscoveryChecklistRow {
+  return {
+    id: DISCOVERY_CHECKLIST_IDS[index],
+    label: DISCOVERY_CHECKLIST_LABELS[index],
+    status,
+  };
+}
+
+/** Checklist rows for DiscoveryScreen; status follows `phase`. */
+export function getDiscoveryChecklist(
+  phase: TuiDiscoveryPhase,
+): readonly DiscoveryChecklistRow[] {
+  switch (phase) {
+    case 'detecting':
+      return [
+        discoveryChecklistRow(0, 'current'),
+        discoveryChecklistRow(1, 'pending'),
+        discoveryChecklistRow(2, 'pending'),
+        discoveryChecklistRow(3, 'pending'),
+      ];
+    case 'structuring':
+      return [
+        discoveryChecklistRow(0, 'done'),
+        discoveryChecklistRow(1, 'current'),
+        discoveryChecklistRow(2, 'pending'),
+        discoveryChecklistRow(3, 'pending'),
+      ];
+    case 'inferring':
+      return [
+        discoveryChecklistRow(0, 'done'),
+        discoveryChecklistRow(1, 'done'),
+        discoveryChecklistRow(2, 'current'),
+        discoveryChecklistRow(3, 'pending'),
+      ];
+    case 'preview':
+      return [
+        discoveryChecklistRow(0, 'done'),
+        discoveryChecklistRow(1, 'done'),
+        discoveryChecklistRow(2, 'done'),
+        discoveryChecklistRow(3, 'current'),
+      ];
+    case 'done':
+      return [
+        discoveryChecklistRow(0, 'done'),
+        discoveryChecklistRow(1, 'done'),
+        discoveryChecklistRow(2, 'done'),
+        discoveryChecklistRow(3, 'done'),
+      ];
+    case 'error':
+      return [
+        discoveryChecklistRow(0, 'done'),
+        discoveryChecklistRow(1, 'done'),
+        discoveryChecklistRow(2, 'failed'),
+        discoveryChecklistRow(3, 'pending'),
+      ];
+    default: {
+      const pending: DiscoveryChecklistItemStatus = 'pending';
+      return [
+        discoveryChecklistRow(0, pending),
+        discoveryChecklistRow(1, pending),
+        discoveryChecklistRow(2, pending),
+        discoveryChecklistRow(3, pending),
+      ];
+    }
+  }
 }
 
 export type TuiPipelineStatus =
@@ -108,6 +207,12 @@ export interface TuiAgentState {
   readonly error: string | null;
 }
 
+export interface TuiSensorViolation {
+  readonly file: string;
+  readonly line: number | null;
+  readonly message: string;
+}
+
 export interface TuiSensorState {
   readonly sensorId: string;
   readonly kind: 'computational' | 'inferential';
@@ -115,12 +220,18 @@ export interface TuiSensorState {
   readonly message: string | null;
   readonly durationMs: number | null;
   readonly onFail: 'block' | 'warn' | null;
+  /** Accumulated progress / stdout-style output for overlay detail. */
+  readonly stdout: string | null;
+  readonly stderr: string | null;
+  readonly violations: readonly TuiSensorViolation[];
 }
 
 export interface TuiFocusState {
   readonly panelId: TuiPanelId;
   readonly overlayStack: readonly string[];
   readonly selectedSprintIdx: number | null;
+  /** Selected row in Sensors panel (for detail overlay). */
+  readonly focusedSensorId: string | null;
 }
 
 export type TuiPanelId =
@@ -132,6 +243,9 @@ export type TuiPanelId =
 
 export interface TuiFeedbackEntry {
   readonly at: number;
+  readonly sprintIdx: number | null;
+  /** 1-based attempt within the sprint (or global if sprint unknown). */
+  readonly attempt: number;
   readonly criterion: string;
   readonly failure: string;
   readonly file: string | null;
@@ -153,6 +267,10 @@ export interface TuiDiffPreviewState {
 
 export interface TuiState {
   readonly mode: TuiMode;
+  /** Set by `pipeline.started` for CLI/editor integrations. */
+  readonly runId: string | null;
+  /** Repo-relative paths the agent read during the run (from `kb.file_read`). */
+  readonly kbPathsRead: readonly string[];
   readonly discovery: TuiDiscoveryState;
   readonly header: TuiHeaderState;
   readonly pipeline: TuiPipelineState;
@@ -205,8 +323,11 @@ export function createInitialTuiState(
 ): TuiState {
   return {
     mode: 'idle',
+    runId: null,
+    kbPathsRead: [],
     discovery: {
       phase: 'detecting',
+      providerSummary: null,
       stackSummary: null,
       structureSummary: null,
       errorSummary: null,
@@ -246,6 +367,7 @@ export function createInitialTuiState(
       panelId: 'pipeline',
       overlayStack: [],
       selectedSprintIdx: null,
+      focusedSensorId: null,
     },
     diffPreview: {
       mode: 'diff',

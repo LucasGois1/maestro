@@ -7,6 +7,8 @@ import { createEventBus, type MaestroEvent } from '@maestro/core';
 import { createStateStore } from '@maestro/state';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { PlannerModelOutput } from '@maestro/agents';
+
 import { runPipeline, type PlannerOutput } from './engine.js';
 import { PipelineEscalationError, PipelinePauseError } from './errors.js';
 import type { AgentExecutor } from './executor.js';
@@ -14,13 +16,51 @@ import { resumePipeline } from './resume.js';
 
 let repoRoot: string;
 
-const plan: PlannerOutput = {
-  summary: 'Ship auth',
+/** Raw model JSON consumed by `normalizePlannerModelOutput` inside `runPipeline`. */
+const plannerModelOutput: PlannerModelOutput = {
+  feature: 'Auth',
+  overview: 'Ship authentication end-to-end.\nCoverage for sessions.',
+  userStories: [
+    {
+      id: 1,
+      role: 'user',
+      action: 'sign in',
+      value: 'access my account',
+    },
+    {
+      id: 2,
+      role: 'admin',
+      action: 'revoke sessions',
+      value: 'team security',
+    },
+  ],
+  aiFeatures: [],
   sprints: [
-    { id: 's1', description: 'Session bootstrap', acceptance: ['a1'] },
-    { id: 's2', description: 'JWT service', acceptance: ['a2'] },
+    {
+      idx: 1,
+      name: 'Session bootstrap',
+      objective: 'Session bootstrap',
+      userStoryIds: [1],
+      dependsOn: [],
+      complexity: 'medium',
+      keyFeatures: ['Secure cookies'],
+    },
+    {
+      idx: 2,
+      name: 'JWT service',
+      objective: 'JWT service',
+      userStoryIds: [2],
+      dependsOn: [1],
+      complexity: 'high',
+      keyFeatures: ['Token refresh'],
+    },
   ],
 };
+
+function expectNormalizedPlan(p: PlannerOutput): void {
+  expect(p.sprints.length).toBe(2);
+  expect(p.summary.length).toBeGreaterThan(0);
+}
 
 beforeEach(async () => {
   repoRoot = await mkdtemp(join(tmpdir(), 'maestro-pipeline-'));
@@ -55,7 +95,7 @@ describe('runPipeline (happy path)', () => {
     const env = makeEnv();
 
     const executor = buildExecutor({
-      planner: () => plan,
+      planner: () => plannerModelOutput,
       architect: () => ({ approved: true, violations: [] }),
       generator: () => ({
         summary: 'done',
@@ -85,6 +125,7 @@ describe('runPipeline (happy path)', () => {
     expect(result.state.phase).toBe('completed');
     expect(result.sprintOutcomes).toHaveLength(2);
     expect(result.sprintOutcomes[0]?.attempts).toBe(1);
+    expectNormalizedPlan(result.plan);
 
     const types = env.events.map((e) => e.type);
     expect(types).toContain('pipeline.started');
@@ -95,7 +136,10 @@ describe('runPipeline (happy path)', () => {
 
     const planPath = join(repoRoot, '.maestro', 'runs', 'r1', 'plan.md');
     const planText = await readFile(planPath, 'utf8');
-    expect(planText).toContain('Ship auth');
+    expect(planText).toMatch(/^---\n/u);
+    expect(planText).toContain('run_id');
+    expect(planText).toContain('Auth');
+    expect(planText).toContain('## User stories principais');
 
     const contractPath = join(
       repoRoot,
@@ -127,7 +171,7 @@ describe('runPipeline (retry + escalation)', () => {
     const attemptsBySprint = [0, 0];
 
     const executor = buildExecutor({
-      planner: () => plan,
+      planner: () => plannerModelOutput,
       architect: () => ({ approved: true, violations: [] }),
       generator: () => {
         attemptsBySprint[0] = (attemptsBySprint[0] ?? 0) + 1;
@@ -175,7 +219,7 @@ describe('runPipeline (graceful pause)', () => {
     const controller = new AbortController();
 
     const executor = buildExecutor({
-      planner: () => plan,
+      planner: () => plannerModelOutput,
       architect: () => {
         controller.abort();
         return { approved: true, violations: [] };
@@ -217,7 +261,7 @@ describe('resumePipeline', () => {
     const controller = new AbortController();
 
     const firstExecutor = buildExecutor({
-      planner: () => plan,
+      planner: () => plannerModelOutput,
       architect: () => {
         controller.abort();
         return { approved: true, violations: [] };
@@ -247,7 +291,7 @@ describe('resumePipeline', () => {
     resumeBus.on((e) => resumed.push(e));
 
     const finishExecutor = buildExecutor({
-      planner: () => plan,
+      planner: () => plannerModelOutput,
       architect: () => ({ approved: true, violations: [] }),
       generator: () => ({ summary: '', changedFiles: [], followUps: [] }),
       evaluator: () => ({ pass: true, failures: [] }),

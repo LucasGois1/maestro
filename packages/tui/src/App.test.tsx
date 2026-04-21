@@ -20,7 +20,8 @@ describe('App', () => {
     expect(frame).toContain('Sprints');
     expect(frame).toContain('Sensores');
     expect(frame).toContain('Diff · Preview · Feedback');
-    expect(frame).toContain('[i] init');
+    expect(frame).toContain('[?]');
+    expect(frame).toContain('help');
     app.unmount();
   });
 
@@ -283,6 +284,9 @@ describe('App', () => {
             message: null,
             durationMs: 5,
             onFail: 'block',
+            stdout: null,
+            stderr: null,
+            violations: [],
           },
         },
       }));
@@ -309,6 +313,8 @@ describe('App', () => {
           feedbackHistory: [
             {
               at: 1,
+              sprintIdx: null,
+              attempt: 1,
               criterion: 'c',
               failure: 'f',
               file: 'a.ts',

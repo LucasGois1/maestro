@@ -23,6 +23,9 @@ describe('sensorRowStyle', () => {
         message: null,
         durationMs: null,
         onFail: 'block',
+        stdout: null,
+        stderr: null,
+        violations: [],
       },
       b: {
         sensorId: 'b',
@@ -31,6 +34,9 @@ describe('sensorRowStyle', () => {
         message: null,
         durationMs: null,
         onFail: 'block',
+        stdout: null,
+        stderr: null,
+        violations: [],
       },
       c: {
         sensorId: 'c',
@@ -39,6 +45,9 @@ describe('sensorRowStyle', () => {
         message: null,
         durationMs: 1,
         onFail: 'block',
+        stdout: null,
+        stderr: null,
+        violations: [],
       },
     };
     expect(summarizeSensors(sensors)).toEqual({
@@ -57,6 +66,9 @@ describe('sensorRowStyle', () => {
       message: null,
       durationMs: null,
       onFail: 'block',
+      stdout: null,
+      stderr: null,
+      violations: [],
     };
     expect(sensorRowIsBlockFailure(failed)).toBe(true);
     const warned: TuiSensorState = { ...failed, onFail: 'warn' };

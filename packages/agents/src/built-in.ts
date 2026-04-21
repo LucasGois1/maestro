@@ -1,19 +1,11 @@
 import { z } from 'zod';
 
 import type { AgentDefinition } from './definition.js';
+import { PLANNER_FEW_SHOT_EXAMPLES } from './planner/calibration.js';
+import { plannerModelOutputSchema } from './planner/plan-output.schema.js';
+import { PLANNER_SYSTEM_PROMPT } from './planner/system-prompt.js';
 
 const textInputSchema = z.object({ prompt: z.string().min(1) });
-
-const plannerOutputSchema = z.object({
-  summary: z.string(),
-  sprints: z.array(
-    z.object({
-      id: z.string(),
-      description: z.string(),
-      acceptance: z.array(z.string()).default([]),
-    }),
-  ),
-});
 
 const architectOutputSchema = z.object({
   approved: z.boolean(),
@@ -153,15 +145,18 @@ const discoveryOutputSchema = z.object({
 
 export const plannerAgent: AgentDefinition<
   z.infer<typeof textInputSchema>,
-  z.infer<typeof plannerOutputSchema>
+  z.infer<typeof plannerModelOutputSchema>
 > = {
   id: 'planner',
   role: 'pipeline',
   stage: 1,
-  systemPrompt:
-    'You are the Maestro Planner. Expand the user prompt into a JSON spec with a short summary and a list of sprints, each with id, description, and acceptance criteria. Reply with only the JSON object (no prose).',
+  systemPrompt: PLANNER_SYSTEM_PROMPT,
   inputSchema: textInputSchema,
-  outputSchema: plannerOutputSchema,
+  outputSchema: plannerModelOutputSchema,
+  tools: ['readKB', 'listDirectory', 'searchCode'],
+  calibration: {
+    fewShotExamples: PLANNER_FEW_SHOT_EXAMPLES,
+  },
 };
 
 export const architectAgent: AgentDefinition<

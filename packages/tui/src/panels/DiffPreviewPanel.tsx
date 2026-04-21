@@ -96,6 +96,11 @@ export function DiffPreviewPanel({
         : '—';
     body = (
       <Box flexDirection="column">
+        <Text dimColor={useColor}>
+          {fb.sprintIdx !== null
+            ? `sprint ${fb.sprintIdx.toString()} · tent. ${fb.attempt.toString()}`
+            : `tent. ${fb.attempt.toString()}`}
+        </Text>
         <Text {...(useColor ? { color: 'yellow' as const } : {})}>
           {`★ ${fb.criterion}`}
         </Text>

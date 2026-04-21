@@ -47,6 +47,27 @@ export {
   plannerAgent,
 } from './built-in.js';
 
+export {
+  PLANNER_FEW_SHOT_EXAMPLES,
+  resolvedPlannerSystemPrompt,
+} from './planner/calibration.js';
+export { PLANNER_SYSTEM_PROMPT } from './planner/system-prompt.js';
+export { createPlannerToolSet } from './planner/tools.js';
+export {
+  isPlannerEscalation,
+  plannerModelOutputSchema,
+  plannerSprintRawSchema,
+  userStorySchema,
+  type PlannerModelOutput,
+  type PlannerSprintRaw,
+  type UserStory,
+} from './planner/plan-output.schema.js';
+export {
+  normalizePlannerModelOutput,
+  type PlannerOutput,
+  type PlannerPipelineSprint,
+} from './planner/normalize.js';
+
 export function registerBuiltInAgents(registry: {
   register(def: AnyAgentDefinition): void;
 }): void {

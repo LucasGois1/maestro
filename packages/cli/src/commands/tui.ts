@@ -1,14 +1,20 @@
 import { createEventBus } from '@maestro/core';
+import { editSprintContract, resolveContractPath } from '@maestro/contract';
 import {
   App,
   bridgeBusToStore,
   createTuiStore,
   playDemoEvents,
   resolveColorMode,
+  type TuiState,
 } from '@maestro/tui';
+import { existsSync } from 'node:fs';
+import { cwd } from 'node:process';
 import { Command } from 'commander';
 import { render, type Instance } from 'ink';
 import { createElement } from 'react';
+
+import { listMaestroFilesUnderRepo } from '../tui-kb.js';
 
 export interface CreateTuiCommandOptions {
   readonly renderApp?: typeof defaultRenderApp;
@@ -46,7 +52,47 @@ export function createTuiCommand(options: CreateTuiCommandOptions = {}): Command
       const store = createTuiStore({ colorMode });
       bridgeBusToStore(bus, store);
 
-      renderApp({ store, bus, colorMode });
+      const repoRoot = cwd();
+      const kbFiles = listMaestroFilesUnderRepo(repoRoot);
+
+      let inkInstance: Instance | undefined;
+
+      const mount = () => {
+        inkInstance = renderApp({
+          store,
+          bus,
+          colorMode,
+          kbExplorer: {
+            repoLabel: repoRoot,
+            files: kbFiles,
+          },
+          editPlan: {
+            resolveContractPath: (state) => {
+              const runId = state.runId;
+              const spIdx = state.pipeline.sprintIdx;
+              if (!runId || spIdx === null) {
+                return null;
+              }
+              const path = resolveContractPath({
+                repoRoot,
+                runId,
+                sprint: spIdx + 1,
+              });
+              return existsSync(path) ? path : null;
+            },
+            onEditPath: async (filePath) => {
+              inkInstance?.unmount();
+              try {
+                await editSprintContract({ filePath });
+              } finally {
+                mount();
+              }
+            },
+          },
+        });
+      };
+
+      mount();
 
       if (flags.demo) {
         startDemo(bus);
@@ -59,11 +105,30 @@ export interface DefaultRenderAppArgs {
   readonly store: ReturnType<typeof createTuiStore>;
   readonly bus: ReturnType<typeof createEventBus>;
   readonly colorMode: ReturnType<typeof resolveColorMode>;
+  readonly kbExplorer?: {
+    readonly repoLabel: string;
+    readonly files: ReturnType<typeof listMaestroFilesUnderRepo>;
+  };
+  readonly editPlan?: {
+    readonly resolveContractPath: (state: TuiState) => string | null;
+    readonly onEditPath: (path: string) => void | Promise<void>;
+  };
 }
 
 export function defaultRenderApp({
   store,
+  bus,
   colorMode,
+  kbExplorer,
+  editPlan,
 }: DefaultRenderAppArgs): Instance {
-  return render(createElement(App, { store, colorMode }));
+  return render(
+    createElement(App, {
+      store,
+      bus,
+      colorMode,
+      ...(kbExplorer ? { kbExplorer } : {}),
+      ...(editPlan ? { editPlan } : {}),
+    }),
+  );
 }

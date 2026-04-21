@@ -11,8 +11,10 @@ import type {
   AgentContext,
   AgentDefinition,
   AnyAgentDefinition,
-  FewShotExample,
 } from './definition.js';
+import { appendCalibrationSection } from './calibration-format.js';
+import { createPlannerToolSet } from './planner/tools.js';
+import { generateText, stepCountIs } from 'ai';
 
 function formatZodIssues(issues: readonly ZodIssue[]): string {
   return issues
@@ -132,19 +134,6 @@ function defaultModelRef(agentId: string, config: MaestroConfig): string {
   return entry.model;
 }
 
-function formatFewShots(examples: readonly FewShotExample[]): string {
-  return examples
-    .map((ex, i) => {
-      const note = ex.note ? ` // ${ex.note}` : '';
-      return [
-        `### Example ${i + 1}${note}`,
-        `INPUT: ${JSON.stringify(ex.input)}`,
-        `OUTPUT: ${JSON.stringify(ex.output)}`,
-      ].join('\n');
-    })
-    .join('\n\n');
-}
-
 async function resolveSystemPrompt(
   def: AnyAgentDefinition,
   ctx: AgentContext,
@@ -153,13 +142,58 @@ async function resolveSystemPrompt(
     typeof def.systemPrompt === 'string'
       ? def.systemPrompt
       : await def.systemPrompt(ctx);
-  if (!def.calibration?.fewShotExamples?.length) return base;
-  return `${base}\n\n## Calibration examples\n\n${formatFewShots(def.calibration.fewShotExamples)}`;
+  return appendCalibrationSection(base, def.calibration?.fewShotExamples);
 }
 
 function stringifyInput(input: unknown): string {
   if (typeof input === 'string') return input;
   return JSON.stringify(input, null, 2);
+}
+
+async function generatePlannerAgentText(options: {
+  readonly model: LanguageModelV3;
+  readonly system: string;
+  readonly prompt: string;
+  readonly bus: EventBus;
+  readonly agentId: string;
+  readonly runId: string;
+  readonly workingDir: string;
+}): Promise<string> {
+  const tools = createPlannerToolSet(options.workingDir);
+  const gen = await generateText({
+    model: options.model,
+    system: options.system,
+    prompt: options.prompt,
+    tools,
+    stopWhen: stepCountIs(12),
+    experimental_onToolCallStart: ({ toolCall }) => {
+      options.bus.emit({
+        type: 'agent.tool_call',
+        agentId: options.agentId,
+        runId: options.runId,
+        tool: toolCall.toolName,
+        args: toolCall.input,
+      });
+    },
+    experimental_onToolCallFinish: (event) => {
+      options.bus.emit({
+        type: 'agent.tool_result',
+        agentId: options.agentId,
+        runId: options.runId,
+        tool: event.toolCall.toolName,
+        result: event.success ? event.output : event.error,
+      });
+    },
+  });
+  if (gen.text.length > 0) {
+    options.bus.emit({
+      type: 'agent.delta',
+      agentId: options.agentId,
+      runId: options.runId,
+      chunk: gen.text,
+    });
+  }
+  return gen.text;
 }
 
 function extractJsonObject(text: string): unknown {
@@ -210,22 +244,36 @@ export async function runAgent<TInput, TOutput>(
 
     const model = resolveModel(definition, config, options.model);
     const system = await resolveSystemPrompt(definition, context);
-
-    const result = streamText({
-      model,
-      system,
-      prompt: stringifyInput(inputParse.data),
-    });
+    const prompt = stringifyInput(inputParse.data);
 
     let text = '';
-    for await (const chunk of result.textStream) {
-      text += chunk;
-      bus.emit({
-        type: 'agent.delta',
+
+    if (definition.id === 'planner') {
+      text = await generatePlannerAgentText({
+        model,
+        system,
+        prompt,
+        bus,
         agentId: definition.id,
         runId: context.runId,
-        chunk,
+        workingDir: context.workingDir,
       });
+    } else {
+      const result = streamText({
+        model,
+        system,
+        prompt,
+      });
+
+      for await (const chunk of result.textStream) {
+        text += chunk;
+        bus.emit({
+          type: 'agent.delta',
+          agentId: definition.id,
+          runId: context.runId,
+          chunk,
+        });
+      }
     }
 
     const outputCandidate = extractJsonObject(text);

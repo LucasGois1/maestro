@@ -4,6 +4,11 @@ import { useTerminalSize } from '../layout/useTerminalSize.js';
 import type { TuiDiscoveryPhase, TuiStore } from '../state/store.js';
 import { useStoreSelector } from '../state/useStoreSelector.js';
 import { DiffPreviewPanel } from './DiffPreviewPanel.js';
+import { DiscoveryPhaseChecklist } from './DiscoveryPhaseChecklist.js';
+
+/** Honest product copy: discovery does not generate sensors.json yet (DSFT-120). */
+export const DISCOVERY_SENSORS_FOOTNOTE =
+  'sensors.json — KB default for now; customize manually. Stack-specific sensors (e.g. ruff, pytest) are not auto-generated yet.';
 
 export interface DiscoveryScreenProps {
   readonly store: TuiStore;
@@ -47,8 +52,13 @@ export function DiscoveryScreen({ store, onChoice }: DiscoveryScreenProps) {
     discovery.phase === 'inferring'
       ? Math.min(10, Math.max(4, Math.floor(size.rows / 5)))
       : 0;
-  const viewportLines = Math.max(8, size.rows - 12 - streamReserve);
+  const viewportLines = Math.max(8, size.rows - 18 - streamReserve);
   const streamLines = streamReserve || 6;
+
+  const showNextSteps =
+    discovery.phase !== 'error' &&
+    discovery.phase !== 'done' &&
+    discovery.phase !== 'preview';
 
   return (
     <Box flexDirection="column" paddingX={1} width={size.columns}>
@@ -58,6 +68,17 @@ export function DiscoveryScreen({ store, onChoice }: DiscoveryScreenProps) {
         </Text>
         <Text>{phaseLabel}</Text>
       </Box>
+
+      {discovery.providerSummary !== null ? (
+        <Box marginBottom={1}>
+          <Text dimColor={useColor}>
+            <Text bold>Provider: </Text>
+            {discovery.providerSummary}
+          </Text>
+        </Box>
+      ) : null}
+
+      <DiscoveryPhaseChecklist phase={discovery.phase} colorMode={colorMode} />
 
       {discovery.progressHint !== null && discovery.phase === 'inferring' ? (
         <Box marginBottom={1}>
@@ -136,9 +157,6 @@ export function DiscoveryScreen({ store, onChoice }: DiscoveryScreenProps) {
               </Text>
             </Box>
           ) : null}
-          <Box marginTop={1}>
-            <Text dimColor={useColor}>Press q to exit.</Text>
-          </Box>
         </Box>
       ) : null}
 
@@ -155,14 +173,75 @@ export function DiscoveryScreen({ store, onChoice }: DiscoveryScreenProps) {
               viewportLines={viewportLines}
             />
           </Box>
-          <Box marginTop={1}>
-            <Text dimColor={useColor}>
-              [Enter] apply to .maestro/ · [q] save draft only / cancel
-            </Text>
-          </Box>
+          <NextStepsBlock useColor={useColor} />
         </Box>
       ) : null}
+
+      {showNextSteps ? (
+        <Box marginBottom={1} flexDirection="column">
+          <NextStepsBlock useColor={useColor} />
+        </Box>
+      ) : null}
+
+      <Box marginTop={showNextSteps ? 0 : 1}>
+        <DiscoveryKeysHint phase={discovery.phase} useColor={useColor} />
+      </Box>
     </Box>
+  );
+}
+
+function NextStepsBlock({ useColor }: { readonly useColor: boolean }) {
+  return (
+    <Box flexDirection="column">
+      <Text bold {...(useColor ? { color: 'cyan' } : {})}>
+        Next steps
+      </Text>
+      <Text dimColor={useColor} wrap="wrap">
+        {'• .maestro/AGENTS.md — written on apply'}
+      </Text>
+      <Text dimColor={useColor} wrap="wrap">
+        {'• .maestro/ARCHITECTURE.md — written on apply'}
+      </Text>
+      <Text dimColor={useColor} wrap="wrap">
+        {`• ${DISCOVERY_SENSORS_FOOTNOTE}`}
+      </Text>
+    </Box>
+  );
+}
+
+function DiscoveryKeysHint({
+  phase,
+  useColor,
+}: {
+  readonly phase: TuiDiscoveryPhase;
+  readonly useColor: boolean;
+}) {
+  let line: string;
+  switch (phase) {
+    case 'detecting':
+    case 'structuring':
+    case 'inferring':
+      line =
+        'Scan running — [Enter] and [q] unlock at preview. ([e] edit: not wired yet)';
+      break;
+    case 'preview':
+    case 'done':
+      line =
+        '[Enter] apply to .maestro/ · [q] save draft only / cancel · [e] edit: not wired yet';
+      break;
+    case 'error':
+      line = '[q] or Enter — exit · [e] edit: not wired yet';
+      break;
+    default:
+      line = '';
+  }
+  if (line.length === 0) {
+    return null;
+  }
+  return (
+    <Text dimColor={useColor} wrap="wrap">
+      {line}
+    </Text>
   );
 }
 

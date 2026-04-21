@@ -7,8 +7,8 @@ describe('Footer', () => {
   it('renders idle hotkeys by default', () => {
     const app = render(<Footer state="idle" />);
     const frame = app.lastFrame() ?? '';
-    expect(frame).toContain('[i] init');
-    expect(frame).toContain('[r] run');
+    expect(frame).toContain('[tab] next panel');
+    expect(frame).toContain('[?] help');
     expect(frame).toContain('[q] quit');
     app.unmount();
   });
@@ -18,6 +18,7 @@ describe('Footer', () => {
     const frame = app.lastFrame() ?? '';
     expect(frame).toContain('[p] pause');
     expect(frame).toContain('[c] cancel');
+    expect(frame).toContain('[?] help');
     app.unmount();
   });
 
@@ -32,6 +33,7 @@ describe('Footer', () => {
     const app = render(<Footer state="overlay" />);
     const frame = app.lastFrame() ?? '';
     expect(frame).toContain('[esc] close');
+    expect(frame).toContain('[q] close');
     expect(frame).toContain('[enter] select');
     app.unmount();
   });

@@ -21,11 +21,10 @@
     "@ai-sdk/provider": "^3.0.8",
     "@maestro/config": "workspace:*",
     "@maestro/core": "workspace:*",
+    "@maestro/kb": "workspace:*",
     "@maestro/provider": "workspace:*",
+    "ai": "^6.0.168",
     "jsonrepair": "^3.14.0",
     "zod": "^4.3.6"
-  },
-  "devDependencies": {
-    "ai": "^6.0.168"
   }
 }

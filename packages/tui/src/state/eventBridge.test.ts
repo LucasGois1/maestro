@@ -15,6 +15,8 @@ describe('bridgeBusToStore', () => {
 
       const state = store.getState();
       expect(state.mode).toBe('run');
+      expect(state.runId).toBe('r1');
+      expect(state.kbPathsRead).toEqual([]);
       expect(state.pipeline.status).toBe('running');
       expect(state.pipeline.error).toBeNull();
       expect(state.diffPreview.unifiedDiff).toBe('');
@@ -527,7 +529,61 @@ describe('bridgeBusToStore', () => {
       const dp = store.getState().diffPreview;
       expect(dp.mode).toBe('feedback');
       expect(dp.feedback?.criterion).toBe('security');
+      expect(dp.feedback?.attempt).toBe(1);
+      expect(dp.feedback?.sprintIdx).toBeNull();
       expect(dp.feedbackHistory).toHaveLength(1);
+    });
+
+    it('increments attempt for repeated feedback in the same sprint', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({ type: 'pipeline.started', runId: 'r' });
+      bus.emit({
+        type: 'pipeline.sprint_started',
+        runId: 'r',
+        sprintIdx: 2,
+        totalSprints: 3,
+      });
+      bus.emit({
+        type: 'evaluator.feedback',
+        runId: 'r',
+        criterion: 'a',
+        failure: 'one',
+      });
+      bus.emit({
+        type: 'evaluator.feedback',
+        runId: 'r',
+        criterion: 'b',
+        failure: 'two',
+      });
+
+      const h = store.getState().diffPreview.feedbackHistory;
+      expect(h).toHaveLength(2);
+      expect(h[0]?.attempt).toBe(1);
+      expect(h[0]?.sprintIdx).toBe(2);
+      expect(h[1]?.attempt).toBe(2);
+      expect(h[1]?.sprintIdx).toBe(2);
+    });
+
+    it('records kb.file_read paths for highlights', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({
+        type: 'kb.file_read',
+        runId: 'r',
+        path: 'docs/a.md',
+      });
+      bus.emit({
+        type: 'kb.file_read',
+        runId: 'r',
+        path: 'docs/a.md',
+      });
+
+      expect(store.getState().kbPathsRead).toEqual(['docs/a.md']);
     });
   });
 

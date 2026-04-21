@@ -51,6 +51,8 @@ describe('DiffPreviewPanel', () => {
           mode: 'feedback',
           feedback: {
             at: 1,
+            sprintIdx: 1,
+            attempt: 2,
             criterion: 'tests pass',
             failure: 'assertion failed',
             file: 'a.ts',

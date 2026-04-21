@@ -1,5 +1,6 @@
 import { Box, Text } from 'ink';
 
+import { PIPELINE_FOOTER_HINTS } from '../keybindings/hotkeysCatalog.js';
 import type {
   TuiColorMode,
   TuiPipelineStatus,
@@ -56,29 +57,12 @@ const HOTKEYS_BY_STATE: Readonly<
     readonly { readonly key: string; readonly label: string }[]
   >
 > = {
-  idle: [
-    { key: '[tab]', label: 'next panel' },
-    { key: '[i]', label: 'init' },
-    { key: '[r]', label: 'run' },
-    { key: '[?]', label: 'help' },
-    { key: '[q]', label: 'quit' },
-  ],
-  running: [
-    { key: '[tab]', label: 'next panel' },
-    { key: '[p]', label: 'pause' },
-    { key: '[c]', label: 'cancel' },
-    { key: '[d]', label: 'diff' },
-    { key: '[q]', label: 'quit' },
-  ],
-  paused: [
-    { key: '[tab]', label: 'next panel' },
-    { key: '[space]', label: 'resume' },
-    { key: '[c]', label: 'cancel' },
-    { key: '[?]', label: 'help' },
-    { key: '[q]', label: 'quit' },
-  ],
+  idle: PIPELINE_FOOTER_HINTS.idle,
+  running: PIPELINE_FOOTER_HINTS.running,
+  paused: PIPELINE_FOOTER_HINTS.paused,
   overlay: [
     { key: '[esc]', label: 'close' },
+    { key: '[q]', label: 'close' },
     { key: '[↑↓]', label: 'navigate' },
     { key: '[enter]', label: 'select' },
   ],
