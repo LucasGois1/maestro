@@ -30,4 +30,9 @@ describe('resolveCliMode', () => {
     expect(resolveCliMode(['tui'])).toBe('command');
     expect(resolveCliMode(['tui', '--demo'])).toBe('command');
   });
+
+  it('routes init as a known subcommand', () => {
+    expect(resolveCliMode(['init'])).toBe('command');
+    expect(resolveCliMode(['init', '--no-ai'])).toBe('command');
+  });
 });

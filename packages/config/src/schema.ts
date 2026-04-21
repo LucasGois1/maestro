@@ -8,6 +8,7 @@ export const AGENT_NAMES = [
   'merger',
   'code-reviewer',
   'doc-gardener',
+  'discovery',
 ] as const;
 
 export type AgentName = (typeof AGENT_NAMES)[number];
@@ -79,6 +80,9 @@ const defaultsSchema = z
     'doc-gardener': agentDefaultSchema.prefault({
       model: 'anthropic/claude-haiku-4-5',
     }),
+    discovery: agentDefaultSchema.prefault({
+      model: 'anthropic/claude-sonnet-4-6',
+    }),
   })
   .strict();
 
@@ -101,6 +105,7 @@ const discoverySchema = z
   .object({
     enabled: z.boolean().default(true),
     autoUpdateAgentsMd: z.boolean().default(true),
+    initBranch: z.string().min(1).default('maestro/init'),
   })
   .strict();
 

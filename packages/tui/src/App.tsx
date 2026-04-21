@@ -26,6 +26,7 @@ import {
   AGENT_LOG_OVERLAY_ID,
   createAgentLogOverlay,
 } from './panels/AgentLogOverlay.js';
+import { DiscoveryScreen } from './panels/DiscoveryScreen.js';
 import { DiffPreviewPanel } from './panels/DiffPreviewPanel.js';
 import {
   FEEDBACK_HISTORY_OVERLAY_ID,
@@ -58,6 +59,9 @@ export interface AppProps {
     readonly title: string;
     readonly render: () => React.ReactNode;
   };
+  readonly discovery?: {
+    readonly onChoice: (choice: 'accept' | 'cancel') => void;
+  };
 }
 
 export function App({
@@ -67,6 +71,7 @@ export function App({
   terminalSize,
   keybindingRouter,
   initialOverlay,
+  discovery,
 }: AppProps) {
   const activeStore = useMemo(
     () => store ?? createTuiStore({ colorMode: colorMode ?? 'color' }),
@@ -90,6 +95,7 @@ export function App({
   const bodyProps = {
     store: activeStore,
     ...(keybindingRouter ? { keybindingRouter } : {}),
+    ...(discovery ? { discovery } : {}),
   };
   const content = (
     <OverlayHostProvider
@@ -108,24 +114,33 @@ export function App({
 interface AppBodyProps {
   readonly store: TuiStore;
   readonly keybindingRouter?: KeybindingRouter;
+  readonly discovery?: AppProps['discovery'];
 }
 
-function AppBody({ store, keybindingRouter }: AppBodyProps) {
+function AppBody({ store, keybindingRouter, discovery }: AppBodyProps) {
   const overlayHost = useOverlayHost();
   const focus = useStoreSelector(store, (state) => state.focus);
+  const mode = useStoreSelector(store, (state) => state.mode);
   const providerProps = {
     focusedPanelId: focus.panelId,
     overlayOpen: overlayHost.overlays.length > 0,
+    enabled: mode !== 'discovery',
     ...(keybindingRouter ? { router: keybindingRouter } : {}),
   };
   return (
     <KeybindingProvider {...providerProps}>
-      <AppShell store={store} />
+      <AppShell store={store} discovery={discovery} />
     </KeybindingProvider>
   );
 }
 
-function AppShell({ store }: { readonly store: TuiStore }) {
+function AppShell({
+  store,
+  discovery,
+}: {
+  readonly store: TuiStore;
+  readonly discovery?: AppProps['discovery'];
+}) {
   const overlayHost = useOverlayHost();
   const mode = useStoreSelector(store, (state) => state.mode);
   const header = useStoreSelector(store, (state) => state.header);
@@ -282,6 +297,20 @@ function AppShell({ store }: { readonly store: TuiStore }) {
     { key: 'r' },
     openFeedbackHistory,
   );
+
+  if (mode === 'discovery') {
+    const onChoice =
+      discovery?.onChoice ??
+      (() => {
+        /* no-op when discovery props omitted */
+      });
+    return (
+      <Box flexDirection="column" width={size.columns}>
+        <Header mode={mode} header={header} colorMode={colorMode} />
+        <DiscoveryScreen store={store} onChoice={onChoice} />
+      </Box>
+    );
+  }
 
   return (
     <Box flexDirection="column" width={size.columns}>

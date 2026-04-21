@@ -18,6 +18,7 @@ describe('createTuiStore', () => {
     const state = store.getState();
 
     expect(state.mode).toBe('idle');
+    expect(state.discovery.phase).toBe('detecting');
     expect(state.pipeline.status).toBe('idle');
     expect(state.sprints).toEqual([]);
     expect(state.sensors).toEqual({});

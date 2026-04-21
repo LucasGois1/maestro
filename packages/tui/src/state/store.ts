@@ -2,6 +2,32 @@ import type { PipelineStageName } from '@maestro/core';
 
 export type TuiMode = 'idle' | 'discovery' | 'run';
 
+export type TuiDiscoveryPhase =
+  | 'detecting'
+  | 'structuring'
+  | 'inferring'
+  | 'preview'
+  | 'done'
+  | 'error';
+
+export interface TuiDiscoveryState {
+  readonly phase: TuiDiscoveryPhase;
+  readonly stackSummary: string | null;
+  readonly structureSummary: string | null;
+  /** Short line (e.g. schema validation failed). */
+  readonly errorSummary: string | null;
+  /** Multi-line detail for the discovery error (issues, raw snippet). */
+  readonly errorDetail: string | null;
+  /** Path to `.maestro/logs/discovery-*.log` when logging is enabled. */
+  readonly logFilePath: string | null;
+  /** Sub-step during inferential discovery (sampling vs LLM). */
+  readonly progressHint: string | null;
+  /** Trailing text from the LLM stream while inferring (for live feedback). */
+  readonly agentStreamTail: string | null;
+  readonly proposedAgentsMd: string | null;
+  readonly proposedArchitectureMd: string | null;
+}
+
 export type TuiPipelineStatus =
   | 'idle'
   | 'running'
@@ -127,6 +153,7 @@ export interface TuiDiffPreviewState {
 
 export interface TuiState {
   readonly mode: TuiMode;
+  readonly discovery: TuiDiscoveryState;
   readonly header: TuiHeaderState;
   readonly pipeline: TuiPipelineState;
   readonly sprints: readonly TuiSprintState[];
@@ -178,6 +205,18 @@ export function createInitialTuiState(
 ): TuiState {
   return {
     mode: 'idle',
+    discovery: {
+      phase: 'detecting',
+      stackSummary: null,
+      structureSummary: null,
+      errorSummary: null,
+      errorDetail: null,
+      logFilePath: null,
+      progressHint: null,
+      agentStreamTail: null,
+      proposedAgentsMd: null,
+      proposedArchitectureMd: null,
+    },
     header: {
       repoName: null,
       branch: null,

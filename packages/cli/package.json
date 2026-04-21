@@ -13,10 +13,13 @@
     "templates"
   ],
   "dependencies": {
+    "@maestro/agents": "workspace:^",
     "@maestro/config": "workspace:*",
+    "@maestro/discovery": "workspace:^",
     "@maestro/core": "workspace:*",
     "@maestro/git": "workspace:*",
     "@maestro/kb": "workspace:^",
+    "@maestro/provider": "workspace:^",
     "@maestro/state": "workspace:*",
     "@maestro/tui": "workspace:*",
     "commander": "^14.0.1",

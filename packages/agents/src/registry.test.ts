@@ -47,7 +47,10 @@ describe('AgentRegistry', () => {
       'merger',
     ]);
     expect(r.sensors().map((d) => d.id)).toEqual(['code-reviewer']);
-    expect(r.background().map((d) => d.id)).toEqual(['doc-gardener']);
+    expect(r.background().map((d) => d.id)).toEqual([
+      'doc-gardener',
+      'discovery',
+    ]);
   });
 
   it('rejects a pipeline agent without stage', () => {

@@ -1,0 +1,28 @@
+{
+  "name": "@maestro/discovery",
+  "version": "0.0.1",
+  "description": "Repository discovery: stack detection and structural analysis",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@maestro/agents": "workspace:^",
+    "@maestro/config": "workspace:^",
+    "@maestro/core": "workspace:^",
+    "@maestro/git": "workspace:^",
+    "@maestro/kb": "workspace:^"
+  }
+}

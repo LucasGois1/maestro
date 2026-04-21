@@ -1,0 +1,15 @@
+{
+  "concurrency": 4,
+  "sensors": [
+    {
+      "id": "go-test",
+      "kind": "computational",
+      "command": "go test ./..."
+    },
+    {
+      "id": "go-vet",
+      "kind": "computational",
+      "command": "go vet ./..."
+    }
+  ]
+}

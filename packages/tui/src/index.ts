@@ -23,6 +23,8 @@ export {
   type TuiAgentLogKind,
   type TuiAgentState,
   type TuiColorMode,
+  type TuiDiscoveryPhase,
+  type TuiDiscoveryState,
   type TuiDiffPreviewState,
   type TuiFeedbackEntry,
   type TuiFocusState,
@@ -57,6 +59,10 @@ export { LayoutGrid } from './layout/LayoutGrid.js';
 export { Header } from './components/Header.js';
 export { Footer, deriveFooterState } from './components/Footer.js';
 export {
+  ListPickerScreen,
+  type ListPickerItem,
+} from './components/ListPickerScreen.js';
+export {
   OverlayHost,
   OverlayHostProvider,
   useOverlayHost,
@@ -72,6 +78,7 @@ export { PipelinePanel } from './panels/PipelinePanel.js';
 export { ActiveAgentPanel } from './panels/ActiveAgentPanel.js';
 export { SprintsPanel } from './panels/SprintsPanel.js';
 export { SensorsPanel } from './panels/SensorsPanel.js';
+export { DiscoveryScreen } from './panels/DiscoveryScreen.js';
 export { DiffPreviewPanel } from './panels/DiffPreviewPanel.js';
 export {
   AGENT_LOG_OVERLAY_ID,

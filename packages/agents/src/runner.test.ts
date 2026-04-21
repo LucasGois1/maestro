@@ -106,6 +106,18 @@ describe('runAgent', () => {
     expect(result.output.echoed).toBe('fenced');
   });
 
+  it('repairs near-JSON from the model (e.g. trailing comma) before validating', async () => {
+    const bus = createEventBus();
+    const result = await runAgent({
+      definition: echoAgent,
+      input: { value: 'hi' },
+      context: ctx,
+      bus,
+      model: mockModel('{"echoed":"ok",}'),
+    });
+    expect(result.output.echoed).toBe('ok');
+  });
+
   it('emits agent.failed when output fails validation', async () => {
     const bus = createEventBus();
     const listener = vi.fn();

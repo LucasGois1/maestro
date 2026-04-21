@@ -1,0 +1,15 @@
+{
+  "concurrency": 4,
+  "sensors": [
+    {
+      "id": "ruff",
+      "kind": "computational",
+      "command": "ruff check ."
+    },
+    {
+      "id": "pytest",
+      "kind": "computational",
+      "command": "pytest -q"
+    }
+  ]
+}

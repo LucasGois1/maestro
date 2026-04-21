@@ -71,6 +71,19 @@ describe('@maestro/cli index', () => {
     expect(program.parse).toHaveBeenCalledWith(['node', 'maestro', 'tui']);
   });
 
+  it('routes maestro init to the command path', () => {
+    const program = { parse: vi.fn() };
+
+    runCli(['init', '--no-ai'], { program, version: '0.0.1' });
+
+    expect(program.parse).toHaveBeenCalledWith([
+      'node',
+      'maestro',
+      'init',
+      '--no-ai',
+    ]);
+  });
+
   it('unmounts the ink app in non-interactive mode', () => {
     vi.useFakeTimers();
 

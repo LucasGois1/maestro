@@ -25,7 +25,9 @@ export {
 } from './registry.js';
 
 export {
+  AgentOutputParseError,
   AgentValidationError,
+  formatAgentErrorForDisplay,
   runAgent,
   type RunAgentOptions,
   type RunAgentResult,
@@ -37,6 +39,7 @@ export {
   architectAgent,
   BUILT_IN_AGENTS,
   codeReviewerAgent,
+  discoveryAgent,
   docGardenerAgent,
   evaluatorAgent,
   generatorAgent,

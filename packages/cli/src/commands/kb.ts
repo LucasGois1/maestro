@@ -1,3 +1,5 @@
+import { loadConfig } from '@maestro/config';
+import { runKbRefresh } from '@maestro/discovery';
 import { createKBManager, lintKnowledgeBase } from '@maestro/kb';
 import { Command } from 'commander';
 
@@ -54,6 +56,26 @@ export function createKBCommand(options: KbCommandOptions = {}): Command {
         io.stderr(`- ${issue.file}: ${issue.message}`);
       }
       process.exitCode = 1;
+    });
+
+  kb.command('refresh')
+    .description('Re-run inferential discovery to refresh AGENTS.md and ARCHITECTURE.md')
+    .action(async () => {
+      const repoRoot = cwd();
+      const { resolved: config } = await loadConfig({ cwd: repoRoot });
+      if (!config.discovery.enabled) {
+        io.stderr('Discovery is disabled in config.');
+        process.exitCode = 1;
+        return;
+      }
+      try {
+        await runKbRefresh({ repoRoot, config });
+        io.stdout('Knowledge base refreshed.');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        io.stderr(message);
+        process.exitCode = 1;
+      }
     });
 
   return kb;

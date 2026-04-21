@@ -1,0 +1,15 @@
+{
+  "concurrency": 4,
+  "sensors": [
+    {
+      "id": "eslint",
+      "kind": "computational",
+      "command": "pnpm exec eslint ."
+    },
+    {
+      "id": "tsc",
+      "kind": "computational",
+      "command": "pnpm exec tsc --noEmit"
+    }
+  ]
+}

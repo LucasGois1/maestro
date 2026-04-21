@@ -3,6 +3,9 @@ import { DEFAULT_CONFIG } from '@maestro/config';
 import type { EventBus } from '@maestro/core';
 import { getModel, streamText } from '@maestro/provider';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
+import { jsonrepair } from 'jsonrepair';
+
+import type { ZodIssue } from 'zod';
 
 import type {
   AgentContext,
@@ -11,15 +14,83 @@ import type {
   FewShotExample,
 } from './definition.js';
 
+function formatZodIssues(issues: readonly ZodIssue[]): string {
+  return issues
+    .map((i) => {
+      const path = i.path.length ? i.path.map(String).join('.') : '(root)';
+      return `  · ${path}: ${i.message}`;
+    })
+    .join('\n');
+}
+
+export class AgentOutputParseError extends Error {
+  constructor(
+    message: string,
+    public readonly rawText: string,
+  ) {
+    super(message);
+    this.name = 'AgentOutputParseError';
+  }
+}
+
 export class AgentValidationError extends Error {
   constructor(
     message: string,
     public readonly phase: 'input' | 'output',
     public readonly issues: readonly unknown[],
+    /** Full model text; use for file logs only, not terminal. */
+    public readonly rawModelOutput?: string,
   ) {
     super(message);
     this.name = 'AgentValidationError';
   }
+}
+
+/** Human-readable blocks for TUI (summary line + wrapped detail). */
+export function formatAgentErrorForDisplay(error: unknown): {
+  readonly summary: string;
+  readonly detail: string;
+} {
+  if (error instanceof AgentOutputParseError) {
+    const head = error.rawText.length > 3500 ? `${error.rawText.slice(0, 3500)}…` : error.rawText;
+    return {
+      summary: 'Model output was not valid JSON',
+      detail: `${error.message}\n\n--- Raw output (truncated for screen) ---\n${head}`,
+    };
+  }
+  if (error instanceof AgentValidationError) {
+    if (error.phase === 'output') {
+      const raw = error.rawModelOutput;
+      const rawBlock =
+        raw && raw.length > 0
+          ? `\n\n--- Model output (truncated for screen) ---\n${
+              raw.length > 3500 ? `${raw.slice(0, 3500)}…` : raw
+            }`
+          : '';
+      return {
+        summary: 'Discovery output did not match the expected schema',
+        detail: `${error.message}${rawBlock}`,
+      };
+    }
+    return {
+      summary: 'Invalid input for discovery agent',
+      detail: error.message,
+    };
+  }
+  if (error instanceof Error) {
+    const stack =
+      error.stack && error.stack.length > 2000
+        ? `${error.stack.slice(0, 2000)}…`
+        : error.stack;
+    return {
+      summary: error.name === 'Error' ? 'Discovery failed' : error.name,
+      detail: error.message + (stack ? `\n\n${stack}` : ''),
+    };
+  }
+  return {
+    summary: 'Discovery failed',
+    detail: String(error),
+  };
 }
 
 export type RunAgentOptions<TInput, TOutput> = {
@@ -97,10 +168,18 @@ function extractJsonObject(text: string): unknown {
   const candidate = fenceMatch?.[1]?.trim() ?? trimmed;
   try {
     return JSON.parse(candidate);
-  } catch {
-    throw new Error(
-      `Agent output was not valid JSON. Raw text: ${candidate.slice(0, 200)}`,
-    );
+  } catch (first) {
+    /** LLMs often emit almost-JSON: newlines inside strings, stray commas, etc. */
+    try {
+      return JSON.parse(jsonrepair(candidate));
+    } catch (second) {
+      const a = first instanceof Error ? first.message : String(first);
+      const b = second instanceof Error ? second.message : String(second);
+      throw new AgentOutputParseError(
+        `Agent output was not valid JSON (parse: ${a}; after repair: ${b}).`,
+        text,
+      );
+    }
   }
 }
 
@@ -152,10 +231,13 @@ export async function runAgent<TInput, TOutput>(
     const outputCandidate = extractJsonObject(text);
     const outputParse = definition.outputSchema.safeParse(outputCandidate);
     if (!outputParse.success) {
+      const issues = outputParse.error.issues;
+      const body = formatZodIssues(issues);
       throw new AgentValidationError(
-        `Invalid output from agent "${definition.id}"`,
+        `Invalid output from agent "${definition.id}" (${issues.length} schema issue(s)):\n${body}`,
         'output',
-        outputParse.error.issues,
+        issues,
+        text,
       );
     }
 

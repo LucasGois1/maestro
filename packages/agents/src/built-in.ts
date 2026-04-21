@@ -61,6 +61,96 @@ const docGardenerOutputSchema = z.object({
   deletions: z.array(z.string()).default([]),
 });
 
+const discoveryInputSchema = z.object({
+  repoRoot: z.string(),
+  stack: z.object({
+    kind: z.string(),
+    markers: z.array(z.string()),
+    hints: z.record(z.string(), z.unknown()),
+  }),
+  structure: z.object({
+    topLevelNames: z.array(z.string()),
+    extensionCounts: z.record(z.string(), z.number()),
+    testDirectoryHints: z.array(z.string()),
+    approxFileCount: z.number(),
+  }),
+  fileSamples: z.array(
+    z.object({
+      path: z.string(),
+      content: z.string(),
+    }),
+  ),
+});
+
+/** Models sometimes emit section-keyed objects instead of one markdown string; merge in prompt order. */
+const DISCOVERY_AGENTS_SECTION_ORDER = [
+  'Header',
+  'Repo Map',
+  'Docs',
+  'Essential Commands',
+  'Critical Conventions',
+  'Escalation Path',
+] as const;
+
+const DISCOVERY_ARCH_SECTION_ORDER = [
+  "Bird's Eye View",
+  'Code Map',
+  'Cross-Cutting Concerns',
+  'Module Boundaries',
+  'Data Flow',
+] as const;
+
+function mergeSectionedMarkdown(
+  raw: Record<string, string>,
+  preferredOrder: readonly string[],
+): string {
+  const parts: string[] = [];
+  const seen = new Set<string>();
+  for (const key of preferredOrder) {
+    const v = raw[key];
+    if (v !== undefined) {
+      const t = v.trim();
+      if (t.length > 0) {
+        parts.push(t);
+        seen.add(key);
+      }
+    }
+  }
+  for (const [k, v] of Object.entries(raw)) {
+    if (seen.has(k)) {
+      continue;
+    }
+    const t = v.trim();
+    if (t.length > 0) {
+      parts.push(t);
+    }
+  }
+  return parts.join('\n\n');
+}
+
+function sectionedMarkdownField(preferredOrder: readonly string[]) {
+  const recordToMd = z
+    .record(
+      z.string(),
+      z.union([z.string(), z.number(), z.boolean()]),
+    )
+    .transform((obj) => {
+      const map: Record<string, string> = {};
+      for (const [k, v] of Object.entries(obj)) {
+        map[k] = typeof v === 'string' ? v : String(v);
+      }
+      return mergeSectionedMarkdown(map, preferredOrder);
+    })
+    .pipe(z.string().min(1));
+
+  return z.union([z.string().min(1), recordToMd]);
+}
+
+const discoveryOutputSchema = z.object({
+  agentsMd: sectionedMarkdownField(DISCOVERY_AGENTS_SECTION_ORDER),
+  architectureMd: sectionedMarkdownField(DISCOVERY_ARCH_SECTION_ORDER),
+});
+
 export const plannerAgent: AgentDefinition<
   z.infer<typeof textInputSchema>,
   z.infer<typeof plannerOutputSchema>
@@ -162,6 +252,36 @@ export const docGardenerAgent: AgentDefinition<
   outputSchema: docGardenerOutputSchema,
 };
 
+export const discoveryAgent: AgentDefinition<
+  z.infer<typeof discoveryInputSchema>,
+  z.infer<typeof discoveryOutputSchema>
+> = {
+  id: 'discovery',
+  role: 'background',
+  systemPrompt: `You are the Maestro Discovery agent. Given structured repo metadata and small file samples, produce JSON only (no markdown fences) with keys "agentsMd" and "architectureMd".
+
+Prefer each value as a single markdown STRING (full document body). If you structure by section instead, you may use a JSON object whose keys are section titles and values are markdown strings for that section — both shapes are accepted.
+
+Do not put markdown fenced code blocks (triple backticks) inside JSON string values — they break JSON escaping. Use indented lines or one-line shell examples instead.
+
+Quality rules (follow strictly):
+- Ground claims in the provided metadata and file samples. Do not invent version numbers, owners, or features not evidenced.
+- Repo Map: list meaningful source and product dirs (e.g. packages/, apps/, src/). Do not list dependency/vendor trees (node_modules, venv), build outputs (dist, build, coverage), or .git. If "topLevelNames" in metadata already omits those, mirror that.
+- Docs: link to real paths like [CONTRIBUTING.md](./CONTRIBUTING.md) or absolute URLs. Do not use [Label](#anchor) unless that exact heading exists in the same generated file (prefer full URLs for external docs).
+- Essential Commands: when package.json appears in samples, align command names with the "scripts" field (e.g. pnpm test if the repo uses pnpm). Include install, build, test, and lint when those scripts exist; otherwise say "TODO: add scripts" briefly.
+- Critical Conventions: cite only what you can infer (e.g. ESLint/Prettier from config files, changesets if mentioned). Otherwise use a short TODO.
+- Escalation Path: prefer issue trackers or contacts suggested by README/CONTRIBUTING samples; otherwise neutral "maintainers via GitHub issues".
+- ARCHITECTURE — Bird's Eye View: one short paragraph on what the system does. Code Map: name real packages/paths from metadata (e.g. packages/cli). Cross-Cutting Concerns: CI/testing/lint only if .github or configs appear in samples. Module Boundaries & Data Flow: stay concrete; avoid vague marketing language.
+
+AGENTS.md must be a concise index (~under 120 lines) with these exact ## headings in order: Header, Repo Map, Docs, Essential Commands, Critical Conventions, Escalation Path. Use bullet lists where appropriate.
+
+ARCHITECTURE.md must use these exact ## headings in order: Bird's Eye View, Code Map, Cross-Cutting Concerns, Module Boundaries, Data Flow. Keep each section short and factual.
+
+If information is missing, write brief TODO placeholders rather than inventing details.`,
+  inputSchema: discoveryInputSchema,
+  outputSchema: discoveryOutputSchema,
+};
+
 export const BUILT_IN_AGENTS = [
   plannerAgent,
   architectAgent,
@@ -170,4 +290,8 @@ export const BUILT_IN_AGENTS = [
   mergerAgent,
   codeReviewerAgent,
   docGardenerAgent,
+  discoveryAgent,
 ] as const;
+
+/** Exposed for tests: validates + normalizes discovery agent JSON output. */
+export { discoveryOutputSchema };

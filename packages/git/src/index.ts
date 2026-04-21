@@ -38,6 +38,12 @@ export {
 } from './commit.js';
 
 export {
+  commitMaestroKbInit,
+  type CommitMaestroKbInitOptions,
+  type CommitMaestroKbInitResult,
+} from './maestro-kb-init.js';
+
+export {
   detectDivergence,
   type DetectDivergenceOptions,
   type DivergenceReport,

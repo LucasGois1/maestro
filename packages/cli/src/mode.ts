@@ -7,6 +7,7 @@ export const KNOWN_SUBCOMMANDS = new Set([
   'abort',
   'config',
   'git',
+  'init',
   'kb',
   'runs',
   'tui',

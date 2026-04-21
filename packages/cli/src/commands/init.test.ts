@@ -47,9 +47,11 @@ describe('maestro init', () => {
       }),
     );
     program.exitOverride();
-    await program.parseAsync(['init'], { from: 'user' });
+    await program.parseAsync(['init', '--no-ai'], { from: 'user' });
 
-    expect(stdout.some((line) => line.includes('Initialized'))).toBe(true);
+    expect(
+      stdout.some((line) => line.includes('computational stack')),
+    ).toBe(true);
 
     await readFile(join(repoRoot, '.maestro', 'config.json'), 'utf8');
     await readFile(join(repoRoot, '.maestro', 'AGENTS.md'), 'utf8');
