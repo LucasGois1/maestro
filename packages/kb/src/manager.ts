@@ -2,6 +2,12 @@ import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 
 import {
+  DEFAULT_CONFIG,
+  resolveConfigPaths,
+  writeConfigFile,
+  type MaestroConfigInput,
+} from '@maestro/config';
+import {
   appendProjectLog,
   maestroRoot,
   type ProjectLogEntry,
@@ -133,6 +139,26 @@ async function writeIfMissing(path: string, content: string): Promise<void> {
   }
 }
 
+async function writeConfigIfMissing(
+  path: string,
+  data: MaestroConfigInput,
+): Promise<void> {
+  try {
+    await readFile(path, 'utf8');
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code: unknown }).code === 'ENOENT'
+    ) {
+      await writeConfigFile(path, data);
+      return;
+    }
+    throw error;
+  }
+}
+
 function escapeRegex(input: string): string {
   return input.replace(/[|\\{}()[\]^$+?.]/gu, '\\$&');
 }
@@ -189,6 +215,10 @@ export function createKBManager(options: CreateKBManagerOptions): KBManager {
   return {
     async init() {
       await mkdir(root, { recursive: true });
+      const projectConfigPath = resolveConfigPaths({
+        cwd: options.repoRoot,
+      }).project;
+      await writeConfigIfMissing(projectConfigPath, DEFAULT_CONFIG);
       await writeIfMissing(pathFor('AGENTS.md'), DEFAULT_AGENTS_MD);
       await writeIfMissing(pathFor('ARCHITECTURE.md'), DEFAULT_ARCHITECTURE_MD);
       await writeIfMissing(pathFor('sensors.json'), DEFAULT_SENSORS_JSON);

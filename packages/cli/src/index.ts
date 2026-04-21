@@ -10,6 +10,7 @@ import { createElement } from 'react';
 import { createAbortCommand } from './commands/abort.js';
 import { createConfigCommand } from './commands/config.js';
 import { createGitCommand } from './commands/git.js';
+import { createInitCommand } from './commands/init.js';
 import { createKBCommand } from './commands/kb.js';
 import { createRunsCommand } from './commands/runs.js';
 import { createTuiCommand } from './commands/tui.js';
@@ -54,6 +55,7 @@ function createProgram(version: string) {
 
   program.addCommand(createAbortCommand());
   program.addCommand(createConfigCommand());
+  program.addCommand(createInitCommand());
   program.addCommand(createGitCommand());
   program.addCommand(createKBCommand());
   program.addCommand(createRunsCommand());

@@ -143,6 +143,9 @@ importers:
 
   packages/kb:
     dependencies:
+      '@maestro/config':
+        specifier: workspace:^
+        version: link:../config
       '@maestro/state':
         specifier: workspace:^
         version: link:../state

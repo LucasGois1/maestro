@@ -53,6 +53,66 @@ describe('lintKnowledgeBase', () => {
     ).toBe(true);
   });
 
+  it('reports missing AGENTS.md sections', async () => {
+    const kb = createKBManager({ repoRoot });
+    await kb.init();
+
+    await writeFile(
+      join(repoRoot, '.maestro', 'AGENTS.md'),
+      ['# AGENTS', '', '## Header', 'x'].join('\n'),
+      'utf8',
+    );
+
+    const report = await lintKnowledgeBase({ repoRoot });
+
+    expect(report.ok).toBe(false);
+    expect(
+      report.issues.some(
+        (issue) =>
+          issue.rule === 'missing-section' && issue.file === '.maestro/AGENTS.md',
+      ),
+    ).toBe(true);
+  });
+
+  it('fix mode appends missing AGENTS sections', async () => {
+    const kb = createKBManager({ repoRoot });
+    await kb.init();
+
+    await writeFile(
+      join(repoRoot, '.maestro', 'AGENTS.md'),
+      ['# AGENTS', '', '## Header', 'x'].join('\n'),
+      'utf8',
+    );
+    await writeFile(
+      join(repoRoot, '.maestro', 'ARCHITECTURE.md'),
+      [
+        '# ARCHITECTURE',
+        '',
+        "## Bird's Eye View",
+        'ok',
+        '## Code Map',
+        'ok',
+        '## Cross-Cutting Concerns',
+        'ok',
+        '## Module Boundaries',
+        'ok',
+        '## Data Flow',
+        'ok',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const fixed = await lintKnowledgeBase({ repoRoot, fix: true });
+    const agents = await kb.read('AGENTS.md');
+
+    expect(fixed.fixedFiles).toContain('.maestro/AGENTS.md');
+    expect(agents).toContain('## Repo Map');
+    expect(agents).toContain('## Escalation Path');
+
+    const clean = await lintKnowledgeBase({ repoRoot });
+    expect(clean.ok).toBe(true);
+  });
+
   it('fix mode appends missing architecture sections and leaves valid docs passing', async () => {
     const kb = createKBManager({ repoRoot });
     await kb.init();
@@ -78,8 +138,9 @@ describe('lintKnowledgeBase', () => {
     const kb = createKBManager({ repoRoot });
     await kb.init();
 
-    const longDoc = Array.from({ length: 151 }, (_, index) => `line ${index + 1}`).join('\n');
-    await writeFile(join(repoRoot, '.maestro', 'AGENTS.md'), `${longDoc}\n`, 'utf8');
+    const base = await kb.read('AGENTS.md');
+    const padding = Array.from({ length: 151 }, (_, index) => `pad ${index + 1}`).join('\n');
+    await writeFile(join(repoRoot, '.maestro', 'AGENTS.md'), `${base}\n${padding}\n`, 'utf8');
 
     const report = await lintKnowledgeBase({ repoRoot });
     expect(report.issues).toEqual([

@@ -38,6 +38,13 @@ describe('createKBManager', () => {
     expect(agents).toContain('# AGENTS');
     expect(architecture).toContain('# ARCHITECTURE');
     expect(sensors).toContain('"sensors"');
+
+    const configRaw = await readFile(
+      join(repoRoot, '.maestro', 'config.json'),
+      'utf8',
+    );
+    const config = JSON.parse(configRaw) as { version?: number };
+    expect(config.version).toBe(1);
   });
 
   it('supports read, write, list, and getAgentContext', async () => {

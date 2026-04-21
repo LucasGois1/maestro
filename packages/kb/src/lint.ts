@@ -36,6 +36,15 @@ const REQUIRED_ARCHITECTURE_SECTIONS = [
   'Data Flow',
 ] as const;
 
+const REQUIRED_AGENTS_SECTIONS = [
+  'Header',
+  'Repo Map',
+  'Docs',
+  'Essential Commands',
+  'Critical Conventions',
+  'Escalation Path',
+] as const;
+
 async function fileExists(path: string): Promise<boolean> {
   try {
     await access(path);
@@ -116,9 +125,36 @@ function relativePath(root: string, filePath: string): string {
   return filePath.slice(root.length + 1).replace(/\\/gu, '/');
 }
 
-function appendMissingSections(content: string): { content: string; changed: boolean } {
+function appendMissingArchitectureSections(
+  content: string,
+): { content: string; changed: boolean } {
   const headings = new Set(findHeadings(content));
   const missing = REQUIRED_ARCHITECTURE_SECTIONS.filter(
+    (heading) => !headings.has(heading),
+  );
+
+  if (missing.length === 0) {
+    return { content, changed: false };
+  }
+
+  const appended = [
+    content.trimEnd(),
+    '',
+    ...missing.flatMap((heading) => [`## ${heading}`, 'TODO.']),
+    '',
+  ].join('\n');
+
+  return {
+    content: appended,
+    changed: true,
+  };
+}
+
+function appendMissingAgentsSections(
+  content: string,
+): { content: string; changed: boolean } {
+  const headings = new Set(findHeadings(content));
+  const missing = REQUIRED_AGENTS_SECTIONS.filter(
     (heading) => !headings.has(heading),
   );
 
@@ -172,18 +208,26 @@ async function runLint(
     return { issues, fixedFiles };
   }
 
-  const [agentsMd, initialArchitectureMd] = await Promise.all([
+  const [initialAgentsMd, initialArchitectureMd] = await Promise.all([
     readFile(agentsPath, 'utf8'),
     readFile(architecturePath, 'utf8'),
   ]);
+  let agentsMd = initialAgentsMd;
   let architectureMd = initialArchitectureMd;
 
   if (options.fix) {
-    const fixedArchitecture = appendMissingSections(architectureMd);
+    const fixedArchitecture = appendMissingArchitectureSections(architectureMd);
     if (fixedArchitecture.changed) {
       architectureMd = fixedArchitecture.content;
       await kb.write('ARCHITECTURE.md', architectureMd);
       fixedFiles.push('.maestro/ARCHITECTURE.md');
+    }
+
+    const fixedAgents = appendMissingAgentsSections(agentsMd);
+    if (fixedAgents.changed) {
+      agentsMd = fixedAgents.content;
+      await kb.write('AGENTS.md', agentsMd);
+      fixedFiles.push('.maestro/AGENTS.md');
     }
   }
 
@@ -204,6 +248,18 @@ async function runLint(
     issues.push({
       rule: 'missing-section',
       file: '.maestro/ARCHITECTURE.md',
+      message: `Missing required section "${heading}".`,
+    });
+  }
+
+  const agentsHeadings = findHeadings(agentsMd);
+  for (const heading of REQUIRED_AGENTS_SECTIONS) {
+    if (agentsHeadings.includes(heading)) {
+      continue;
+    }
+    issues.push({
+      rule: 'missing-section',
+      file: '.maestro/AGENTS.md',
       message: `Missing required section "${heading}".`,
     });
   }
