@@ -11,6 +11,9 @@ describe('sensorDefinitionSchema', () => {
     });
 
     expect(sensor.kind).toBe('computational');
+    if (sensor.kind !== 'computational') {
+      throw new Error('expected computational sensor');
+    }
     expect(sensor.onFail).toBe('block');
     expect(sensor.parseOutput).toBe('generic');
     expect(sensor.expectExitCode).toBe(0);

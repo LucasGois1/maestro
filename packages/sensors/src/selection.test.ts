@@ -7,15 +7,7 @@ describe('sensorAppliesToFiles', () => {
     expect(
       sensorAppliesToFiles(
         {
-          id: 'pytest',
-          kind: 'computational',
-          command: 'pnpm test',
-          args: [],
           appliesTo: [],
-          onFail: 'block',
-          parseOutput: 'generic',
-          expectExitCode: 0,
-          timeoutSec: 60,
         },
         ['src/index.ts'],
       ),
@@ -26,15 +18,7 @@ describe('sensorAppliesToFiles', () => {
     expect(
       sensorAppliesToFiles(
         {
-          id: 'frontend-tests',
-          kind: 'computational',
-          command: 'pnpm test',
-          args: [],
           appliesTo: ['packages/tui/**'],
-          onFail: 'block',
-          parseOutput: 'generic',
-          expectExitCode: 0,
-          timeoutSec: 60,
         },
         ['packages/tui/src/index.ts'],
       ),
@@ -45,18 +29,52 @@ describe('sensorAppliesToFiles', () => {
     expect(
       sensorAppliesToFiles(
         {
-          id: 'frontend-tests',
-          kind: 'computational',
-          command: 'pnpm test',
-          args: [],
           appliesTo: ['packages/tui/**'],
-          onFail: 'block',
-          parseOutput: 'generic',
-          expectExitCode: 0,
-          timeoutSec: 60,
         },
         ['packages/git/src/index.ts'],
       ),
     ).toBe(false);
+  });
+
+  it('returns false when patterns are set but no files changed', () => {
+    expect(
+      sensorAppliesToFiles(
+        {
+          appliesTo: ['src/**'],
+        },
+        [],
+      ),
+    ).toBe(false);
+  });
+
+  it('matches single-segment globs and question-mark wildcards', () => {
+    expect(
+      sensorAppliesToFiles(
+        {
+          appliesTo: ['src/*.ts'],
+        },
+        ['src/app.ts'],
+      ),
+    ).toBe(true);
+
+    expect(
+      sensorAppliesToFiles(
+        {
+          appliesTo: ['src/file?.ts'],
+        },
+        ['src/fileX.ts'],
+      ),
+    ).toBe(true);
+  });
+
+  it('matches ** across path segments', () => {
+    expect(
+      sensorAppliesToFiles(
+        {
+          appliesTo: ['packages/**/index.ts'],
+        },
+        ['packages/foo/bar/index.ts'],
+      ),
+    ).toBe(true);
   });
 });

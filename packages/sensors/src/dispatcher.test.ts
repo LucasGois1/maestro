@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
+import { createAgentRegistry } from '@maestro/agents';
+import type { MaestroConfig } from '@maestro/config';
 import { createEventBus } from '@maestro/core';
 import { composePolicy } from '@maestro/sandbox';
 
 import { dispatchSensors } from './dispatcher.js';
+import type { AgentRunner } from './runner.js';
 
 describe('dispatchSensors', () => {
   it('runs block sensors before warn sensors when concurrency is one', async () => {
@@ -178,5 +181,50 @@ describe('dispatchSensors', () => {
     ]);
     expect(events).toContain('sensor.started');
     expect(events).toContain('sensor.completed');
+  });
+
+  it('forwards optional run context fields to inferential sensors', async () => {
+    const approver = vi.fn();
+    const agentRunner = vi.fn(
+      async (): Promise<{
+        output: { verdict: 'approve'; findings: [] };
+        text: string;
+        durationMs: number;
+      }> => ({
+        output: { verdict: 'approve', findings: [] },
+        text: '',
+        durationMs: 2,
+      }),
+    ) as AgentRunner;
+
+    const results = await dispatchSensors(
+      [
+        {
+          id: 'review',
+          kind: 'inferential',
+          agent: 'code-reviewer',
+          criteria: [],
+          timeoutSec: 60,
+          onFail: 'block',
+          appliesTo: [],
+        },
+      ],
+      {
+        runId: 'r-opt',
+        repoRoot: '/repo',
+        bus: createEventBus(),
+        concurrency: 1,
+        maestroDir: '/maestro',
+        diff: 'diff --git a/x b/x',
+        policy: composePolicy({ mode: 'allowlist' }),
+        approver,
+        agentRunner,
+        registry: createAgentRegistry(),
+        config: {} as MaestroConfig,
+      },
+    );
+
+    expect(results[0]?.status).toBe('passed');
+    expect(agentRunner).toHaveBeenCalled();
   });
 });
