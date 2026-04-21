@@ -11,7 +11,23 @@ vi.mock('ink', () => ({
 }));
 
 vi.mock('@maestro/tui', () => ({
-  HelloWorld: () => null,
+  App: () => null,
+  bridgeBusToStore: vi.fn(() => () => undefined),
+  createTuiStore: vi.fn(() => ({
+    getState: vi.fn(() => ({ mode: 'idle' })),
+    setState: vi.fn(),
+    subscribe: vi.fn(() => vi.fn()),
+    select: vi.fn(() => vi.fn()),
+  })),
+  playDemoEvents: vi.fn(() => ({ cancel: vi.fn(), totalDurationMs: 0 })),
+  resolveColorMode: vi.fn(() => 'color'),
+}));
+
+vi.mock('@maestro/core', () => ({
+  createEventBus: vi.fn(() => ({
+    emit: vi.fn(),
+    on: vi.fn(() => vi.fn()),
+  })),
 }));
 
 import { createProgram, runCli } from './index.ts';
@@ -45,6 +61,14 @@ describe('@maestro/cli index', () => {
     runCli([], { stdoutIsTTY: true, version: '0.0.1' });
 
     expect(renderMock).toHaveBeenCalledOnce();
+  });
+
+  it('routes maestro tui to the command path', () => {
+    const program = { parse: vi.fn() };
+
+    runCli(['tui'], { program, version: '0.0.1' });
+
+    expect(program.parse).toHaveBeenCalledWith(['node', 'maestro', 'tui']);
   });
 
   it('unmounts the ink app in non-interactive mode', () => {

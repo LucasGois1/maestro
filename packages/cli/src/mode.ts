@@ -9,6 +9,7 @@ export const KNOWN_SUBCOMMANDS = new Set([
   'git',
   'kb',
   'runs',
+  'tui',
 ]);
 
 export function resolveCliMode(args: string[]): CliMode {

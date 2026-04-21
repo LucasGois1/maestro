@@ -25,4 +25,9 @@ describe('resolveCliMode', () => {
   it('stays in app mode for unknown first args', () => {
     expect(resolveCliMode(['some-prompt'])).toBe('app');
   });
+
+  it('routes tui as a known subcommand', () => {
+    expect(resolveCliMode(['tui'])).toBe('command');
+    expect(resolveCliMode(['tui', '--demo'])).toBe('command');
+  });
 });

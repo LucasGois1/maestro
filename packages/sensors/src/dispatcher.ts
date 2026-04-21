@@ -95,7 +95,9 @@ export async function dispatchSensors(
   while (nextIndex < runnable.length || running.size > 0) {
     while (nextIndex < runnable.length && running.size < concurrency) {
       const sensor = runnable[nextIndex];
-      launch(sensor!, nextIndex);
+      if (sensor) {
+        launch(sensor, nextIndex);
+      }
       nextIndex += 1;
     }
     if (running.size > 0) {

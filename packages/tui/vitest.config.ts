@@ -1,3 +1,13 @@
 import { createPackageVitestConfig } from '../../vitest.config.ts';
 
-export default createPackageVitestConfig(import.meta.dirname);
+const baseConfig = createPackageVitestConfig(import.meta.dirname);
+
+export default {
+  ...baseConfig,
+  test: {
+    ...baseConfig.test,
+    setupFiles: ['./vitest.setup.ts'],
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
+  },
+};

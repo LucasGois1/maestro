@@ -1,9 +1,10 @@
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
+import { createEventBus } from '@maestro/core';
+import { App, bridgeBusToStore, createTuiStore } from '@maestro/tui';
 import { Command } from 'commander';
 import { render } from 'ink';
-import { HelloWorld } from '@maestro/tui';
 import { createElement } from 'react';
 
 import { createAbortCommand } from './commands/abort.js';
@@ -11,6 +12,7 @@ import { createConfigCommand } from './commands/config.js';
 import { createGitCommand } from './commands/git.js';
 import { createKBCommand } from './commands/kb.js';
 import { createRunsCommand } from './commands/runs.js';
+import { createTuiCommand } from './commands/tui.js';
 import { resolveCliMode } from './mode.js';
 
 const CLI_PACKAGE_NAME = '@maestro/cli';
@@ -31,8 +33,11 @@ type ExecuteCliFromProcessOptions = {
   run?: typeof runCli;
 };
 
-function renderInkApp(version: string, stdoutIsTTY: boolean) {
-  const instance = render(createElement(HelloWorld, { version }));
+function renderInkApp(_version: string, stdoutIsTTY: boolean) {
+  const bus = createEventBus();
+  const store = createTuiStore();
+  bridgeBusToStore(bus, store);
+  const instance = render(createElement(App, { store }));
 
   if (!stdoutIsTTY) {
     setTimeout(() => {
@@ -52,6 +57,7 @@ function createProgram(version: string) {
   program.addCommand(createGitCommand());
   program.addCommand(createKBCommand());
   program.addCommand(createRunsCommand());
+  program.addCommand(createTuiCommand());
 
   return program;
 }

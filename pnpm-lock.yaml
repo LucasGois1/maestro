@@ -84,6 +84,9 @@ importers:
       '@maestro/config':
         specifier: workspace:*
         version: link:../config
+      '@maestro/core':
+        specifier: workspace:*
+        version: link:../core
       '@maestro/git':
         specifier: workspace:*
         version: link:../git
@@ -224,6 +227,9 @@ importers:
 
   packages/tui:
     dependencies:
+      '@maestro/core':
+        specifier: workspace:*
+        version: link:../core
       ink:
         specifier: 7.0.1
         version: 7.0.1(@types/react@19.2.14)(react-devtools-core@6.1.5)(react@19.2.5)

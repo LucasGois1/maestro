@@ -1,0 +1,313 @@
+import { createEventBus } from '@maestro/core';
+import { describe, expect, it, vi } from 'vitest';
+
+import { bridgeBusToStore } from './eventBridge.js';
+import { createTuiStore } from './store.js';
+
+describe('bridgeBusToStore', () => {
+  describe('pipeline events', () => {
+    it('transitions into run mode on pipeline.started', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({ type: 'pipeline.started', runId: 'r1' });
+
+      const state = store.getState();
+      expect(state.mode).toBe('run');
+      expect(state.pipeline.status).toBe('running');
+      expect(state.pipeline.error).toBeNull();
+    });
+
+    it('tracks stage and sprint progression', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({
+        type: 'pipeline.sprint_started',
+        runId: 'r1',
+        sprintIdx: 2,
+        totalSprints: 4,
+      });
+      bus.emit({
+        type: 'pipeline.stage_entered',
+        runId: 'r1',
+        stage: 'generating',
+        sprintIdx: 2,
+      });
+      bus.emit({
+        type: 'pipeline.sprint_retried',
+        runId: 'r1',
+        sprintIdx: 2,
+        retry: 1,
+      });
+
+      const state = store.getState();
+      expect(state.pipeline.stage).toBe('generating');
+      expect(state.pipeline.sprintIdx).toBe(2);
+      expect(state.header.sprintIdx).toBe(2);
+      expect(state.header.totalSprints).toBe(4);
+      expect(state.pipeline.retryCount).toBe(1);
+      expect(state.sprints).toEqual([
+        { idx: 2, status: 'running', retries: 1 },
+      ]);
+    });
+
+    it('marks sprints as escalated', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({
+        type: 'pipeline.sprint_started',
+        runId: 'r1',
+        sprintIdx: 1,
+        totalSprints: 2,
+      });
+      bus.emit({
+        type: 'pipeline.sprint_escalated',
+        runId: 'r1',
+        sprintIdx: 1,
+        reason: 'retries exhausted',
+      });
+
+      expect(store.getState().sprints[0]?.status).toBe('escalated');
+    });
+
+    it('reflects pause, resume, completion and failure', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({ type: 'pipeline.started', runId: 'r1' });
+      bus.emit({
+        type: 'pipeline.paused',
+        runId: 'r1',
+        at: 'generating',
+      });
+      expect(store.getState().pipeline.status).toBe('paused');
+
+      bus.emit({
+        type: 'pipeline.resumed',
+        runId: 'r1',
+        from: 'generating',
+      });
+      expect(store.getState().pipeline.status).toBe('running');
+
+      bus.emit({ type: 'pipeline.completed', runId: 'r1', durationMs: 10 });
+      expect(store.getState().pipeline.status).toBe('completed');
+
+      bus.emit({
+        type: 'pipeline.failed',
+        runId: 'r1',
+        error: 'boom',
+        at: 'generating',
+      });
+      const failed = store.getState();
+      expect(failed.pipeline.status).toBe('failed');
+      expect(failed.pipeline.error).toBe('boom');
+    });
+  });
+
+  describe('agent events', () => {
+    it('records the active agent and streams deltas capped by buffer size', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store, { agentDeltaBufferChars: 6 });
+
+      bus.emit({
+        type: 'agent.started',
+        agentId: 'planner',
+        runId: 'r1',
+      });
+      bus.emit({
+        type: 'agent.delta',
+        agentId: 'planner',
+        runId: 'r1',
+        chunk: 'hello ',
+      });
+      bus.emit({
+        type: 'agent.delta',
+        agentId: 'planner',
+        runId: 'r1',
+        chunk: 'world',
+      });
+
+      const state = store.getState();
+      expect(state.agent.activeAgentId).toBe('planner');
+      expect(state.agent.lastDelta).toBe(' world');
+      expect(state.agent.lastDelta.length).toBeLessThanOrEqual(6);
+    });
+
+    it('buffers decisions with a cap and uses the injected clock', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      const clock = vi.fn(() => 42);
+      bridgeBusToStore(bus, store, {
+        agentDecisionBufferSize: 2,
+        clock,
+      });
+
+      bus.emit({
+        type: 'agent.decision',
+        agentId: 'planner',
+        runId: 'r1',
+        message: 'first',
+      });
+      bus.emit({
+        type: 'agent.decision',
+        agentId: 'planner',
+        runId: 'r1',
+        message: 'second',
+      });
+      bus.emit({
+        type: 'agent.decision',
+        agentId: 'planner',
+        runId: 'r1',
+        message: 'third',
+      });
+
+      const decisions = store.getState().agent.decisions;
+      expect(decisions.map((entry) => entry.message)).toEqual([
+        'second',
+        'third',
+      ]);
+      expect(decisions.every((entry) => entry.at === 42)).toBe(true);
+      expect(clock).toHaveBeenCalled();
+    });
+
+    it('ignores tool_call and tool_result events', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({
+        type: 'agent.tool_call',
+        agentId: 'a',
+        runId: 'r',
+        tool: 'x',
+        args: {},
+      });
+      bus.emit({
+        type: 'agent.tool_result',
+        agentId: 'a',
+        runId: 'r',
+        tool: 'x',
+        result: {},
+      });
+
+      const state = store.getState();
+      expect(state.agent.activeAgentId).toBeNull();
+      expect(state.agent.decisions).toEqual([]);
+    });
+
+    it('clears the active agent on complete and records errors on failure', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({ type: 'agent.started', agentId: 'planner', runId: 'r' });
+      bus.emit({
+        type: 'agent.completed',
+        agentId: 'planner',
+        runId: 'r',
+        output: null,
+        durationMs: 5,
+      });
+      expect(store.getState().agent.activeAgentId).toBeNull();
+
+      bus.emit({ type: 'agent.started', agentId: 'planner', runId: 'r' });
+      bus.emit({
+        type: 'agent.failed',
+        agentId: 'planner',
+        runId: 'r',
+        error: 'kaboom',
+      });
+      expect(store.getState().agent.error).toBe('kaboom');
+    });
+  });
+
+  describe('sensor events', () => {
+    it('tracks sensor lifecycle from start to completion', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({
+        type: 'sensor.started',
+        sensorId: 'ruff',
+        runId: 'r',
+        kind: 'computational',
+      });
+      bus.emit({
+        type: 'sensor.progress',
+        sensorId: 'ruff',
+        runId: 'r',
+        message: 'linting…',
+      });
+      bus.emit({
+        type: 'sensor.completed',
+        sensorId: 'ruff',
+        runId: 'r',
+        status: 'passed',
+        durationMs: 30,
+      });
+
+      const sensor = store.getState().sensors['ruff'];
+      expect(sensor).toBeDefined();
+      expect(sensor?.kind).toBe('computational');
+      expect(sensor?.status).toBe('passed');
+      expect(sensor?.message).toBe('linting…');
+    });
+
+    it('records sensor failures with error message', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({
+        type: 'sensor.started',
+        sensorId: 'mypy',
+        runId: 'r',
+        kind: 'computational',
+      });
+      bus.emit({
+        type: 'sensor.failed',
+        sensorId: 'mypy',
+        runId: 'r',
+        error: 'type error',
+      });
+
+      const sensor = store.getState().sensors['mypy'];
+      expect(sensor?.status).toBe('error');
+      expect(sensor?.message).toBe('type error');
+    });
+
+    it('ignores sensor.progress for unknown sensor ids', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({
+        type: 'sensor.progress',
+        sensorId: 'ghost',
+        runId: 'r',
+        message: 'ignored',
+      });
+
+      expect(store.getState().sensors['ghost']).toBeUndefined();
+    });
+  });
+
+  it('disposes the subscription when the returned callback is invoked', () => {
+    const bus = createEventBus();
+    const store = createTuiStore();
+    const dispose = bridgeBusToStore(bus, store);
+
+    dispose();
+    bus.emit({ type: 'pipeline.started', runId: 'r1' });
+
+    expect(store.getState().mode).toBe('idle');
+  });
+});

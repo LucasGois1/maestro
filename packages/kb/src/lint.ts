@@ -172,10 +172,11 @@ async function runLint(
     return { issues, fixedFiles };
   }
 
-  let [agentsMd, architectureMd] = await Promise.all([
+  const [agentsMd, initialArchitectureMd] = await Promise.all([
     readFile(agentsPath, 'utf8'),
     readFile(architecturePath, 'utf8'),
   ]);
+  let architectureMd = initialArchitectureMd;
 
   if (options.fix) {
     const fixedArchitecture = appendMissingSections(architectureMd);

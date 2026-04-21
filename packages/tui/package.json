@@ -9,6 +9,7 @@
     "dist"
   ],
   "dependencies": {
+    "@maestro/core": "workspace:*",
     "ink": "7.0.1",
     "react": "^19.2.0",
     "react-devtools-core": "^6.1.2"
