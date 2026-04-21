@@ -68,12 +68,21 @@ importers:
       '@maestro/core':
         specifier: workspace:*
         version: link:../core
+      '@maestro/git':
+        specifier: workspace:*
+        version: link:../git
       '@maestro/kb':
         specifier: workspace:*
         version: link:../kb
       '@maestro/provider':
         specifier: workspace:*
         version: link:../provider
+      '@maestro/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox
+      '@maestro/sensors':
+        specifier: workspace:*
+        version: link:../sensors
       ai:
         specifier: ^6.0.168
         version: 6.0.168(zod@4.3.6)

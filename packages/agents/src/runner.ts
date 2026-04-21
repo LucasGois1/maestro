@@ -15,6 +15,7 @@ import type {
 import { generateText, stepCountIs, type ToolSet } from 'ai';
 
 import { appendCalibrationSection } from './calibration-format.js';
+import { createGeneratorToolSet } from './generator-tools.js';
 import {
   createArchitectToolSet,
   createPlannerToolSet,
@@ -264,7 +265,17 @@ export async function runAgent<TInput, TOutput>(
               tools: createArchitectToolSet(context.workingDir),
               maxSteps: 12,
             }
-          : null;
+          : definition.id === 'generator'
+            ? {
+                tools: createGeneratorToolSet({
+                  repoRoot: context.workingDir,
+                  config,
+                  runId: context.runId,
+                  bus,
+                }),
+                maxSteps: 28,
+              }
+            : null;
 
     if (toolAugmented) {
       text = await generateToolAugmentedAgentText({

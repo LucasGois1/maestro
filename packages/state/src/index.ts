@@ -25,6 +25,7 @@ export {
   STATE_FILE,
   feedbackPath,
   handoffPath,
+  selfEvalPath,
   maestroRoot,
   projectLogPath,
   runCheckpointsDir,
@@ -55,6 +56,12 @@ export {
   type HandoffArtifact,
   type WriteHandoffOptions,
 } from './handoff.js';
+export {
+  renderSelfEvalMarkdown,
+  writeSprintSelfEval,
+  type SprintSelfEvalPayload,
+  type WriteSprintSelfEvalOptions,
+} from './self-eval.js';
 
 export {
   appendProjectLog,

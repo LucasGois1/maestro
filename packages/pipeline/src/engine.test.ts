@@ -7,7 +7,11 @@ import { createEventBus, type MaestroEvent } from '@maestro/core';
 import { createStateStore } from '@maestro/state';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ArchitectModelOutput, PlannerModelOutput } from '@maestro/agents';
+import type {
+  ArchitectModelOutput,
+  GeneratorModelOutput,
+  PlannerModelOutput,
+} from '@maestro/agents';
 
 import { runPipeline, type PlannerOutput } from './engine.js';
 import { PipelineEscalationError, PipelinePauseError } from './errors.js';
@@ -124,6 +128,21 @@ function mockArchitectOk(input: unknown): ArchitectModelOutput {
   };
 }
 
+function mockGeneratorOk(input: unknown): GeneratorModelOutput {
+  const i = input as { sprint: { idx: number } };
+  return {
+    sprintIdx: i.sprint.idx,
+    filesChanged: [{ path: 'a.ts', changeType: 'added' }],
+    commits: [{ sha: 'c0ffee', message: 'feat(test): stub' }],
+    selfEval: {
+      coversAllCriteria: true,
+      missingCriteria: [],
+      concerns: [],
+    },
+    handoffNotes: 'Stub handoff.',
+  };
+}
+
 afterEach(async () => {
   await rm(repoRoot, { recursive: true, force: true });
 });
@@ -155,11 +174,7 @@ describe('runPipeline (happy path)', () => {
     const executor = buildExecutor({
       planner: () => plannerModelOutput,
       architect: (input) => mockArchitectOk(input),
-      generator: () => ({
-        summary: 'done',
-        changedFiles: ['a.ts'],
-        followUps: [],
-      }),
+      generator: (input) => mockGeneratorOk(input),
       evaluator: () => ({ pass: true, failures: [] }),
       merger: () => ({
         branch: 'maestro/demo',
@@ -211,6 +226,18 @@ describe('runPipeline (happy path)', () => {
     );
     await expect(readFile(dn1, 'utf8')).resolves.toContain('Design notes');
 
+    const selfEval1 = join(
+      repoRoot,
+      '.maestro',
+      'runs',
+      'r1',
+      'checkpoints',
+      'sprint-1-self-eval.md',
+    );
+    await expect(readFile(selfEval1, 'utf8')).resolves.toContain(
+      'Self-evaluation',
+    );
+
     const contractPath = join(
       repoRoot,
       '.maestro',
@@ -239,11 +266,7 @@ describe('runPipeline (happy path)', () => {
     const executor = buildExecutor({
       planner: () => plannerModelOutputThreeSprints,
       architect: (input) => mockArchitectOk(input),
-      generator: () => ({
-        summary: 'done',
-        changedFiles: ['a.ts'],
-        followUps: [],
-      }),
+      generator: (input) => mockGeneratorOk(input),
       evaluator: () => ({ pass: true, failures: [] }),
       merger: () => ({ branch: 'maestro/demo', summary: 'ok' }),
     });
@@ -286,6 +309,110 @@ describe('runPipeline (happy path)', () => {
       /### Sprint 3 — Audit log[\s\S]*?### Architect notes/u,
     );
   });
+
+  it('passes evaluatorFeedback into generator input on retry', async () => {
+    const env = makeEnv();
+    const generatorInputs: unknown[] = [];
+    let evalCalls = 0;
+    const oneSprintPlan: PlannerModelOutput = {
+      ...plannerModelOutput,
+      sprints: [plannerModelOutput.sprints[0]!],
+    };
+    const executor = buildExecutor({
+      planner: () => oneSprintPlan,
+      architect: (input) => mockArchitectOk(input),
+      generator: (input) => {
+        generatorInputs.push(input);
+        return mockGeneratorOk(input);
+      },
+      evaluator: () => {
+        evalCalls += 1;
+        if (evalCalls < 2) {
+          return { pass: false, failures: ['need more work'] };
+        }
+        return { pass: true, failures: [] };
+      },
+      merger: () => ({ branch: 'maestro/demo', summary: 'ok' }),
+    });
+
+    await runPipeline({
+      runId: 'r-feed',
+      prompt: 'x',
+      branch: 'maestro/demo',
+      worktreePath: repoRoot,
+      repoRoot,
+      store: env.store,
+      bus: env.bus,
+      config: env.config,
+      executor,
+      retries: 3,
+    });
+
+    expect(generatorInputs).toHaveLength(2);
+    expect(generatorInputs[1]).toMatchObject({
+      evaluatorFeedback: { failures: ['need more work'] },
+    });
+  });
+
+  it('persists three new files from generator output in handoff', async () => {
+    const env = makeEnv();
+    const executor = buildExecutor({
+      planner: () => plannerModelOutput,
+      architect: (input) => mockArchitectOk(input),
+      generator: (input) => {
+        const i = input as { sprint: { idx: number } };
+        return {
+          sprintIdx: i.sprint.idx,
+          filesChanged: [
+            { path: 'one.ts', changeType: 'added' as const },
+            { path: 'two.ts', changeType: 'added' as const },
+            { path: 'three.ts', changeType: 'added' as const },
+          ],
+          commits: [
+            {
+              sha: 'abc',
+              message: 'feat(app): add three modules',
+            },
+          ],
+          selfEval: {
+            coversAllCriteria: true,
+            missingCriteria: [],
+            concerns: [],
+          },
+          handoffNotes: 'Three files added.',
+        };
+      },
+      evaluator: () => ({ pass: true, failures: [] }),
+      merger: () => ({ branch: 'maestro/demo', summary: 'ok' }),
+    });
+
+    await runPipeline({
+      runId: 'r-three',
+      prompt: 'y',
+      branch: 'maestro/demo',
+      worktreePath: repoRoot,
+      repoRoot,
+      store: env.store,
+      bus: env.bus,
+      config: env.config,
+      executor,
+    });
+
+    const handoff = await readFile(
+      join(
+        repoRoot,
+        '.maestro',
+        'runs',
+        'r-three',
+        'checkpoints',
+        'sprint-1-handoff.md',
+      ),
+      'utf8',
+    );
+    expect(handoff).toContain('one.ts');
+    expect(handoff).toContain('two.ts');
+    expect(handoff).toContain('three.ts');
+  });
 });
 
 describe('runPipeline (retry + escalation)', () => {
@@ -296,9 +423,9 @@ describe('runPipeline (retry + escalation)', () => {
     const executor = buildExecutor({
       planner: () => plannerModelOutput,
       architect: (input) => mockArchitectOk(input),
-      generator: () => {
+      generator: (input) => {
         attemptsBySprint[0] = (attemptsBySprint[0] ?? 0) + 1;
-        return { summary: '', changedFiles: [], followUps: [] };
+        return mockGeneratorOk(input);
       },
       evaluator: () => ({ pass: false, failures: ['acceptance missing'] }),
       merger: () => ({ branch: 'x', summary: 'y' }),
@@ -347,11 +474,7 @@ describe('runPipeline (graceful pause)', () => {
         controller.abort();
         return mockArchitectOk(input);
       },
-      generator: () => ({
-        summary: '',
-        changedFiles: [],
-        followUps: [],
-      }),
+      generator: (input) => mockGeneratorOk(input),
       evaluator: () => ({ pass: true, failures: [] }),
       merger: () => ({ branch: 'x', summary: 'y' }),
     });
@@ -389,7 +512,7 @@ describe('resumePipeline', () => {
         controller.abort();
         return mockArchitectOk(input);
       },
-      generator: () => ({ summary: '', changedFiles: [], followUps: [] }),
+      generator: (input) => mockGeneratorOk(input),
       evaluator: () => ({ pass: true, failures: [] }),
       merger: () => ({ branch: 'x', summary: 'y' }),
     });
@@ -416,7 +539,7 @@ describe('resumePipeline', () => {
     const finishExecutor = buildExecutor({
       planner: () => plannerModelOutput,
       architect: (input) => mockArchitectOk(input),
-      generator: () => ({ summary: '', changedFiles: [], followUps: [] }),
+      generator: (input) => mockGeneratorOk(input),
       evaluator: () => ({ pass: true, failures: [] }),
       merger: () => ({ branch: 'x', summary: 'y' }),
     });

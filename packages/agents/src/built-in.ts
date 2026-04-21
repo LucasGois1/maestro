@@ -4,6 +4,10 @@ import type { AgentDefinition } from './definition.js';
 import { architectModelOutputSchema } from './architect/architect-output.schema.js';
 import { ARCHITECT_FEW_SHOT_EXAMPLES as ARCHITECT_CALIBRATION } from './architect/calibration.js';
 import { ARCHITECT_SYSTEM_PROMPT } from './architect/system-prompt.js';
+import { GENERATOR_FEW_SHOT_EXAMPLES as GENERATOR_CALIBRATION } from './generator/calibration.js';
+import { generatorInputSchema } from './generator/generator-input.schema.js';
+import { generatorModelOutputSchema } from './generator/generator-output.schema.js';
+import { GENERATOR_SYSTEM_PROMPT } from './generator/system-prompt.js';
 import { PLANNER_FEW_SHOT_EXAMPLES } from './planner/calibration.js';
 import { plannerModelOutputSchema } from './planner/plan-output.schema.js';
 import { PLANNER_SYSTEM_PROMPT } from './planner/system-prompt.js';
@@ -15,12 +19,6 @@ const architectInputSchema = z.object({
   architecture: z.string().min(1),
   sprint: z.unknown(),
   sprintIdx: z.number().int().nonnegative(),
-});
-
-const generatorOutputSchema = z.object({
-  summary: z.string(),
-  changedFiles: z.array(z.string()).default([]),
-  followUps: z.array(z.string()).default([]),
 });
 
 const evaluatorOutputSchema = z.object({
@@ -186,19 +184,28 @@ export const architectAgent: AgentDefinition<
 };
 
 export const generatorAgent: AgentDefinition<
-  { sprint: unknown; repoRoot: string },
-  z.infer<typeof generatorOutputSchema>
+  z.infer<typeof generatorInputSchema>,
+  z.infer<typeof generatorModelOutputSchema>
 > = {
   id: 'generator',
   role: 'pipeline',
   stage: 3,
-  systemPrompt:
-    'You are the Maestro Generator. Implement the given sprint end-to-end and report back a JSON object {summary, changedFiles[], followUps[]}.',
-  inputSchema: z.object({
-    sprint: z.unknown(),
-    repoRoot: z.string(),
-  }),
-  outputSchema: generatorOutputSchema,
+  systemPrompt: GENERATOR_SYSTEM_PROMPT,
+  inputSchema: generatorInputSchema,
+  outputSchema: generatorModelOutputSchema,
+  tools: [
+    'readFile',
+    'writeFile',
+    'editFile',
+    'runShell',
+    'runSensor',
+    'gitCommit',
+    'listDirectory',
+    'searchCode',
+  ],
+  calibration: {
+    fewShotExamples: GENERATOR_CALIBRATION,
+  },
 };
 
 export const evaluatorAgent: AgentDefinition<

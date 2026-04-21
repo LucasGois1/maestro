@@ -1,10 +1,9 @@
 import { resolve } from 'node:path';
 
-import {
-  codeReviewerAgent,
-  runAgent,
-  type AgentRegistry,
-  type RunAgentResult,
+import type {
+  AgentContext,
+  AgentRegistry,
+  AnyAgentDefinition,
 } from '@maestro/agents';
 import type { MaestroConfig } from '@maestro/config';
 import type { EventBus } from '@maestro/core';
@@ -29,7 +28,17 @@ export type ShellRunner = (
   options: RunCommandOptions,
 ) => Promise<RunCommandResult>;
 
-export type AgentRunner = typeof runAgent;
+export type AgentRunner = (options: {
+  readonly definition: AnyAgentDefinition;
+  readonly input: unknown;
+  readonly context: AgentContext;
+  readonly bus: EventBus;
+  readonly config?: MaestroConfig;
+}) => Promise<{
+  readonly output: unknown;
+  readonly text: string;
+  readonly durationMs: number;
+}>;
 
 export type SensorRunContext = {
   readonly runId: string;
@@ -155,7 +164,7 @@ function resolveCwd(sensor: ComputationalSensorDefinition, repoRoot: string): st
 }
 
 function resolveInferentialOutput(
-  output: Awaited<RunAgentResult<unknown>>['output'],
+  output: unknown,
 ): { status: 'passed' | 'failed'; violations: readonly Violation[] } {
   if (
     output &&
@@ -318,7 +327,7 @@ async function runComputationalSensor(
   }
 }
 
-function resolveAgentDefinition(
+async function resolveAgentDefinition(
   sensor: InferentialSensorDefinition,
   registry?: AgentRegistry,
 ) {
@@ -326,6 +335,7 @@ function resolveAgentDefinition(
   if (fromRegistry) {
     return fromRegistry;
   }
+  const { codeReviewerAgent } = await import('@maestro/agents');
   if (sensor.agent === codeReviewerAgent.id) {
     return codeReviewerAgent;
   }
@@ -336,8 +346,9 @@ async function runInferentialSensor(
   sensor: InferentialSensorDefinition,
   context: SensorRunContext,
 ): Promise<SensorResult> {
+  const { runAgent } = await import('@maestro/agents');
   const agentRunner = context.agentRunner ?? runAgent;
-  const definition = resolveAgentDefinition(sensor, context.registry);
+  const definition = await resolveAgentDefinition(sensor, context.registry);
 
   context.bus.emit({
     type: 'sensor.started',
@@ -355,7 +366,7 @@ async function runInferentialSensor(
 
   try {
     const execution = await agentRunner({
-      definition,
+      definition: definition as AnyAgentDefinition,
       input: { diff: context.diff ?? '' },
       context: {
         agentId: sensor.agent,

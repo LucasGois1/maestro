@@ -73,6 +73,24 @@ export {
   summarizeDependencies,
 } from './repo-tools.js';
 export {
+  createGeneratorToolSet,
+  type GeneratorToolContext,
+  type GeneratorToolHooks,
+} from './generator-tools.js';
+export {
+  GENERATOR_FEW_SHOT_EXAMPLES,
+  resolvedGeneratorSystemPrompt,
+} from './generator/calibration.js';
+export { GENERATOR_SYSTEM_PROMPT } from './generator/system-prompt.js';
+export {
+  generatorInputSchema,
+  type GeneratorInput,
+} from './generator/generator-input.schema.js';
+export {
+  generatorModelOutputSchema,
+  type GeneratorModelOutput,
+} from './generator/generator-output.schema.js';
+export {
   isPlannerEscalation,
   plannerModelOutputSchema,
   plannerSprintRawSchema,

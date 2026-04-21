@@ -5,6 +5,7 @@ import {
   evaluatorAgent,
   finalizeArchitectOutput,
   generatorAgent,
+  generatorModelOutputSchema,
   mergerAgent,
   normalizePlannerModelOutput,
   plannerAgent,
@@ -21,8 +22,15 @@ import {
   type SprintContractFrontmatter,
 } from '@maestro/contract';
 import type { EventBus, PipelineStageName } from '@maestro/core';
-import { writeHandoff, type RunState, type StateStore } from '@maestro/state';
-import { mkdir, writeFile } from 'node:fs/promises';
+import {
+  handoffPath,
+  maestroRoot,
+  writeHandoff,
+  writeSprintSelfEval,
+  type RunState,
+  type StateStore,
+} from '@maestro/state';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import type { AgentExecutor } from './executor.js';
@@ -132,7 +140,7 @@ async function writeInitialContract(
   const frontmatter = sprintContractFrontmatterSchema.parse({
     sprint: sprintIdx + 1,
     feature: sprint.name,
-    status: 'proposed',
+    status: 'agreed',
     acceptance_criteria: sprint.acceptance.length
       ? sprint.acceptance.map((description, idx) => ({
           id: `${sprint.id}-${idx + 1}`,
@@ -335,9 +343,41 @@ export async function runPipeline(
       );
 
       // generating + evaluating with retry budget
+      const root = maestroRoot(options.repoRoot, maestroDir);
+      const contractPath = join(
+        root,
+        'runs',
+        options.runId,
+        'contracts',
+        `sprint-${(sprintIdx + 1).toString()}.md`,
+      );
+      const contractText = (await readOptionalUtf8(contractPath)) ?? '';
+
+      const designNotesPath = join(
+        root,
+        'runs',
+        options.runId,
+        'design-notes',
+        `design-notes-sprint-${(sprintIdx + 1).toString()}.md`,
+      );
+      const architectNotesText = (await readOptionalUtf8(designNotesPath)) ?? '';
+
+      let previousHandoff: string | undefined;
+      if (sprintIdx > 0) {
+        previousHandoff = await readOptionalUtf8(
+          handoffPath({
+            repoRoot: options.repoRoot,
+            runId: options.runId,
+            ...(maestroDir !== undefined ? { maestroDir } : {}),
+            sprint: sprintIdx,
+          }),
+        );
+      }
+
       let attempts = 0;
       let generatorOutput: unknown;
       let evaluatorOutput: EvaluatorOutput | undefined;
+      let lastEvaluatorFailures: readonly string[] = [];
       while (attempts < retries) {
         assertNotAborted(options.abortSignal, 'generating');
         attempts += 1;
@@ -356,7 +396,23 @@ export async function runPipeline(
         const generator = resolveAgent(options.registry, generatorAgent);
         generatorOutput = await executor({
           definition: generator,
-          input: { sprint, repoRoot: options.repoRoot },
+          input: {
+            runId: options.runId,
+            sprintIdx,
+            repoRoot: options.repoRoot,
+            sprint,
+            sprintContract: contractText,
+            planFull: plan,
+            architectNotes: architectNotesText,
+            previousHandoff,
+            ...(lastEvaluatorFailures.length > 0
+              ? {
+                  evaluatorFeedback: {
+                    failures: [...lastEvaluatorFailures],
+                  },
+                }
+              : {}),
+          },
           context: contextFor('generator', options.runId, options.repoRoot),
           bus: options.bus,
           config: options.config,
@@ -377,6 +433,7 @@ export async function runPipeline(
         })) as EvaluatorOutput;
 
         if (evaluatorOutput.pass) break;
+        lastEvaluatorFailures = evaluatorOutput.failures;
       }
 
       if (!evaluatorOutput || !evaluatorOutput.pass) {
@@ -401,10 +458,20 @@ export async function runPipeline(
         );
       }
 
+      const parsedGenerator = generatorModelOutputSchema.parse(generatorOutput);
+
+      await writeSprintSelfEval({
+        repoRoot: options.repoRoot,
+        runId: options.runId,
+        ...(maestroDir !== undefined ? { maestroDir } : {}),
+        sprint: sprint.idx,
+        selfEval: parsedGenerator.selfEval,
+      });
+
       sprintOutcomes.push({
         sprintIdx,
         attempts,
-        generator: generatorOutput,
+        generator: parsedGenerator,
         evaluator: evaluatorOutput,
       });
 
@@ -414,8 +481,8 @@ export async function runPipeline(
         ...(maestroDir !== undefined ? { maestroDir } : {}),
         handoff: {
           sprint: sprintIdx + 1,
-          summary: sprint.objective,
-          changedFiles: extractChangedFiles(generatorOutput),
+          summary: parsedGenerator.handoffNotes.trim() || sprint.objective,
+          changedFiles: extractChangedFiles(parsedGenerator),
           decisions: [],
           nextSteps: sprint.acceptance.slice(),
         },
@@ -489,6 +556,16 @@ function extractChangedFiles(generatorOutput: unknown): readonly string[] {
   if (
     typeof generatorOutput === 'object' &&
     generatorOutput !== null &&
+    'filesChanged' in generatorOutput &&
+    Array.isArray((generatorOutput as { filesChanged: unknown }).filesChanged)
+  ) {
+    const list = (generatorOutput as { filesChanged: { path: string }[] })
+      .filesChanged;
+    return list.map((f) => f.path);
+  }
+  if (
+    typeof generatorOutput === 'object' &&
+    generatorOutput !== null &&
     'changedFiles' in generatorOutput &&
     Array.isArray((generatorOutput as { changedFiles: unknown }).changedFiles)
   ) {
@@ -496,6 +573,14 @@ function extractChangedFiles(generatorOutput: unknown): readonly string[] {
     return list.filter((f): f is string => typeof f === 'string');
   }
   return [];
+}
+
+async function readOptionalUtf8(filePath: string): Promise<string | undefined> {
+  try {
+    return await readFile(filePath, 'utf8');
+  } catch {
+    return undefined;
+  }
 }
 
 function extractDefaults(

@@ -55,7 +55,10 @@ const readFileToolInput = z.object({
     ),
 });
 
-async function readRepoFileContent(repoRoot: string, rel: string): Promise<string> {
+export async function readRepoFileContent(
+  repoRoot: string,
+  rel: string,
+): Promise<string> {
   const abs = resolvePathUnderRepo(repoRoot, rel);
   const buf = await readFile(abs);
   const text = buf.toString('utf8');

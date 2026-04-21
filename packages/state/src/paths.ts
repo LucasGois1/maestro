@@ -62,6 +62,10 @@ export function handoffPath(opts: RunPathOptions & { sprint: number }): string {
   return join(runCheckpointsDir(opts), `sprint-${opts.sprint}-handoff.md`);
 }
 
+export function selfEvalPath(opts: RunPathOptions & { sprint: number }): string {
+  return join(runCheckpointsDir(opts), `sprint-${opts.sprint}-self-eval.md`);
+}
+
 export function feedbackPath(
   opts: RunPathOptions & { sprint: number; iteration: number },
 ): string {
