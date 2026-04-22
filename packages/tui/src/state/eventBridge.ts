@@ -232,6 +232,40 @@ function handlePipelineEvent(
         }),
       }));
       return;
+    case 'pipeline.plan_revised':
+      store.setState((state) => {
+        const at = config.clock();
+        const message = `Plan revised (attempt ${event.attempt.toString()}): ${event.reasonSummary}`;
+        const decision = {
+          agentId: 'planner',
+          message,
+          at,
+        };
+        const nextDecisions = [...state.agent.decisions, decision];
+        const trimmedDecisions =
+          nextDecisions.length > config.decisionCap
+            ? nextDecisions.slice(nextDecisions.length - config.decisionCap)
+            : nextDecisions;
+        const entry: TuiAgentLogEntry = {
+          kind: 'decision',
+          agentId: 'planner',
+          at,
+          text: message,
+        };
+        return {
+          ...state,
+          agent: {
+            ...state.agent,
+            decisions: trimmedDecisions,
+            messageLog: appendAgentLog(
+              state.agent.messageLog,
+              entry,
+              config.logCap,
+            ),
+          },
+        };
+      });
+      return;
     case 'pipeline.sprint_escalated':
       store.setState((state) => ({
         ...state,

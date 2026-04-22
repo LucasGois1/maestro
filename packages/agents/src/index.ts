@@ -207,6 +207,12 @@ export {
   type UserStory,
 } from './planner/plan-output.schema.js';
 export {
+  plannerInputSchema,
+  plannerReplanContextSchema,
+  type PlannerInput,
+  type PlannerReplanContext,
+} from './planner/planner-input.schema.js';
+export {
   normalizePlannerModelOutput,
   type PlannerOutput,
   type PlannerPipelineSprint,

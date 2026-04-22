@@ -17,6 +17,7 @@ import { mergerInputSchema } from './merger/merger-input.schema.js';
 import { mergerModelOutputSchema } from './merger/merger-output.schema.js';
 import { MERGER_SYSTEM_PROMPT } from './merger/system-prompt.js';
 import { PLANNER_FEW_SHOT_EXAMPLES } from './planner/calibration.js';
+import { plannerInputSchema } from './planner/planner-input.schema.js';
 import { plannerModelOutputSchema } from './planner/plan-output.schema.js';
 import { PLANNER_SYSTEM_PROMPT } from './planner/system-prompt.js';
 import { CODE_REVIEWER_FEW_SHOT_EXAMPLES as CODE_REVIEWER_CALIBRATION } from './code-reviewer/calibration.js';
@@ -27,8 +28,6 @@ import { DOC_GARDENER_FEW_SHOT_EXAMPLES } from './doc-gardener/calibration.js';
 import { gardenerInputSchema } from './doc-gardener/gardener-input.schema.js';
 import { gardenerOutputSchema } from './doc-gardener/gardener-output.schema.js';
 import { DOC_GARDENER_SYSTEM_PROMPT } from './doc-gardener/system-prompt.js';
-
-const textInputSchema = z.object({ prompt: z.string().min(1) });
 
 const architectInputSchema = z.object({
   plan: z.unknown(),
@@ -125,14 +124,14 @@ const discoveryOutputSchema = z.object({
 });
 
 export const plannerAgent: AgentDefinition<
-  z.infer<typeof textInputSchema>,
+  z.infer<typeof plannerInputSchema>,
   z.infer<typeof plannerModelOutputSchema>
 > = {
   id: 'planner',
   role: 'pipeline',
   stage: 1,
   systemPrompt: PLANNER_SYSTEM_PROMPT,
-  inputSchema: textInputSchema,
+  inputSchema: plannerInputSchema,
   outputSchema: plannerModelOutputSchema,
   tools: ['readKB', 'listDirectory', 'searchCode'],
   calibration: {

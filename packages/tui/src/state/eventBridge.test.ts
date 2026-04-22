@@ -100,6 +100,29 @@ describe('bridgeBusToStore', () => {
       expect(store.getState().sprints[0]?.status).toBe('escalated');
     });
 
+    it('records plan_revised as a planner decision and log entry', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store, { clock: () => 42 });
+
+      bus.emit({
+        type: 'pipeline.plan_revised',
+        runId: 'r1',
+        attempt: 1,
+        reasonSummary: 'Architect: narrow scope',
+      });
+
+      const { decisions, messageLog } = store.getState().agent;
+      expect(decisions.some((d) => d.message.includes('Plan revised'))).toBe(
+        true,
+      );
+      expect(
+        messageLog.some(
+          (e) => e.kind === 'decision' && e.text.includes('Plan revised'),
+        ),
+      ).toBe(true);
+    });
+
     it('accumulates history with closed previous stages on stage_entered', () => {
       const bus = createEventBus();
       const store = createTuiStore();

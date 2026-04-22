@@ -80,6 +80,14 @@ export type PipelineEvent =
       readonly reason: string;
     }
   | {
+      readonly type: 'pipeline.plan_revised';
+      readonly runId: string;
+      /** 1-based replan attempt within this pipeline run. */
+      readonly attempt: number;
+      /** Short human-readable summary (e.g. truncated Architect reason). */
+      readonly reasonSummary: string;
+    }
+  | {
       readonly type: 'pipeline.paused';
       readonly runId: string;
       readonly at: PipelineStageName;

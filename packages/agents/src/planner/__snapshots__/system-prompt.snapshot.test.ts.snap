@@ -19,6 +19,12 @@ Required JSON shape for a normal plan:
 
 overview: 2–3 short paragraphs of product vision (plain text, use \\n between paragraphs in the JSON string).
 
+Replan mode (when the JSON input includes a top-level "replan" object):
+- The Architect rejected a sprint; you must emit a full revised plan JSON (same shape as a normal plan), not {"escalationReason"} unless the user prompt itself is still contradictory.
+- Follow the Architect feedback in "replan" exactly: narrow scope, respect module/docs boundaries, and do not reintroduce the same overreach.
+- You may use fewer than 4 sprints and even a single sprint when the feedback demands a minimal slice; do not pad sprints to meet the usual 4–6 guideline.
+- Keep "replan.previousPlanSummary" in mind only as context for what failed — replace it with a better decomposition.
+
 ## Calibration examples
 
 ### Example 1 // prompt simples → plano completo

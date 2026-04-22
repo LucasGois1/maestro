@@ -15,7 +15,11 @@ import type {
   PlannerModelOutput,
 } from '@maestro/agents';
 
-import { runPipeline, type PlannerOutput } from './engine.js';
+import {
+  DEFAULT_MAX_PLAN_REPLANS,
+  runPipeline,
+  type PlannerOutput,
+} from './engine.js';
 import { PipelineEscalationError, PipelinePauseError } from './errors.js';
 import type { AgentExecutor } from './executor.js';
 import { resumePipeline } from './resume.js';
@@ -129,6 +133,39 @@ function mockArchitectOk(input: unknown): ArchitectModelOutput {
     boundaryCheck: 'ok',
   };
 }
+
+function mockArchitectRefactorNeeded(input: unknown): ArchitectModelOutput {
+  const i = input as { sprint: { idx: number } };
+  return {
+    sprintIdx: i.sprint.idx,
+    scopeTecnico: { newFiles: [], filesToTouch: [], testFiles: [] },
+    patternsToFollow: [],
+    libraries: [],
+    boundaryCheck: 'refactor_needed',
+    boundaryNotes: 'Narrow scope before implementation.',
+  };
+}
+
+/** Single-sprint plan after a simulated Architect-driven replan. */
+const plannerModelOutputNarrow: PlannerModelOutput = {
+  feature: 'Narrow slice',
+  overview: 'One sprint only.',
+  userStories: [
+    { id: 1, role: 'dev', action: 'ship', value: 'minimal change' },
+  ],
+  aiFeatures: [],
+  sprints: [
+    {
+      idx: 1,
+      name: 'Minimal',
+      objective: 'Minimal objective',
+      userStoryIds: [1],
+      dependsOn: [],
+      complexity: 'low',
+      keyFeatures: ['Docs'],
+    },
+  ],
+};
 
 function mockGeneratorOk(input: unknown): GeneratorModelOutput {
   const i = input as { sprint: { idx: number } };
@@ -625,6 +662,87 @@ describe('runPipeline (graceful pause)', () => {
     expect(paused).toBeDefined();
     const state = await env.store.load('r-pause');
     expect(state?.status).toBe('paused');
+  });
+});
+
+describe('runPipeline (plan replan)', () => {
+  it('reruns Planner with replan context then completes when Architect approves', async () => {
+    const env = makeEnv();
+    let plannerCalls = 0;
+    let architectCalls = 0;
+    const executor = buildExecutor({
+      planner: (input) => {
+        plannerCalls += 1;
+        const inp = input as { replan?: { attempt: number } };
+        if (plannerCalls === 1) {
+          expect(inp.replan).toBeUndefined();
+          return plannerModelOutput;
+        }
+        expect(inp.replan).toBeDefined();
+        expect(inp.replan?.attempt).toBe(1);
+        return plannerModelOutputNarrow;
+      },
+      architect: (input) => {
+        architectCalls += 1;
+        if (architectCalls === 1) {
+          return mockArchitectRefactorNeeded(input);
+        }
+        return mockArchitectOk(input);
+      },
+      generator: (input) => mockGeneratorOk(input),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () => mockMergerModelOutput('maestro/demo'),
+    });
+
+    const result = await runPipeline({
+      runId: 'r-replan',
+      prompt: 'ship',
+      branch: 'maestro/demo',
+      worktreePath: repoRoot,
+      repoRoot,
+      store: env.store,
+      bus: env.bus,
+      config: env.config,
+      executor,
+      maxPlanReplans: DEFAULT_MAX_PLAN_REPLANS,
+    });
+
+    expect(plannerCalls).toBe(2);
+    expect(architectCalls).toBeGreaterThanOrEqual(2);
+    expect(result.plan.sprints).toHaveLength(1);
+    expect(result.state.status).toBe('completed');
+    expect(env.events.some((e) => e.type === 'pipeline.plan_revised')).toBe(
+      true,
+    );
+  });
+
+  it('escalates after replan budget is exhausted', async () => {
+    const env = makeEnv();
+    const executor = buildExecutor({
+      planner: () => plannerModelOutput,
+      architect: (input) => mockArchitectRefactorNeeded(input),
+      generator: (input) => mockGeneratorOk(input),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () => mockMergerModelOutput('maestro/demo'),
+    });
+
+    await expect(
+      runPipeline({
+        runId: 'r-replan-exhaust',
+        prompt: 'ship',
+        branch: 'maestro/demo',
+        worktreePath: repoRoot,
+        repoRoot,
+        store: env.store,
+        bus: env.bus,
+        config: env.config,
+        executor,
+        maxPlanReplans: 1,
+      }),
+    ).rejects.toBeInstanceOf(PipelineEscalationError);
+
+    const revised = env.events.filter((e) => e.type === 'pipeline.plan_revised');
+    expect(revised).toHaveLength(1);
   });
 });
 

@@ -62,6 +62,11 @@ import {
   type TuiStore,
 } from './state/store.js';
 import { useStoreSelector } from './state/useStoreSelector.js';
+import {
+  PT_APP_KBEXPLORER_NO_CLI_LABEL,
+  PT_EDITPLAN_NEEDS_INTEGRATION,
+  PT_EDITPLAN_NO_ACTIVE_SPRINT,
+} from './i18n/ptInventory.js';
 
 export interface AppProps {
   readonly store?: TuiStore;
@@ -269,7 +274,8 @@ function AppShell({
     if (alreadyOpen) {
       return;
     }
-    const label = kbExplorer?.repoLabel ?? '(sem dados do CLI)';
+    const label =
+      kbExplorer?.repoLabel ?? PT_APP_KBEXPLORER_NO_CLI_LABEL;
     const files = kbExplorer?.files ?? [];
     overlayHost.push(
       createKbExplorerOverlay(
@@ -293,7 +299,7 @@ function AppShell({
     if (!editPlan) {
       overlayHost.push(
         createEditPlanMessageOverlay(
-          'Disponível quando o comando maestro for iniciado com integração ao editor (repoRoot + run).',
+          PT_EDITPLAN_NEEDS_INTEGRATION,
           colorMode,
         ),
       );
@@ -303,7 +309,7 @@ function AppShell({
     if (!path) {
       overlayHost.push(
         createEditPlanMessageOverlay(
-          'Sem run/sprint ativo ou contrato ainda não criado.',
+          PT_EDITPLAN_NO_ACTIVE_SPRINT,
           colorMode,
         ),
       );

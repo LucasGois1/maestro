@@ -17,10 +17,12 @@ import {
   type AgentContext,
   type AgentDefinition,
   type AgentRegistry,
+  type ArchitectPipelineResult,
   type EvaluatorModelOutput,
   type GeneratorInput,
   type MergerModelOutput,
   type PlannerOutput,
+  type PlannerReplanContext,
 } from '@maestro/agents';
 import type { MaestroConfig } from '@maestro/config';
 import { detectRemote, getWorkingTreeDiff, removeWorktree } from '@maestro/git';
@@ -58,6 +60,9 @@ import { serializePlanMarkdown } from './plan-markdown.js';
 
 export const DEFAULT_RETRIES = 3;
 
+/** Max automatic Planner rewrites after Architect rejects a sprint (in-memory per run). */
+export const DEFAULT_MAX_PLAN_REPLANS = 2;
+
 export type {
   EvaluatorModelOutput,
   MergerModelOutput,
@@ -85,6 +90,8 @@ export type PipelineRunOptions = {
   readonly removeWorktreeOnSuccess?: boolean;
   /** Sobrepõe `config.merger.requireDraftPr`. */
   readonly requireDraftPr?: boolean;
+  /** Máximo de replans automáticos (Planner com feedback do Architect). */
+  readonly maxPlanReplans?: number;
 };
 
 export type PipelineRunResult = {
@@ -292,6 +299,82 @@ async function updatePhase(
   return options.store.update(options.runId, { phase, ...extras });
 }
 
+const PLAN_REASON_SUMMARY_MAX = 400;
+
+function summarizePlanForReplan(plan: PlannerOutput): string {
+  return plan.sprints
+    .map(
+      (sp) =>
+        `Sprint ${sp.idx.toString()} — ${sp.name}: ${sp.objective}`,
+    )
+    .join('\n');
+}
+
+function summarizeArchitectBlockReason(
+  architectResult: ArchitectPipelineResult,
+): string {
+  const reason =
+    architectResult.escalation?.reason ??
+    architectResult.boundaryNotes ??
+    architectResult.boundaryCheck;
+  const full = `Architect: ${reason}`;
+  return full.length > PLAN_REASON_SUMMARY_MAX
+    ? `${full.slice(0, PLAN_REASON_SUMMARY_MAX)}…`
+    : full;
+}
+
+function buildPlannerReplanContext(
+  plan: PlannerOutput,
+  sprintIdx: number,
+  architectResult: ArchitectPipelineResult,
+  attempt: number,
+): PlannerReplanContext {
+  const sprint = plan.sprints[sprintIdx];
+  if (sprint === undefined) {
+    throw new Error(`Invalid sprintIdx ${sprintIdx.toString()} for replan`);
+  }
+  return {
+    attempt,
+    blockedSprintIdx: sprintIdx,
+    blockedSprintName: sprint.name,
+    blockedSprintObjective: sprint.objective,
+    boundaryCheck: architectResult.boundaryCheck,
+    previousPlanSummary: summarizePlanForReplan(plan),
+    ...(architectResult.boundaryNotes !== undefined &&
+    architectResult.boundaryNotes.length > 0
+      ? { boundaryNotes: architectResult.boundaryNotes }
+      : {}),
+    ...(architectResult.escalation?.reason !== undefined &&
+    architectResult.escalation.reason.length > 0
+      ? { escalationReason: architectResult.escalation.reason }
+      : {}),
+  };
+}
+
+async function runPlannerPhase(
+  options: PipelineRunOptions,
+  executor: AgentExecutor,
+  replan: PlannerReplanContext | undefined,
+): Promise<PlannerOutput> {
+  assertNotAborted(options.abortSignal, 'planning');
+  await updatePhase(options, 'planning');
+  const planner = resolveAgent(options.registry, plannerAgent);
+  const rawPlan = await executor({
+    definition: planner,
+    input:
+      replan === undefined
+        ? { prompt: options.prompt }
+        : { prompt: options.prompt, replan },
+    context: contextFor('planner', options.runId, options.repoRoot),
+    bus: options.bus,
+    config: options.config,
+  });
+  return normalizePlannerModelOutput(rawPlan, {
+    runId: options.runId,
+    prompt: options.prompt,
+  });
+}
+
 export async function runPipeline(
   options: PipelineRunOptions,
 ): Promise<PipelineRunResult> {
@@ -331,21 +414,9 @@ export async function runPipeline(
   }> = [];
 
   try {
-    // planning
-    assertNotAborted(options.abortSignal, 'planning');
-    await updatePhase(options, 'planning');
-    const planner = resolveAgent(options.registry, plannerAgent);
-    const rawPlan = await executor({
-      definition: planner,
-      input: { prompt: options.prompt },
-      context: contextFor('planner', options.runId, options.repoRoot),
-      bus: options.bus,
-      config: options.config,
-    });
-    const plan = normalizePlannerModelOutput(rawPlan, {
-      runId: options.runId,
-      prompt: options.prompt,
-    });
+    const maxPlanReplans = options.maxPlanReplans ?? DEFAULT_MAX_PLAN_REPLANS;
+    let planReplansUsed = 0;
+    let plan = await runPlannerPhase(options, executor, undefined);
     await writePlanFile(options.repoRoot, options.runId, plan, maestroDir);
 
     const architectureDoc = await loadArchitectureDocument(
@@ -354,8 +425,8 @@ export async function runPipeline(
       maestroDir,
     );
 
-    // per-sprint loop
-    for (let sprintIdx = 0; sprintIdx < plan.sprints.length; sprintIdx += 1) {
+    replanLoop: for (;;) {
+      for (let sprintIdx = 0; sprintIdx < plan.sprints.length; sprintIdx += 1) {
       assertNotAborted(options.abortSignal, 'architecting');
       const sprint = plan.sprints[sprintIdx];
       if (!sprint) continue;
@@ -393,6 +464,58 @@ export async function runPipeline(
           message: `Architect sprintIdx ${architectResult.sprintIdx.toString()} != plan sprint.idx ${sprint.idx.toString()}; using plan idx for artifacts.`,
         });
       }
+      if (!architectResult.approved) {
+        const reason =
+          architectResult.escalation?.reason ??
+          architectResult.boundaryNotes ??
+          architectResult.boundaryCheck;
+
+        if (planReplansUsed < maxPlanReplans) {
+          planReplansUsed += 1;
+          options.bus.emit({
+            type: 'pipeline.plan_revised',
+            runId: options.runId,
+            attempt: planReplansUsed,
+            reasonSummary: summarizeArchitectBlockReason(architectResult),
+          });
+          plan = await runPlannerPhase(
+            options,
+            executor,
+            buildPlannerReplanContext(
+              plan,
+              sprintIdx,
+              architectResult,
+              planReplansUsed,
+            ),
+          );
+          await writePlanFile(
+            options.repoRoot,
+            options.runId,
+            plan,
+            maestroDir,
+          );
+          continue replanLoop;
+        }
+
+        options.bus.emit({
+          type: 'pipeline.sprint_escalated',
+          runId: options.runId,
+          sprintIdx,
+          reason: `Architect: ${reason}`,
+        });
+        await options.store.update(options.runId, {
+          phase: 'escalated',
+          status: 'paused',
+          escalation: { sprintIdx, reason: `Architect: ${reason}` },
+          pausedAt: new Date().toISOString(),
+        });
+        throw new PipelineEscalationError(
+          `Sprint ${sprintIdx + 1} blocked by Architect: ${reason}`,
+          sprintIdx,
+          reason,
+        );
+      }
+
       const designDoc = renderArchitectNotesMarkdown(
         architectResult,
         sprint.name,
@@ -412,29 +535,6 @@ export async function runPipeline(
         embed,
         maestroDir,
       );
-      if (!architectResult.approved) {
-        const reason =
-          architectResult.escalation?.reason ??
-          architectResult.boundaryNotes ??
-          architectResult.boundaryCheck;
-        options.bus.emit({
-          type: 'pipeline.sprint_escalated',
-          runId: options.runId,
-          sprintIdx,
-          reason: `Architect: ${reason}`,
-        });
-        await options.store.update(options.runId, {
-          phase: 'escalated',
-          status: 'paused',
-          escalation: { sprintIdx, reason: `Architect: ${reason}` },
-          pausedAt: new Date().toISOString(),
-        });
-        throw new PipelineEscalationError(
-          `Sprint ${sprintIdx + 1} blocked by Architect: ${reason}`,
-          sprintIdx,
-          reason,
-        );
-      }
 
       // contracting (minimal: seed a contract file; negotiation comes when we wire contract pkg in v0.2)
       assertNotAborted(options.abortSignal, 'contracting');
@@ -658,6 +758,9 @@ export async function runPipeline(
           nextSteps: sprint.acceptance.slice(),
         },
       });
+      }
+
+      break replanLoop;
     }
 
     // merging
