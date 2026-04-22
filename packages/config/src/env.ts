@@ -1,14 +1,29 @@
-import type { MaestroConfigInput } from './schema.js';
+import type { MaestroConfigInput, ProviderName } from './schema.js';
 
 export const ENV_PREFIX = 'MAESTRO_';
 
-const PROVIDER_KEY_ENV_VARS = {
+/** Variáveis de ambiente para API keys por provider (CLI / docs). */
+export const PROVIDER_KEY_ENV_VARS = {
   anthropic: 'MAESTRO_ANTHROPIC_KEY',
   openai: 'MAESTRO_OPENAI_KEY',
   google: 'MAESTRO_GOOGLE_KEY',
 } as const;
 
-const OLLAMA_BASE_URL_ENV_VAR = 'MAESTRO_OLLAMA_BASE_URL';
+export const OLLAMA_BASE_URL_ENV_VAR = 'MAESTRO_OLLAMA_BASE_URL';
+
+/** Nome da variável de ambiente para credenciais ou URL (Ollama). */
+export function providerCredentialEnvVar(provider: ProviderName): string {
+  if (provider === 'ollama') {
+    return OLLAMA_BASE_URL_ENV_VAR;
+  }
+  if (provider === 'anthropic') {
+    return PROVIDER_KEY_ENV_VARS.anthropic;
+  }
+  if (provider === 'openai') {
+    return PROVIDER_KEY_ENV_VARS.openai;
+  }
+  return PROVIDER_KEY_ENV_VARS.google;
+}
 
 export function buildEnvOverlay(
   env: NodeJS.ProcessEnv = process.env,

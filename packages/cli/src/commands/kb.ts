@@ -1,4 +1,4 @@
-import { loadConfig } from '@maestro/config';
+import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import { runKbRefresh } from '@maestro/discovery';
 import { createKBManager, lintKnowledgeBase } from '@maestro/kb';
 import { Command } from 'commander';
@@ -66,7 +66,9 @@ export function createKBCommand(options: KbCommandOptions = {}): Command {
     )
     .action(async () => {
       const repoRoot = cwd();
-      const { resolved: config } = await loadConfig({ cwd: repoRoot });
+      const { resolved: config } = await loadConfigWithAutoResolvedModels({
+        cwd: repoRoot,
+      });
       if (!config.discovery.enabled) {
         io.stderr('Discovery is disabled in config.');
         process.exitCode = 1;

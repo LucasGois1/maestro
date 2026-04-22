@@ -5,7 +5,8 @@ import {
   computeBranchName,
   createWorktree,
 } from '@maestro/git';
-import { ConfigValidationError, loadConfig } from '@maestro/config';
+import { ConfigValidationError } from '@maestro/config';
+import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import type { EventBus } from '@maestro/core';
 import { runPipeline, resumePipeline } from '@maestro/pipeline';
 import { createStateStore, type StateStore } from '@maestro/state';
@@ -135,7 +136,7 @@ async function executeRun(options: {
     };
   }
   try {
-    const loaded = await loadConfig({ cwd: options.repoRoot });
+    const loaded = await loadConfigWithAutoResolvedModels({ cwd: options.repoRoot });
     const runId = options.randomUuid();
     const branching = loaded.resolved.branching as {
       strategy: typeof loaded.resolved.branching.strategy;
@@ -192,7 +193,7 @@ async function executeResume(options: {
   readonly bus: EventBus;
 }): Promise<TuiCommandExecutionResult> {
   try {
-    const loaded = await loadConfig({ cwd: options.repoRoot });
+    const loaded = await loadConfigWithAutoResolvedModels({ cwd: options.repoRoot });
     const runId = options.tokens[1];
     void resumePipeline({
       ...(runId !== undefined ? { runId } : {}),

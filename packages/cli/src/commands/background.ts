@@ -1,12 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
 import { executeBackgroundGardener } from '@maestro/agents';
-import {
-  ConfigValidationError,
-  loadConfig,
-  type MaestroConfig,
-} from '@maestro/config';
+import { ConfigValidationError, type MaestroConfig } from '@maestro/config';
 import { createEventBus } from '@maestro/core';
+import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import { createStateStore, type StateStore } from '@maestro/state';
 import { Command } from 'commander';
 
@@ -40,7 +37,7 @@ async function loadConfigOrExit(
   repoRoot: string,
 ): Promise<MaestroConfig | null> {
   try {
-    const loaded = await loadConfig({ cwd: repoRoot });
+    const loaded = await loadConfigWithAutoResolvedModels({ cwd: repoRoot });
     return loaded.resolved;
   } catch (error) {
     if (error instanceof ConfigValidationError) {

@@ -1,10 +1,7 @@
 import { cwd as processCwd } from 'node:process';
 
-import {
-  ConfigValidationError,
-  loadConfig,
-  type LoadedConfig,
-} from '@maestro/config';
+import { ConfigValidationError, type LoadedConfig } from '@maestro/config';
+import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import { createEventBus, type EventBus } from '@maestro/core';
 import {
   PipelineRunNotFoundError,
@@ -35,7 +32,7 @@ const defaultIo: Io = {
 export type ResumeCommandOptions = {
   readonly io?: Io;
   readonly cwd?: () => string;
-  readonly loadConfig?: typeof loadConfig;
+  readonly loadConfig?: typeof loadConfigWithAutoResolvedModels;
   readonly store?: StateStore;
   readonly resumePipeline?: (
     options: ResumePipelineOptions,
@@ -51,7 +48,7 @@ function formatConfigIssues(error: ConfigValidationError): string {
 }
 
 async function loadConfigOrExit(
-  loader: typeof loadConfig,
+  loader: typeof loadConfigWithAutoResolvedModels,
   repoRoot: string,
   io: Io,
 ): Promise<LoadedConfig | null> {
@@ -92,7 +89,7 @@ export function createResumeCommand(
 ): Command {
   const io = options.io ?? defaultIo;
   const cwd = options.cwd ?? (() => processCwd());
-  const configLoader = options.loadConfig ?? loadConfig;
+  const configLoader = options.loadConfig ?? loadConfigWithAutoResolvedModels;
   const pipelineResumer = options.resumePipeline ?? resumePipeline;
   const renderApp = options.renderApp ?? renderPipelineApp;
 

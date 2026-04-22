@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildEnvOverlay } from './env.js';
+import { buildEnvOverlay, providerCredentialEnvVar } from './env.js';
 
 describe('buildEnvOverlay', () => {
   it('returns empty overlay when no env vars are set', () => {
@@ -30,5 +30,16 @@ describe('buildEnvOverlay', () => {
 
   it('ignores empty env values', () => {
     expect(buildEnvOverlay({ MAESTRO_ANTHROPIC_KEY: '' })).toEqual({});
+  });
+});
+
+describe('providerCredentialEnvVar', () => {
+  it('maps cloud providers to MAESTRO_*_KEY', () => {
+    expect(providerCredentialEnvVar('openai')).toBe('MAESTRO_OPENAI_KEY');
+    expect(providerCredentialEnvVar('anthropic')).toBe('MAESTRO_ANTHROPIC_KEY');
+  });
+
+  it('maps ollama to base URL env', () => {
+    expect(providerCredentialEnvVar('ollama')).toBe('MAESTRO_OLLAMA_BASE_URL');
   });
 });

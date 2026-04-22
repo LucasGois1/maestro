@@ -48,7 +48,7 @@ function createAnthropicModel(
   modelId: string,
   config: MaestroConfig,
 ): LanguageModelV3 {
-  const apiKey = config.providers.anthropic.apiKey;
+  const apiKey = config.providers.anthropic.apiKey?.trim();
   if (!apiKey) throw new MissingApiKeyError('anthropic');
   return createAnthropic({ apiKey })(modelId);
 }
@@ -57,7 +57,7 @@ function createOpenAIModel(
   modelId: string,
   config: MaestroConfig,
 ): LanguageModelV3 {
-  const apiKey = config.providers.openai.apiKey;
+  const apiKey = config.providers.openai.apiKey?.trim();
   if (!apiKey) throw new MissingApiKeyError('openai');
   return createOpenAI({ apiKey })(modelId);
 }
@@ -66,7 +66,7 @@ function createGoogleModel(
   modelId: string,
   config: MaestroConfig,
 ): LanguageModelV3 {
-  const apiKey = config.providers.google.apiKey;
+  const apiKey = config.providers.google.apiKey?.trim();
   if (!apiKey) throw new MissingApiKeyError('google');
   return createGoogleGenerativeAI({ apiKey })(modelId);
 }

@@ -4,7 +4,6 @@ import {
   ConfigValidationError,
   getByPath,
   isSecretPath,
-  loadConfig,
   maskSecrets,
   readConfigFile,
   resolveConfigPaths,
@@ -13,6 +12,7 @@ import {
   type LoadedConfig,
   type MaestroConfigInput,
 } from '@maestro/config';
+import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import { Command } from 'commander';
 
 type Scope = 'global' | 'project';
@@ -44,7 +44,7 @@ function formatIssues(error: ConfigValidationError): string {
 
 async function loadOrPrintError(io: Io): Promise<LoadedConfig | null> {
   try {
-    return await loadConfig();
+    return await loadConfigWithAutoResolvedModels();
   } catch (error) {
     if (error instanceof ConfigValidationError) {
       io.stderr('Configuration is invalid:');
@@ -158,7 +158,7 @@ export function createConfigCommand(io: Io = defaultIo): Command {
     .description('Validate the effective config against the schema')
     .action(async () => {
       try {
-        await loadConfig();
+        await loadConfigWithAutoResolvedModels();
         io.stdout('Configuration is valid.');
       } catch (error) {
         if (error instanceof ConfigValidationError) {

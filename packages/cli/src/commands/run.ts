@@ -8,11 +8,8 @@ import {
   type CreateWorktreeOptions,
   type WorktreeInfo,
 } from '@maestro/git';
-import {
-  ConfigValidationError,
-  loadConfig,
-  type LoadedConfig,
-} from '@maestro/config';
+import { ConfigValidationError, type LoadedConfig } from '@maestro/config';
+import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import { createEventBus, type EventBus } from '@maestro/core';
 import {
   runPipeline,
@@ -42,7 +39,7 @@ const defaultIo: Io = {
 export type RunCommandOptions = {
   readonly io?: Io;
   readonly cwd?: () => string;
-  readonly loadConfig?: typeof loadConfig;
+  readonly loadConfig?: typeof loadConfigWithAutoResolvedModels;
   readonly store?: StateStore;
   readonly randomUuid?: () => string;
   readonly createWorktree?: (
@@ -67,7 +64,7 @@ function formatConfigIssues(error: ConfigValidationError): string {
 }
 
 async function loadConfigOrExit(
-  loader: typeof loadConfig,
+  loader: typeof loadConfigWithAutoResolvedModels,
   repoRoot: string,
   io: Io,
 ): Promise<LoadedConfig | null> {
@@ -133,7 +130,7 @@ function resolveBranch(options: {
 export function createRunCommand(options: RunCommandOptions = {}): Command {
   const io = options.io ?? defaultIo;
   const cwd = options.cwd ?? (() => processCwd());
-  const configLoader = options.loadConfig ?? loadConfig;
+  const configLoader = options.loadConfig ?? loadConfigWithAutoResolvedModels;
   const randomUuid = options.randomUuid ?? (() => randomUUID());
   const worktreeCreator = options.createWorktree ?? createWorktree;
   const pipelineRunner = options.runPipeline ?? runPipeline;

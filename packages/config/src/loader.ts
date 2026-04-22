@@ -132,6 +132,8 @@ export async function loadConfig(
     );
   }
 
+  const resolved = result.data;
+
   return {
     paths,
     sources: {
@@ -141,7 +143,7 @@ export async function loadConfig(
       runOverrides,
     },
     merged,
-    resolved: result.data,
+    resolved,
   };
 }
 

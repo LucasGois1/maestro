@@ -1,4 +1,3 @@
-import { loadConfig } from '@maestro/config';
 import {
   applyDiscoveryToKb,
   applyGreenfieldTemplate,
@@ -10,13 +9,18 @@ import {
 } from '@maestro/discovery';
 import { commitMaestroKbInit } from '@maestro/git';
 import { createKBManager } from '@maestro/kb';
-import { listInferenceReadyProviders } from '@maestro/provider';
+import {
+  listInferenceReadyProviders,
+  loadConfigWithAutoResolvedModels,
+} from '@maestro/provider';
 import { Command } from 'commander';
 
 import {
   formatDiscoveryProviderSummary,
   runInitDiscoveryTui,
 } from '../init-discovery-tui.js';
+import { mountPostInitHomeShell } from '../post-init-home-tui.js';
+import { runInitModelSetupInk } from '../init-model-setup.js';
 import {
   resolveDiscoveryConfigNonInteractive,
   runDiscoveryProviderSetupInk,
@@ -45,7 +49,9 @@ async function commitIfRequested(
   if (!flags.commit) {
     return;
   }
-  const { resolved: config } = await loadConfig({ cwd: repoRoot });
+  const { resolved: config } = await loadConfigWithAutoResolvedModels({
+    cwd: repoRoot,
+  });
   const result = await commitMaestroKbInit({
     cwd: repoRoot,
     branchName: config.discovery.initBranch,
@@ -78,7 +84,7 @@ export function createInitCommand(options: InitCommandOptions = {}): Command {
     )
     .option(
       '--no-ai',
-      'Skip inferential discovery (stack/structure scan only; no LLM)',
+      'Skip inferential discovery and the interactive per-agent model/credentials wizard (stack/structure scan only; no LLM)',
     )
     .option(
       '--apply',
@@ -96,6 +102,24 @@ export function createInitCommand(options: InitCommandOptions = {}): Command {
         commit?: boolean;
       }) => {
         const repoRoot = cwd();
+        const interactiveModelWizard =
+          flags.template === undefined &&
+          flags.ai !== false &&
+          process.stdout.isTTY &&
+          process.stdin.isTTY;
+
+        if (interactiveModelWizard) {
+          const wizard = await runInitModelSetupInk({
+            repoRoot,
+            env: process.env,
+          });
+          if (wizard.kind === 'abort') {
+            io.stderr(wizard.message);
+            process.exitCode = 1;
+            return;
+          }
+        }
+
         const kb = createKBManager({ repoRoot });
         await kb.init();
 
@@ -118,7 +142,9 @@ export function createInitCommand(options: InitCommandOptions = {}): Command {
           return;
         }
 
-        const { resolved: config } = await loadConfig({ cwd: repoRoot });
+        const { resolved: config } = await loadConfigWithAutoResolvedModels({
+    cwd: repoRoot,
+  });
 
         if (flags.ai === false) {
           const comp = await runComputationalDiscovery(repoRoot);
@@ -197,6 +223,9 @@ export function createInitCommand(options: InitCommandOptions = {}): Command {
             now: new Date(),
           });
           await commitIfRequested(flags, repoRoot, io);
+          if (outcome.choice === 'accept') {
+            mountPostInitHomeShell({ repoRoot, env: process.env });
+          }
           return;
         }
 

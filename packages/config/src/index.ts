@@ -25,7 +25,13 @@ export {
 
 export { deepMerge, deepMergeAll, isPlainObject } from './merge.js';
 
-export { buildEnvOverlay, ENV_PREFIX } from './env.js';
+export {
+  buildEnvOverlay,
+  ENV_PREFIX,
+  OLLAMA_BASE_URL_ENV_VAR,
+  PROVIDER_KEY_ENV_VARS,
+  providerCredentialEnvVar,
+} from './env.js';
 
 export { isSecretPath, maskSecrets, MASK_PLACEHOLDER } from './mask.js';
 

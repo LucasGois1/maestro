@@ -1,9 +1,14 @@
 import {
+  AGENT_NAMES,
   PROVIDER_NAMES,
   type MaestroConfig,
   type ProviderName,
 } from '@maestro/config';
 
+import {
+  applyModelStackToConfig,
+  BALANCED_MODEL_STACK_BY_PROVIDER,
+} from './curated-model-presets.js';
 import { parseModelRef } from './ref.js';
 
 /** Suggested `provider/model` refs for the discovery agent when switching provider. */
@@ -94,4 +99,42 @@ export function withDiscoveryAgentModel(
       },
     },
   };
+}
+
+/** True when every `defaults.<agent>.model` provider has credentials (or Ollama URL). */
+export function allDefaultModelProvidersReady(config: MaestroConfig): boolean {
+  for (const name of AGENT_NAMES) {
+    const model = config.defaults[name]?.model;
+    if (typeof model !== 'string' || model.length === 0) {
+      return false;
+    }
+    const { provider } = parseModelRef(model);
+    if (!canUseProviderForInference(config, provider)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * When exactly one inference provider is credentialed and at least one default
+ * model still points at an unusable provider, rewrite all agent defaults to
+ * the balanced stack for that provider (same spirit as discovery auto-resolve).
+ */
+export function autoResolveAllDefaultModelsWhenSingleProvider(
+  config: MaestroConfig,
+): MaestroConfig | null {
+  const ready = listInferenceReadyProviders(config);
+  if (ready.length !== 1) {
+    return null;
+  }
+  if (allDefaultModelProvidersReady(config)) {
+    return null;
+  }
+  const only = ready[0];
+  if (only === undefined) {
+    return null;
+  }
+  const stack = BALANCED_MODEL_STACK_BY_PROVIDER[only];
+  return applyModelStackToConfig(config, stack);
 }
