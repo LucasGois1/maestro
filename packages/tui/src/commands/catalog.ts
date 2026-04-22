@@ -135,11 +135,37 @@ export function normalizeCommandInput(input: string): string {
     : trimmed;
 }
 
+/**
+ * `/run list` was matching `run` with prompt "list". Rewrite common `run …`
+ * typos so they resolve to `runs …` subcommands instead.
+ */
+function rewriteRunVsRunsCollision(trimmed: string): string {
+  if (/^run\s+list\s*$/iu.test(trimmed)) {
+    return 'runs list';
+  }
+  if (/^run\s+ls\s*$/iu.test(trimmed)) {
+    return 'runs list';
+  }
+  if (/^run\s+show\b/iu.test(trimmed)) {
+    return trimmed.replace(/^run\s+/iu, 'runs ');
+  }
+  if (/^run\s+clean\b/iu.test(trimmed)) {
+    return trimmed.replace(/^run\s+/iu, 'runs ');
+  }
+  return trimmed;
+}
+
+/** Normalized line after optional `maestro` prefix and `run`/`runs` disambiguation. */
+export function prepareTuiCommandInput(input: string): string {
+  const base = normalizeCommandInput(input).trim();
+  return rewriteRunVsRunsCollision(base);
+}
+
 export function suggestCommands(
   input: string,
   catalog: readonly CommandCatalogEntry[] = COMMAND_CATALOG,
 ): readonly CommandSuggestion[] {
-  const normalized = normalizeCommandInput(input).trimStart().toLowerCase();
+  const normalized = prepareTuiCommandInput(input).trimStart().toLowerCase();
   if (normalized.length === 0) {
     return catalog.slice(0, 6).map((entry) => ({
       entry,
@@ -172,19 +198,77 @@ function commandMatches(candidate: string, normalizedInput: string): boolean {
   );
 }
 
+/** Commands whose first token equals `root` (case-insensitive). */
+export function entriesForSlashRoot(
+  root: string,
+  catalog: readonly CommandCatalogEntry[] = COMMAND_CATALOG,
+): readonly CommandCatalogEntry[] {
+  const r = root.trim().toLowerCase();
+  if (r.length === 0) {
+    return [];
+  }
+  return catalog.filter((e) => {
+    const first = (e.command.split(/\s+/u)[0] ?? '').toLowerCase();
+    return first === r;
+  });
+}
+
+/**
+ * True when `usage` contains a required `<placeholder>` (not `[optional]`).
+ */
+export function commandEntryNeedsTrailingArgs(
+  entry: CommandCatalogEntry,
+): boolean {
+  return /<[a-zA-Z_/][^>]*>/u.test(entry.usage);
+}
+
+/**
+ * After the user types a single root token (`/runs`, `/config`), show a pick
+ * list when the catalog has multiple commands under that root.
+ */
+export function subcommandPickMenuForPrepared(
+  preparedTrimmed: string,
+  catalog: readonly CommandCatalogEntry[] = COMMAND_CATALOG,
+): { readonly root: string; readonly entries: readonly CommandCatalogEntry[] } | null {
+  const prep = preparedTrimmed.trim();
+  if (prep.length === 0) {
+    return null;
+  }
+  const tokens = prep.split(/\s+/u).filter(Boolean);
+  if (tokens.length !== 1) {
+    return null;
+  }
+  const root = tokens[0];
+  if (root === undefined) {
+    return null;
+  }
+  const entries = entriesForSlashRoot(root, catalog);
+  return entries.length >= 2 ? { root, entries } : null;
+}
+
 export function findCommandEntry(
   input: string,
   catalog: readonly CommandCatalogEntry[] = COMMAND_CATALOG,
 ): CommandCatalogEntry | null {
-  const normalized = normalizeCommandInput(input).trim();
-  if (normalized.length === 0) {
+  const prepared = prepareTuiCommandInput(input);
+  if (prepared.length === 0) {
     return null;
   }
-  const padded = `${normalized} `;
-  return (
-    catalog.find((entry) => {
-      const candidates = [entry.command, ...(entry.aliases ?? [])];
-      return candidates.some((candidate) => padded.startsWith(`${candidate} `));
-    }) ?? null
-  );
+  const padded = `${prepared} `;
+  let best: { entry: CommandCatalogEntry; len: number } | null = null;
+
+  for (const entry of catalog) {
+    const candidates = [entry.command, ...(entry.aliases ?? [])];
+    for (const candidate of candidates) {
+      const prefix = `${candidate} `;
+      if (prepared === candidate || padded.startsWith(prefix)) {
+        const len = candidate.length;
+        if (best === null || len > best.len) {
+          best = { entry, len };
+        }
+      }
+    }
+  }
+
+  return best?.entry ?? null;
 }

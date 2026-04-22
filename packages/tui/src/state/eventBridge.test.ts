@@ -345,6 +345,29 @@ describe('bridgeBusToStore', () => {
       ]);
     });
 
+    it('formats tool_call text from args (e.g. path for write_file)', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store, { clock: () => 1 });
+
+      bus.emit({
+        type: 'agent.tool_call',
+        agentId: 'g',
+        runId: 'r',
+        tool: 'write_file',
+        args: { path: 'src/foo.ts', content: 'x' },
+      });
+
+      expect(store.getState().agent.messageLog).toEqual([
+        {
+          kind: 'tool_call',
+          agentId: 'g',
+          at: 1,
+          text: 'write_file — src/foo.ts',
+        },
+      ]);
+    });
+
     it('appends deltas and decisions to messageLog with buffering', () => {
       const bus = createEventBus();
       const store = createTuiStore();

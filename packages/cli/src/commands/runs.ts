@@ -22,14 +22,77 @@ type RunsCommandOptions = {
   readonly store?: StateStore;
   readonly cwd?: () => string;
   readonly confirm?: (prompt: string) => Promise<boolean>;
+  /** Override terminal width for list table (tests / non-TTY). */
+  readonly listColumns?: number;
 };
 
-function formatRow(state: RunState): string {
-  const phase = state.phase.padEnd(12, ' ');
-  const status = state.status.padEnd(10, ' ');
-  const updated = state.lastUpdatedAt;
-  const prompt = state.metadata.prompt.slice(0, 60);
-  return `${state.runId}\t${status}\t${phase}\t${updated}\t${prompt}`;
+const LIST_GAP = 2;
+const LIST_COL_RUN_ID = 36;
+const LIST_COL_STATUS = 10;
+const LIST_COL_PHASE = 14;
+const LIST_COL_UPDATED = 22;
+
+function listTerminalColumns(explicit?: number): number {
+  if (explicit !== undefined && Number.isFinite(explicit) && explicit >= 48) {
+    return explicit;
+  }
+  const c = process.stdout.columns;
+  return typeof c === 'number' && Number.isFinite(c) && c >= 48 ? c : 100;
+}
+
+function clipCell(value: string, width: number): string {
+  if (width <= 0) {
+    return '';
+  }
+  const t = value;
+  if (t.length <= width) {
+    return t.padEnd(width, ' ');
+  }
+  if (width <= 1) {
+    return '…';
+  }
+  return `${t.slice(0, width - 1)}…`;
+}
+
+function joinListColumns(parts: readonly string[]): string {
+  return parts.join(' '.repeat(LIST_GAP));
+}
+
+function listTableReservedWidth(): number {
+  return (
+    LIST_COL_RUN_ID +
+    LIST_COL_STATUS +
+    LIST_COL_PHASE +
+    LIST_COL_UPDATED +
+    LIST_GAP * 4
+  );
+}
+
+function listPromptColumnWidth(terminalColumns: number): number {
+  const reserved = listTableReservedWidth();
+  return Math.max(8, terminalColumns - reserved);
+}
+
+function formatListHeader(terminalColumns: number): string {
+  const pw = listPromptColumnWidth(terminalColumns);
+  return joinListColumns([
+    clipCell('runId', LIST_COL_RUN_ID),
+    clipCell('status', LIST_COL_STATUS),
+    clipCell('phase', LIST_COL_PHASE),
+    clipCell('updatedAt', LIST_COL_UPDATED),
+    clipCell('prompt', pw),
+  ]);
+}
+
+function formatListRow(state: RunState, terminalColumns: number): string {
+  const pw = listPromptColumnWidth(terminalColumns);
+  return joinListColumns([
+    clipCell(state.runId, LIST_COL_RUN_ID),
+    clipCell(state.status, LIST_COL_STATUS),
+    clipCell(state.phase, LIST_COL_PHASE),
+    clipCell(state.lastUpdatedAt, LIST_COL_UPDATED),
+    clipCell(state.metadata.prompt, pw),
+  ]);
 }
 
 function formatDetail(state: RunState): string {
@@ -63,6 +126,7 @@ function formatDetail(state: RunState): string {
 
 export function createRunsCommand(options: RunsCommandOptions = {}): Command {
   const io = options.io ?? defaultIo;
+  const listColumns = () => listTerminalColumns(options.listColumns);
   const cwd = options.cwd ?? (() => process.cwd());
   const confirm =
     options.confirm ??
@@ -89,8 +153,11 @@ export function createRunsCommand(options: RunsCommandOptions = {}): Command {
         io.stdout('No runs recorded.');
         return;
       }
-      io.stdout('runId\tstatus\tphase\tupdatedAt\tprompt');
-      for (const run of runs) io.stdout(formatRow(run));
+      const cols = listColumns();
+      io.stdout(formatListHeader(cols));
+      for (const run of runs) {
+        io.stdout(formatListRow(run, cols));
+      }
     });
 
   cmd

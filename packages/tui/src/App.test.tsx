@@ -44,7 +44,10 @@ describe('App', () => {
     await new Promise((resolve) => setTimeout(resolve, 30));
 
     expect(commandExecutor).toHaveBeenCalledWith(
-      expect.objectContaining({ input: 'run ship auth' }),
+      expect.objectContaining({
+        input: 'run ship auth',
+        command: expect.objectContaining({ command: 'run' }),
+      }),
     );
     const frame = app.lastFrame() ?? '';
     expect(frame).toContain('executed run ship auth');
@@ -69,12 +72,65 @@ describe('App', () => {
     app.stdin.write('\t');
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(app.lastFrame()).toContain('/run ');
+    expect(app.lastFrame()).toContain(
+      '↑↓ to navigate · Enter to confirm · Esc to cancel',
+    );
 
     app.stdin.write('\u0015not a command\r');
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     expect(commandExecutor).not.toHaveBeenCalled();
     expect(app.lastFrame()).toContain('Commands must start with "/"');
+    app.unmount();
+  });
+
+  it('opens a subcommand menu for /runs and runs the chosen item on Enter', async () => {
+    const commandExecutor = vi.fn(async ({ input }) => ({
+      level: 'info' as const,
+      message: `executed ${input}`,
+    }));
+    const app = render(
+      <App terminalSize={SIZE_WIDE} commandExecutor={commandExecutor} />,
+    );
+
+    app.stdin.write('/runs\r');
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(commandExecutor).not.toHaveBeenCalled();
+    const frame1 = app.lastFrame() ?? '';
+    expect(frame1).toContain('/runs');
+    expect(frame1).toContain('runs list');
+    expect(frame1).toContain(
+      '↑↓ to navigate · Enter to confirm · Esc to cancel',
+    );
+
+    app.stdin.write('\r');
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(commandExecutor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: 'runs list',
+        command: expect.objectContaining({ command: 'runs list' }),
+      }),
+    );
+    app.unmount();
+  });
+
+  it('passes prepared input so /run list maps to runs list for the executor', async () => {
+    const commandExecutor = vi.fn(async ({ input }) => ({
+      level: 'info' as const,
+      message: `executed ${input}`,
+    }));
+    const app = render(
+      <App terminalSize={SIZE_WIDE} commandExecutor={commandExecutor} />,
+    );
+
+    app.stdin.write('/run list\r');
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(commandExecutor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: 'runs list',
+        command: expect.objectContaining({ command: 'runs list' }),
+      }),
+    );
     app.unmount();
   });
 

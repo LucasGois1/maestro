@@ -18,7 +18,7 @@ const io = {
 };
 
 async function run(args: string[]): Promise<void> {
-  const program = createRunsCommand({ io, store });
+  const program = createRunsCommand({ io, store, listColumns: 100 });
   program.exitOverride();
   await program.parseAsync(args, { from: 'user' });
 }
@@ -58,8 +58,14 @@ describe('maestro runs', () => {
     await store.create({ ...seedOpts, runId: 'run-1' });
     await store.create({ ...seedOpts, runId: 'run-2' });
     await run(['list']);
-    expect(stdout[0]).toBe('runId\tstatus\tphase\tupdatedAt\tprompt');
+    const header = stdout[0] ?? '';
+    expect(header).toMatch(/^runId\s+status\s+phase\s+updatedAt\s+prompt/);
+    expect(header.length).toBe(100);
     expect(stdout.slice(1)).toHaveLength(2);
+    for (const row of stdout.slice(1)) {
+      expect(row.length).toBe(100);
+      expect(row.startsWith('run-')).toBe(true);
+    }
   });
 
   it('list reports empty state clearly', async () => {

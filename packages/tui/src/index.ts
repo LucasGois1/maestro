@@ -142,8 +142,12 @@ export {
 } from './keybindings/hotkeysCatalog.js';
 export {
   COMMAND_CATALOG,
+  commandEntryNeedsTrailingArgs,
+  entriesForSlashRoot,
   findCommandEntry,
   normalizeCommandInput,
+  prepareTuiCommandInput,
+  subcommandPickMenuForPrepared,
   suggestCommands,
   type CommandCatalogEntry,
   type CommandHandlerId,

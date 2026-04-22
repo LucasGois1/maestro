@@ -7,6 +7,7 @@ import type {
   SensorEvent,
 } from '@maestro/core';
 
+import { formatToolCallSummary } from '../format-tool-call-summary.js';
 import type {
   TuiAgentLogEntry,
   TuiFeedbackEntry,
@@ -438,7 +439,7 @@ function handleAgentEvent(
           kind: 'tool_call',
           agentId: event.agentId,
           at: config.clock(),
-          text: event.tool,
+          text: formatToolCallSummary(event.tool, event.args),
         };
         return {
           ...state,

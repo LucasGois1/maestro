@@ -62,11 +62,6 @@ import {
   type TuiStore,
 } from './state/store.js';
 import { useStoreSelector } from './state/useStoreSelector.js';
-import {
-  PT_APP_KBEXPLORER_NO_CLI_LABEL,
-  PT_EDITPLAN_NEEDS_INTEGRATION,
-  PT_EDITPLAN_NO_ACTIVE_SPRINT,
-} from './i18n/ptInventory.js';
 
 export interface AppProps {
   readonly store?: TuiStore;
@@ -275,7 +270,7 @@ function AppShell({
       return;
     }
     const label =
-      kbExplorer?.repoLabel ?? PT_APP_KBEXPLORER_NO_CLI_LABEL;
+      kbExplorer?.repoLabel ?? "placeholder";
     const files = kbExplorer?.files ?? [];
     overlayHost.push(
       createKbExplorerOverlay(
@@ -299,7 +294,7 @@ function AppShell({
     if (!editPlan) {
       overlayHost.push(
         createEditPlanMessageOverlay(
-          PT_EDITPLAN_NEEDS_INTEGRATION,
+          "Missing integration",
           colorMode,
         ),
       );
@@ -309,7 +304,7 @@ function AppShell({
     if (!path) {
       overlayHost.push(
         createEditPlanMessageOverlay(
-          PT_EDITPLAN_NO_ACTIVE_SPRINT,
+          "No one active sprint",
           colorMode,
         ),
       );
