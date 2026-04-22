@@ -166,9 +166,11 @@ function AppBody({
   const focus = useStoreSelector(store, (state) => state.focus);
   const mode = useStoreSelector(store, (state) => state.mode);
   const providerProps = {
-    focusedPanelId: focus.panelId,
+    /** Discovery embeds diff without layout focus; treat diff as focused so panel shortcuts work. */
+    focusedPanelId: mode === 'discovery' ? 'diff' : focus.panelId,
     overlayOpen: overlayHost.overlays.length > 0,
-    enabled: mode !== 'discovery' && commandExecutor === undefined,
+    /** Keep router on during discovery; only the stdin command shell disables it. */
+    enabled: commandExecutor === undefined,
     ...(keybindingRouter ? { router: keybindingRouter } : {}),
   };
   return (
@@ -213,22 +215,32 @@ function AppShell({
     overlayHost.overlays.length > 0,
   );
 
-  useKeybinding({ kind: 'global' }, { key: 'tab' }, () => {
-    store.setState((state) => ({
-      ...state,
-      focus: { ...state.focus, panelId: nextPanelId(state.focus.panelId) },
-    }));
-  });
+  useKeybinding(
+    { kind: 'global' },
+    { key: 'tab' },
+    () => {
+      store.setState((state) => ({
+        ...state,
+        focus: { ...state.focus, panelId: nextPanelId(state.focus.panelId) },
+      }));
+    },
+    { enabled: mode !== 'discovery' },
+  );
 
-  useKeybinding({ kind: 'global' }, { key: 'tab', shift: true }, () => {
-    store.setState((state) => ({
-      ...state,
-      focus: {
-        ...state.focus,
-        panelId: previousPanelId(state.focus.panelId),
-      },
-    }));
-  });
+  useKeybinding(
+    { kind: 'global' },
+    { key: 'tab', shift: true },
+    () => {
+      store.setState((state) => ({
+        ...state,
+        focus: {
+          ...state.focus,
+          panelId: previousPanelId(state.focus.panelId),
+        },
+      }));
+    },
+    { enabled: mode !== 'discovery' },
+  );
 
   useKeybinding({ kind: 'overlay' }, { key: 'escape' }, () => {
     overlayHost.pop();

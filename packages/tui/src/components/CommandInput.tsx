@@ -7,6 +7,7 @@ import {
   suggestCommands,
   type CommandCatalogEntry,
 } from '../commands/catalog.js';
+import { useTerminalSize } from '../layout/useTerminalSize.js';
 import type { TuiColorMode } from '../state/store.js';
 
 export type TuiCommandExecutionResult = {
@@ -31,6 +32,7 @@ export function CommandInput({
   colorMode = 'color',
 }: CommandInputProps) {
   const useColor = colorMode === 'color';
+  const { columns } = useTerminalSize();
   const [draft, setDraft] = useState('');
   const [message, setMessage] = useState<TuiCommandExecutionResult | null>(
     null,
@@ -39,17 +41,31 @@ export function CommandInput({
   const [commandHistory, setCommandHistory] = useState<readonly string[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number | null>(null);
 
-  const normalizedDraft = normalizeCommandInput(draft);
-  const suggestions = useMemo(
-    () => suggestCommands(normalizedDraft),
-    [normalizedDraft],
-  );
+  const input = draft.trimStart();
+  const hasSlashPrefix = input.startsWith('/');
+  const slashQuery = hasSlashPrefix ? input.slice(1) : '';
+  const normalizedDraft = normalizeCommandInput(slashQuery);
+  const suggestions = useMemo(() => {
+    if (!hasSlashPrefix) {
+      return [];
+    }
+    return suggestCommands(normalizedDraft);
+  }, [hasSlashPrefix, normalizedDraft]);
 
   const selected = suggestions[selectedSuggestion] ?? suggestions[0] ?? null;
 
   const submitCommand = useCallback(
     async (rawInput: string): Promise<void> => {
-      const normalized = normalizeCommandInput(rawInput).trim();
+      const trimmed = rawInput.trimStart();
+      if (!trimmed.startsWith('/')) {
+        setMessage({
+          level: 'error',
+          message: 'Commands must start with "/". Example: /run <prompt>',
+        });
+        return;
+      }
+      const withoutSlash = trimmed.slice(1);
+      const normalized = normalizeCommandInput(withoutSlash).trim();
       const command = findCommandEntry(normalized);
       if (!command) {
         const suggestion = suggestCommands(normalized)[0];
@@ -57,7 +73,7 @@ export function CommandInput({
           level: 'error',
           message: suggestion
             ? `Unknown command. Did you mean "${suggestion.entry.usage}"?`
-            : 'Unknown command. Type "run <prompt>" to start a task.',
+            : 'Unknown command. Type "/run <prompt>" to start a task.',
         });
         return;
       }
@@ -72,7 +88,9 @@ export function CommandInput({
       setMessage(result);
       if (result.level !== 'error') {
         setCommandHistory((history) =>
-          history.at(-1) === normalized ? history : [...history, normalized],
+          history.at(-1) === `/${normalized}`
+            ? history
+            : [...history, `/${normalized}`],
         );
         setDraft('');
         setSelectedSuggestion(0);
@@ -154,7 +172,7 @@ export function CommandInput({
       }
       if (key.tab) {
         if (selected) {
-          setDraft(selected.completion);
+          setDraft(`/${selected.completion}`);
           setSelectedSuggestion(0);
           setHistoryIndex(null);
         }
@@ -187,14 +205,12 @@ export function CommandInput({
         ? 'yellow'
         : 'green';
 
+  /** Width inside `paddingX={1}` on this column (matches App shell width). */
+  const ruleWidth = Math.max(8, columns - 2);
+  const horizontalRule = '\u2500'.repeat(ruleWidth);
+
   return (
     <Box flexDirection="column" paddingX={1}>
-      <Box>
-        <Text {...(useColor ? { color: 'cyan' } : {})}>maestro › </Text>
-        <Text dimColor={disabled && useColor}>
-          {disabled ? '(overlay open)' : draft}
-        </Text>
-      </Box>
       {!disabled && suggestions.length > 0 ? (
         <Box flexDirection="column">
           {suggestions.slice(0, 3).map((suggestion, idx) => (
@@ -206,11 +222,22 @@ export function CommandInput({
               dimColor={useColor && idx !== selectedSuggestion}
             >
               {idx === selectedSuggestion ? '› ' : '  '}
-              {suggestion.entry.usage} — {suggestion.entry.description}
+              {`/${suggestion.entry.usage}`} — {suggestion.entry.description}
             </Text>
           ))}
         </Box>
       ) : null}
+      <Text dimColor={useColor}>{horizontalRule}</Text>
+      <Box flexDirection="row" flexWrap="nowrap">
+        <Text {...(useColor && !disabled ? { color: 'green' } : {})}>❯ </Text>
+        <Text dimColor={disabled && useColor}>
+          {disabled ? '(overlay open)' : draft}
+        </Text>
+        {!disabled ? (
+          <Text {...(useColor ? { color: 'cyan' } : {})}>▏</Text>
+        ) : null}
+      </Box>
+      <Text dimColor={useColor}>{horizontalRule}</Text>
       {message ? (
         <Text {...(useColor ? { color: messageColor } : {})}>
           {message.message}

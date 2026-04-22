@@ -33,24 +33,28 @@ export function LayoutGrid({ slots }: LayoutGridProps) {
     );
   }
 
+  // Wide: dedicated right column for diff (full height); other panels stack on the left.
+  // Left:right flex 3:2 so the three top panels keep enough width at ~120 cols.
   return (
-    <Box flexDirection="column" flexGrow={1}>
-      <Box flexDirection="row" flexGrow={1}>
-        <Box flexGrow={1} flexBasis={0}>
-          {slots.pipeline}
+    <Box flexDirection="row" flexGrow={1}>
+      <Box flexDirection="column" flexGrow={3} flexBasis={0}>
+        <Box flexDirection="row" flexGrow={1} flexBasis={0}>
+          <Box flexGrow={1} flexBasis={0}>
+            {slots.pipeline}
+          </Box>
+          <Box flexGrow={2} flexBasis={0}>
+            {slots.activeAgent}
+          </Box>
+          <Box flexGrow={1} flexBasis={0}>
+            {slots.sprints}
+          </Box>
         </Box>
-        <Box flexGrow={2} flexBasis={0}>
-          {slots.activeAgent}
-        </Box>
-        <Box flexGrow={1} flexBasis={0}>
-          {slots.sprints}
-        </Box>
-      </Box>
-      <Box flexDirection="row" flexGrow={1}>
         <Box flexGrow={1} flexBasis={0}>
           {slots.sensors}
         </Box>
-        <Box flexGrow={2} flexBasis={0}>
+      </Box>
+      <Box flexGrow={2} flexBasis={0} flexDirection="column">
+        <Box flexGrow={1} flexBasis={0} flexDirection="column">
           {slots.diff}
         </Box>
       </Box>

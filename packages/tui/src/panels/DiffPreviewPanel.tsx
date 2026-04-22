@@ -20,7 +20,7 @@ export interface DiffPreviewPanelProps {
 }
 
 const PREVIEW_V01 =
-  'Preview da aplicação (Playwright) disponível no v0.3 — behaviour harness.';
+  'App preview (Playwright) is planned for v0.3 — behaviour harness.';
 
 interface DiffUnifiedBodyProps {
   readonly activePath: string | null;
@@ -51,7 +51,7 @@ function DiffUnifiedBody({
   useKeybinding({ kind: 'panel', panelId: 'diff' }, { key: 'j' }, scrollDown);
   useKeybinding({ kind: 'panel', panelId: 'diff' }, { key: 'k' }, scrollUp);
 
-  const pathLine = activePath !== null ? activePath : '(nenhum arquivo ativo)';
+  const pathLine = activePath !== null ? activePath : '(no active file)';
 
   return (
     <Box flexDirection="column">
@@ -68,7 +68,7 @@ function DiffUnifiedBody({
       })}
       {totalLines > viewportLines ? (
         <Text dimColor={useColor}>
-          {`… ${(scroll + 1).toString()}-${Math.min(scroll + lines.length, totalLines).toString()} / ${totalLines.toString()} linhas · [j][k]`}
+          {`… ${(scroll + 1).toString()}-${Math.min(scroll + lines.length, totalLines).toString()} / ${totalLines.toString()} lines · [j][k]`}
         </Text>
       ) : null}
     </Box>
@@ -97,8 +97,8 @@ export function DiffPreviewPanel({
       <Box flexDirection="column">
         <Text dimColor={useColor}>
           {fb.sprintIdx !== null
-            ? `sprint ${fb.sprintIdx.toString()} · tent. ${fb.attempt.toString()}`
-            : `tent. ${fb.attempt.toString()}`}
+            ? `sprint ${fb.sprintIdx.toString()} · attempt ${fb.attempt.toString()}`
+            : `attempt ${fb.attempt.toString()}`}
         </Text>
         <Text {...(useColor ? { color: 'yellow' as const } : {})}>
           {`★ ${fb.criterion}`}
@@ -108,18 +108,18 @@ export function DiffPreviewPanel({
         {fb.suggestedAction ? (
           <Text
             dimColor={useColor}
-          >{`ação sugerida: ${fb.suggestedAction}`}</Text>
+          >{`suggested action: ${fb.suggestedAction}`}</Text>
         ) : null}
       </Box>
     );
   } else if (diffPreview.mode === 'feedback') {
     body = (
       <Text dimColor={useColor}>
-        (sem feedback — aguarde evaluator.feedback)
+        (no feedback yet — wait for evaluator.feedback)
       </Text>
     );
   } else if (diffPreview.unifiedDiff.length === 0) {
-    body = <Text dimColor={useColor}>(aguardando diff…)</Text>;
+    body = <Text dimColor={useColor}>(waiting for diff…)</Text>;
   } else {
     body = (
       <DiffUnifiedBody
@@ -133,7 +133,7 @@ export function DiffPreviewPanel({
   }
 
   const panelFooter = focused
-    ? 'próximo arquivo [d] · preview [p] · histórico feedback [r] · scroll [j][k]'
+    ? 'next file [d] · preview [p] · feedback history [r] · scroll [j][k]'
     : undefined;
 
   return (
@@ -141,6 +141,7 @@ export function DiffPreviewPanel({
       title={title}
       focused={focused}
       colorMode={colorMode}
+      flexGrow={1}
       {...(panelFooter !== undefined ? { footerHint: panelFooter } : {})}
     >
       {body}

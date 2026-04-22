@@ -6,7 +6,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { App } from './App.js';
 import { createTuiStore } from './state/store.js';
 
-const SIZE_WIDE = { columns: 120, rows: 40 } as const;
+/** Wide enough for left column (3 panels + sensors) + dedicated diff column without title wrap. */
+const SIZE_WIDE = { columns: 160, rows: 40 } as const;
 const SIZE_NARROW = { columns: 60, rows: 24 } as const;
 
 describe('App', () => {
@@ -15,11 +16,10 @@ describe('App', () => {
 
     const frame = app.lastFrame() ?? '';
     expect(frame).toContain('maestro');
-    expect(frame).toContain('maestro ›');
     expect(frame).toContain('Pipeline');
     expect(frame).toContain('Active Agent');
     expect(frame).toContain('Sprints');
-    expect(frame).toContain('Sensores');
+    expect(frame).toContain('Sensors');
     expect(frame).toContain('Diff · Preview · Feedback');
     expect(frame).toContain('[?]');
     expect(frame).toContain('help');
@@ -40,7 +40,7 @@ describe('App', () => {
       />,
     );
 
-    app.stdin.write('run ship auth\r');
+    app.stdin.write('/run ship auth\r');
     await new Promise((resolve) => setTimeout(resolve, 30));
 
     expect(commandExecutor).toHaveBeenCalledWith(
@@ -60,17 +60,21 @@ describe('App', () => {
 
     app.stdin.write('ru');
     await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(app.lastFrame()).not.toContain('run <prompt>');
+
+    app.stdin.write('\u0015/ru');
+    await new Promise((resolve) => setTimeout(resolve, 20));
     expect(app.lastFrame()).toContain('run <prompt>');
 
     app.stdin.write('\t');
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(app.lastFrame()).toContain('maestro › run');
+    expect(app.lastFrame()).toContain('/run ');
 
     app.stdin.write('\u0015not a command\r');
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     expect(commandExecutor).not.toHaveBeenCalled();
-    expect(app.lastFrame()).toContain('Unknown command');
+    expect(app.lastFrame()).toContain('Commands must start with "/"');
     app.unmount();
   });
 
@@ -83,15 +87,15 @@ describe('App', () => {
       <App terminalSize={SIZE_WIDE} commandExecutor={commandExecutor} />,
     );
 
-    app.stdin.write('run ship auth\r');
+    app.stdin.write('/run ship auth\r');
     await new Promise((resolve) => setTimeout(resolve, 20));
     app.stdin.write('\u001b[A');
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    expect(app.lastFrame()).toContain('maestro › run ship auth');
+    expect(app.lastFrame()).toContain('/run ship auth');
     app.stdin.write('\u001b[B');
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(app.lastFrame()).toContain('maestro ›');
+    expect(app.lastFrame()).not.toContain('/run ship auth');
     app.unmount();
   });
 
@@ -109,11 +113,11 @@ describe('App', () => {
       />,
     );
 
-    app.stdin.write('run ship auth\r');
+    app.stdin.write('/run ship auth\r');
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     expect(commandExecutor).not.toHaveBeenCalled();
-    expect(app.lastFrame()).toContain('maestro › (overlay open)');
+    expect(app.lastFrame()).toContain('(overlay open)');
     app.unmount();
   });
 
@@ -156,7 +160,7 @@ describe('App', () => {
       'Pipeline',
       'Active Agent',
       'Sprints',
-      'Sensores',
+      'Sensors',
       'Diff · Preview · Feedback',
     ].map((token) => frame.indexOf(token));
 
@@ -384,7 +388,7 @@ describe('App', () => {
     app.stdin.write('s');
     await new Promise((resolve) => setTimeout(resolve, 30));
 
-    expect(app.lastFrame()).toContain('Sensores — detalhe');
+    expect(app.lastFrame()).toContain('Sensors — detail');
     app.unmount();
   });
 

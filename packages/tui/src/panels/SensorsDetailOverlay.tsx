@@ -23,7 +23,7 @@ export function SensorsDetailOverlay({
   );
 
   if (entries.length === 0) {
-    return <Text dimColor={useColor}>(nenhum sensor)</Text>;
+    return <Text dimColor={useColor}>(no sensors)</Text>;
   }
 
   const primaryId =
@@ -38,7 +38,7 @@ export function SensorsDetailOverlay({
       {primary ? (
         <Box flexDirection="column" marginBottom={1}>
           <Text bold {...(useColor ? { color: 'magenta' } : {})}>
-            {`▸ ${primary.sensorId} (foco)`}
+            {`▸ ${primary.sensorId} (focused)`}
           </Text>
           <Text dimColor={useColor}>
             {`kind: ${primary.kind} · status: ${primary.status} · onFail: ${primary.onFail ?? '—'}`}
@@ -87,7 +87,7 @@ export function SensorsDetailOverlay({
       {rest.length > 0 ? (
         <Box flexDirection="column">
           <Text bold dimColor={useColor}>
-            Outros
+            Others
           </Text>
           {rest.map((sensor) => (
             <Box key={sensor.sensorId} flexDirection="column" marginBottom={1}>
@@ -116,7 +116,7 @@ export function createSensorsDetailOverlay(
 ) {
   return {
     id: SENSORS_DETAIL_OVERLAY_ID,
-    title: 'Sensores — detalhe',
+    title: 'Sensors — detail',
     render: () => (
       <SensorsDetailOverlay
         sensors={sensors}

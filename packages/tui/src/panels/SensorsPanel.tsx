@@ -113,47 +113,55 @@ export function SensorsPanel({
   if (entries.length === 0) {
     return (
       <Panel
-        title="Sensores (paralelo)"
+        title="Sensors (parallel)"
         focused={focused}
         colorMode={colorMode}
+        flexGrow={1}
       >
-        <Text dimColor={useColor}>no sensors reporting</Text>
+        <Box flexGrow={1} justifyContent="center">
+          <Text dimColor={useColor}>no sensors reporting</Text>
+        </Box>
       </Panel>
     );
   }
 
-  const sensorsFooter = focused ? 'detalhe [s] · linha [↑↓][j][k]' : undefined;
+  const sensorsFooter = focused
+    ? 'detail [s] · row [↑↓][j][k]'
+    : undefined;
 
   return (
     <Panel
-      title="Sensores (paralelo)"
+      title="Sensors (parallel)"
       focused={focused}
       colorMode={colorMode}
+      flexGrow={1}
       {...(sensorsFooter !== undefined ? { footerHint: sensorsFooter } : {})}
     >
-      <Box flexDirection="column">
-        {visible.map((sensor) => {
-          const row = formatSensorRow(sensor, 36);
-          const blockFail = sensorRowIsBlockFailure(sensor);
-          const warnOnly =
-            sensor.onFail === 'warn' &&
-            (sensor.status === 'failed' || sensor.status === 'warned');
-          const isRowFocus = sensor.sensorId === focusedSensorId;
-          const colorProps =
-            useColor && blockFail
-              ? { color: 'red' as const, bold: true as const }
-              : useColor && warnOnly
-                ? { color: 'yellow' as const }
-                : useColor && sensor.status === 'running'
-                  ? { color: 'cyan' as const }
-                  : {};
-          const prefix = isRowFocus && focused ? '▸ ' : '  ';
-          return (
-            <Text key={sensor.sensorId} {...colorProps}>
-              {`${prefix}${row}`}
-            </Text>
-          );
-        })}
+      <Box flexDirection="column" flexGrow={1}>
+        <Box flexDirection="column" flexGrow={1}>
+          {visible.map((sensor) => {
+            const row = formatSensorRow(sensor, 36);
+            const blockFail = sensorRowIsBlockFailure(sensor);
+            const warnOnly =
+              sensor.onFail === 'warn' &&
+              (sensor.status === 'failed' || sensor.status === 'warned');
+            const isRowFocus = sensor.sensorId === focusedSensorId;
+            const colorProps =
+              useColor && blockFail
+                ? { color: 'red' as const, bold: true as const }
+                : useColor && warnOnly
+                  ? { color: 'yellow' as const }
+                  : useColor && sensor.status === 'running'
+                    ? { color: 'cyan' as const }
+                    : {};
+            const prefix = isRowFocus && focused ? '▸ ' : '  ';
+            return (
+              <Text key={sensor.sensorId} {...colorProps}>
+                {`${prefix}${row}`}
+              </Text>
+            );
+          })}
+        </Box>
         <Text dimColor={useColor}>
           {`${summary.passed.toString()} passed · ${summary.running.toString()} running · ${summary.queued.toString()} queued · ${summary.failed.toString()} failed`}
         </Text>

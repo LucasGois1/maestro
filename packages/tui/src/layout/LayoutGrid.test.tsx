@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { LayoutGrid } from './LayoutGrid.js';
 import { TerminalSizeProvider } from './useTerminalSize.js';
+import React from 'react';
 
 const SLOTS = {
   pipeline: <Text>[pipeline]</Text>,
@@ -16,7 +17,7 @@ const SLOTS = {
 describe('LayoutGrid', () => {
   it('renders all five slots at wide widths', () => {
     const app = render(
-      <TerminalSizeProvider value={{ columns: 120, rows: 40 }}>
+      <TerminalSizeProvider value={{ columns: 160, rows: 40 }}>
         <LayoutGrid slots={SLOTS} />
       </TerminalSizeProvider>,
     );
@@ -34,14 +35,25 @@ describe('LayoutGrid', () => {
   it('renders at exactly 80 columns using the multi-column layout', () => {
     const app = render(
       <TerminalSizeProvider value={{ columns: 80, rows: 24 }}>
-        <LayoutGrid slots={SLOTS} />
+        <LayoutGrid
+          slots={{
+            ...SLOTS,
+            pipeline: <Text>PL</Text>,
+            activeAgent: <Text>AA</Text>,
+            sprints: <Text>SP</Text>,
+            sensors: <Text>SE</Text>,
+            diff: <Text>DF</Text>,
+          }}
+        />
       </TerminalSizeProvider>,
     );
 
     const frame = app.lastFrame() ?? '';
-    expect(frame).toContain('[pipeline]');
-    expect(frame).toContain('[activeAgent]');
-    expect(frame).toContain('[sprints]');
+    expect(frame).toContain('PL');
+    expect(frame).toContain('AA');
+    expect(frame).toContain('SP');
+    expect(frame).toContain('SE');
+    expect(frame).toContain('DF');
 
     app.unmount();
   });
