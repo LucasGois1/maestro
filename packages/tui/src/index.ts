@@ -62,6 +62,12 @@ export { LayoutGrid } from './layout/LayoutGrid.js';
 export { Header } from './components/Header.js';
 export { Footer, deriveFooterState } from './components/Footer.js';
 export {
+  CommandInput,
+  type CommandInputProps,
+  type TuiCommandExecutionResult,
+  type TuiCommandExecutor,
+} from './components/CommandInput.js';
+export {
   ListPickerScreen,
   type ListPickerItem,
 } from './components/ListPickerScreen.js';
@@ -134,6 +140,15 @@ export {
   PIPELINE_FOOTER_HINTS,
   PANEL_HOTKEYS,
 } from './keybindings/hotkeysCatalog.js';
+export {
+  COMMAND_CATALOG,
+  findCommandEntry,
+  normalizeCommandInput,
+  suggestCommands,
+  type CommandCatalogEntry,
+  type CommandHandlerId,
+  type CommandSuggestion,
+} from './commands/catalog.js';
 export {
   createKeybindingRouter,
   KeybindingProvider,

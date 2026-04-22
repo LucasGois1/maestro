@@ -10,6 +10,8 @@ export const KNOWN_SUBCOMMANDS = new Set([
   'git',
   'init',
   'kb',
+  'resume',
+  'run',
   'runs',
   'tui',
 ]);

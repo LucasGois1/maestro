@@ -2,6 +2,10 @@ import { Box } from 'ink';
 import { useCallback, useEffect, useMemo } from 'react';
 import type { EventBus } from '@maestro/core';
 
+import {
+  CommandInput,
+  type TuiCommandExecutor,
+} from './components/CommandInput.js';
 import { Footer, deriveFooterState } from './components/Footer.js';
 import { Header } from './components/Header.js';
 import {
@@ -83,6 +87,7 @@ export interface AppProps {
     readonly resolveContractPath: (state: TuiState) => string | null;
     readonly onEditPath: (path: string) => void | Promise<void>;
   };
+  readonly commandExecutor?: TuiCommandExecutor;
 }
 
 export function App({
@@ -95,6 +100,7 @@ export function App({
   discovery,
   kbExplorer,
   editPlan,
+  commandExecutor,
 }: AppProps) {
   const activeStore = useMemo(
     () => store ?? createTuiStore({ colorMode: colorMode ?? 'color' }),
@@ -121,6 +127,7 @@ export function App({
     ...(discovery ? { discovery } : {}),
     ...(kbExplorer ? { kbExplorer } : {}),
     ...(editPlan ? { editPlan } : {}),
+    ...(commandExecutor ? { commandExecutor } : {}),
   };
   const content = (
     <OverlayHostProvider initialStack={initialOverlay ? [initialOverlay] : []}>
@@ -144,6 +151,7 @@ interface AppBodyProps {
   readonly discovery?: AppProps['discovery'];
   readonly kbExplorer?: AppProps['kbExplorer'];
   readonly editPlan?: AppProps['editPlan'];
+  readonly commandExecutor?: AppProps['commandExecutor'];
 }
 
 function AppBody({
@@ -152,6 +160,7 @@ function AppBody({
   discovery,
   kbExplorer,
   editPlan,
+  commandExecutor,
 }: AppBodyProps) {
   const overlayHost = useOverlayHost();
   const focus = useStoreSelector(store, (state) => state.focus);
@@ -159,7 +168,7 @@ function AppBody({
   const providerProps = {
     focusedPanelId: focus.panelId,
     overlayOpen: overlayHost.overlays.length > 0,
-    enabled: mode !== 'discovery',
+    enabled: mode !== 'discovery' && commandExecutor === undefined,
     ...(keybindingRouter ? { router: keybindingRouter } : {}),
   };
   return (
@@ -169,6 +178,7 @@ function AppBody({
         discovery={discovery}
         kbExplorer={kbExplorer}
         editPlan={editPlan}
+        commandExecutor={commandExecutor}
       />
     </KeybindingProvider>
   );
@@ -179,11 +189,13 @@ function AppShell({
   discovery,
   kbExplorer,
   editPlan,
+  commandExecutor,
 }: {
   readonly store: TuiStore;
   readonly discovery?: AppProps['discovery'];
   readonly kbExplorer?: AppProps['kbExplorer'];
   readonly editPlan?: AppProps['editPlan'];
+  readonly commandExecutor?: AppProps['commandExecutor'];
 }) {
   const overlayHost = useOverlayHost();
   const mode = useStoreSelector(store, (state) => state.mode);
@@ -500,6 +512,11 @@ function AppShell({
         }}
       />
       <OverlayHost colorMode={colorMode} />
+      <CommandInput
+        {...(commandExecutor ? { executor: commandExecutor } : {})}
+        disabled={overlayHost.overlays.length > 0}
+        colorMode={colorMode}
+      />
       <Footer state={footerState} colorMode={colorMode} />
     </Box>
   );

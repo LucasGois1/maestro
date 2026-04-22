@@ -131,6 +131,9 @@ importers:
       '@maestro/kb':
         specifier: workspace:^
         version: link:../kb
+      '@maestro/pipeline':
+        specifier: workspace:*
+        version: link:../pipeline
       '@maestro/provider':
         specifier: workspace:^
         version: link:../provider

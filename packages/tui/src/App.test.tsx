@@ -1,7 +1,7 @@
 import { createEventBus } from '@maestro/core';
 import { render } from 'ink-testing-library';
 import { act } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { App } from './App.js';
 import { createTuiStore } from './state/store.js';
@@ -15,6 +15,7 @@ describe('App', () => {
 
     const frame = app.lastFrame() ?? '';
     expect(frame).toContain('maestro');
+    expect(frame).toContain('maestro ›');
     expect(frame).toContain('Pipeline');
     expect(frame).toContain('Active Agent');
     expect(frame).toContain('Sprints');
@@ -22,6 +23,97 @@ describe('App', () => {
     expect(frame).toContain('Diff · Preview · Feedback');
     expect(frame).toContain('[?]');
     expect(frame).toContain('help');
+    app.unmount();
+  });
+
+  it('submits a TUI command through the command input', async () => {
+    const bus = createEventBus();
+    const commandExecutor = vi.fn(async ({ input }) => {
+      bus.emit({ type: 'pipeline.started', runId: 'r-command' });
+      return { level: 'info' as const, message: `executed ${input}` };
+    });
+    const app = render(
+      <App
+        bus={bus}
+        terminalSize={SIZE_WIDE}
+        commandExecutor={commandExecutor}
+      />,
+    );
+
+    app.stdin.write('run ship auth\r');
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    expect(commandExecutor).toHaveBeenCalledWith(
+      expect.objectContaining({ input: 'run ship auth' }),
+    );
+    const frame = app.lastFrame() ?? '';
+    expect(frame).toContain('executed run ship auth');
+    expect(frame).toContain('run');
+    app.unmount();
+  });
+
+  it('suggests known commands and rejects unknown free text', async () => {
+    const commandExecutor = vi.fn();
+    const app = render(
+      <App terminalSize={SIZE_WIDE} commandExecutor={commandExecutor} />,
+    );
+
+    app.stdin.write('ru');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(app.lastFrame()).toContain('run <prompt>');
+
+    app.stdin.write('\t');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(app.lastFrame()).toContain('maestro › run');
+
+    app.stdin.write('\u0015not a command\r');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(commandExecutor).not.toHaveBeenCalled();
+    expect(app.lastFrame()).toContain('Unknown command');
+    app.unmount();
+  });
+
+  it('recalls executed commands from history with arrow keys', async () => {
+    const commandExecutor = vi.fn(async ({ input }) => ({
+      level: 'info' as const,
+      message: `executed ${input}`,
+    }));
+    const app = render(
+      <App terminalSize={SIZE_WIDE} commandExecutor={commandExecutor} />,
+    );
+
+    app.stdin.write('run ship auth\r');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    app.stdin.write('\u001b[A');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(app.lastFrame()).toContain('maestro › run ship auth');
+    app.stdin.write('\u001b[B');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(app.lastFrame()).toContain('maestro ›');
+    app.unmount();
+  });
+
+  it('disables the command input while an overlay is open', async () => {
+    const commandExecutor = vi.fn();
+    const app = render(
+      <App
+        terminalSize={SIZE_WIDE}
+        commandExecutor={commandExecutor}
+        initialOverlay={{
+          id: 'help',
+          title: 'Help',
+          render: () => null,
+        }}
+      />,
+    );
+
+    app.stdin.write('run ship auth\r');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(commandExecutor).not.toHaveBeenCalled();
+    expect(app.lastFrame()).toContain('maestro › (overlay open)');
     app.unmount();
   });
 

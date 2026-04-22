@@ -15,6 +15,7 @@ import { render, type Instance } from 'ink';
 import { createElement } from 'react';
 
 import { listMaestroFilesUnderRepo } from '../tui-kb.js';
+import { createTuiCommandExecutor } from '../tui-command-executor.js';
 
 export interface CreateTuiCommandOptions {
   readonly renderApp?: typeof defaultRenderApp;
@@ -56,6 +57,10 @@ export function createTuiCommand(
 
       const repoRoot = cwd();
       const kbFiles = listMaestroFilesUnderRepo(repoRoot);
+      const commandExecutor = createTuiCommandExecutor({
+        repoRoot,
+        bus,
+      });
 
       let inkInstance: Instance | undefined;
 
@@ -91,6 +96,7 @@ export function createTuiCommand(
               }
             },
           },
+          commandExecutor,
         });
       };
 
@@ -115,6 +121,7 @@ export interface DefaultRenderAppArgs {
     readonly resolveContractPath: (state: TuiState) => string | null;
     readonly onEditPath: (path: string) => void | Promise<void>;
   };
+  readonly commandExecutor?: Parameters<typeof App>[0]['commandExecutor'];
 }
 
 export function defaultRenderApp({
@@ -123,6 +130,7 @@ export function defaultRenderApp({
   colorMode,
   kbExplorer,
   editPlan,
+  commandExecutor,
 }: DefaultRenderAppArgs): Instance {
   return render(
     createElement(App, {
@@ -131,6 +139,7 @@ export function defaultRenderApp({
       colorMode,
       ...(kbExplorer ? { kbExplorer } : {}),
       ...(editPlan ? { editPlan } : {}),
+      ...(commandExecutor ? { commandExecutor } : {}),
     }),
     {
       interactive: Boolean(process.stdin.isTTY && process.stdout.isTTY),
