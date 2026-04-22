@@ -494,6 +494,8 @@ function AppShell({
           activeAgent: (
             <ActiveAgentPanel
               agent={agent}
+              pipelineStage={pipeline.stage}
+              pipelineStatus={pipeline.status}
               focused={focus.panelId === 'activeAgent'}
               colorMode={colorMode}
             />

@@ -26,11 +26,49 @@ describe('ActiveAgentPanel', () => {
     app.unmount();
   });
 
-  it('shows placeholder when there is no output', () => {
+  it('shows placeholder when there is no agent', () => {
     const state = createInitialTuiState();
     const app = render(<ActiveAgentPanel agent={state.agent} />);
 
-    expect(app.lastFrame()).toContain('(no output yet)');
+    expect(app.lastFrame()).toContain('(sem agente ativo)');
+    app.unmount();
+  });
+
+  it('shows working hint and spinner when pipeline is running but log is empty', () => {
+    const state = createInitialTuiState();
+    const app = render(
+      <ActiveAgentPanel
+        agent={{
+          ...state.agent,
+          activeAgentId: 'planner',
+          messageLog: [],
+        }}
+        pipelineStage="planning"
+        pipelineStatus="running"
+      />,
+    );
+
+    const frame = app.lastFrame() ?? '';
+    expect(frame).toContain('A gerar o plano do produto');
+    expect(frame).toContain('A aguardar tokens ou ferramentas do agente');
+    app.unmount();
+  });
+
+  it('shows idle placeholder when agent is active but pipeline is not running', () => {
+    const state = createInitialTuiState();
+    const app = render(
+      <ActiveAgentPanel
+        agent={{
+          ...state.agent,
+          activeAgentId: 'planner',
+          messageLog: [],
+        }}
+        pipelineStage="planning"
+        pipelineStatus="paused"
+      />,
+    );
+
+    expect(app.lastFrame()).toContain('(sem saída ainda)');
     app.unmount();
   });
 

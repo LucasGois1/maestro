@@ -324,6 +324,25 @@ describe('computeStageDurations', () => {
     expect(durations.evaluating).toBe(200);
     expect(durations.merging).toBeNull();
   });
+
+  it('includes elapsed time for the in-progress stage when nowMs is passed', () => {
+    const durations = computeStageDurations(
+      {
+        status: 'running',
+        stage: 'planning',
+        sprintIdx: null,
+        retryCount: 0,
+        error: null,
+        history: [
+          { stage: 'discovering', startedAt: 0, endedAt: 100 },
+          { stage: 'planning', startedAt: 100, endedAt: null },
+        ],
+      },
+      5_100,
+    );
+    expect(durations.discovering).toBe(100);
+    expect(durations.planning).toBe(5_000);
+  });
 });
 
 describe('selectStageStatuses/selectStageDurations', () => {

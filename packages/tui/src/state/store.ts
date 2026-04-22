@@ -504,6 +504,7 @@ export function computeStageStatuses(
 
 export function computeStageDurations(
   pipeline: TuiPipelineState,
+  nowMs?: number,
 ): TuiStageDurationMap {
   const durations: Record<PipelineStageName, number | null> = {
     discovering: null,
@@ -517,6 +518,16 @@ export function computeStageDurations(
 
   for (const record of pipeline.history) {
     if (record.endedAt === null) {
+      if (
+        nowMs !== undefined &&
+        pipeline.stage !== null &&
+        record.stage === pipeline.stage
+      ) {
+        const live = nowMs - record.startedAt;
+        const existing = durations[record.stage];
+        durations[record.stage] =
+          existing === null ? live : existing + live;
+      }
       continue;
     }
     const elapsed = record.endedAt - record.startedAt;

@@ -1,5 +1,5 @@
 import { render } from 'ink-testing-library';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createInitialTuiState } from '../state/store.js';
 
@@ -25,34 +25,41 @@ describe('PipelinePanel', () => {
   });
 
   it('renders running, passed and pending icons based on pipeline state', () => {
-    const app = render(
-      <PipelinePanel
-        pipeline={{
-          status: 'running',
-          stage: 'generating',
-          sprintIdx: 1,
-          retryCount: 0,
-          error: null,
-          history: [
-            { stage: 'discovering', startedAt: 0, endedAt: 100 },
-            { stage: 'planning', startedAt: 100, endedAt: 2_000 },
-            { stage: 'architecting', startedAt: 2_000, endedAt: 5_000 },
-            { stage: 'contracting', startedAt: 5_000, endedAt: 6_000 },
-            { stage: 'generating', startedAt: 6_000, endedAt: null },
-          ],
-        }}
-        sprints={[{ idx: 1, status: 'running', retries: 0 }]}
-      />,
-    );
+    vi.useFakeTimers();
+    vi.setSystemTime(20_000);
+    try {
+      const app = render(
+        <PipelinePanel
+          pipeline={{
+            status: 'running',
+            stage: 'generating',
+            sprintIdx: 1,
+            retryCount: 0,
+            error: null,
+            history: [
+              { stage: 'discovering', startedAt: 0, endedAt: 100 },
+              { stage: 'planning', startedAt: 100, endedAt: 2_000 },
+              { stage: 'architecting', startedAt: 2_000, endedAt: 5_000 },
+              { stage: 'contracting', startedAt: 5_000, endedAt: 6_000 },
+              { stage: 'generating', startedAt: 6_000, endedAt: null },
+            ],
+          }}
+          sprints={[{ idx: 1, status: 'running', retries: 0 }]}
+        />,
+      );
 
-    const frame = app.lastFrame() ?? '';
-    expect(frame).toContain('✓ Discovering');
-    expect(frame).toContain('✓ Planning');
-    expect(frame).toContain('⟳ Generating');
-    expect(frame).toContain('○ Evaluating');
-    expect(frame).toContain('○ Merging');
-    expect(frame).toContain('sprint #1');
-    app.unmount();
+      const frame = app.lastFrame() ?? '';
+      expect(frame).toContain('✓ Discovering');
+      expect(frame).toContain('✓ Planning');
+      expect(frame).toContain('⟳ Generating');
+      expect(frame).toContain('14s');
+      expect(frame).toContain('○ Evaluating');
+      expect(frame).toContain('○ Merging');
+      expect(frame).toContain('sprint #1');
+      app.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('renders failed stage with error message', () => {
