@@ -80,6 +80,8 @@ export type WriteAgentParseAuditOptions = {
   readonly candidateText: string;
   readonly parseMessage: string;
   readonly generateTextAudit: GenerateTextAuditModel;
+  /** True when a no-tools JSON recovery pass ran after an all-tool-calls loop. */
+  readonly toolLoopRecoveryAttempted?: boolean;
 };
 
 /**
@@ -105,6 +107,7 @@ export async function writeAgentParseAuditLog(
       writtenAt: new Date().toISOString(),
       agentId: options.agentId,
       runId: options.context.runId,
+      toolLoopRecoveryAttempted: options.toolLoopRecoveryAttempted ?? false,
       parseMessage: options.parseMessage,
       candidateTextLength: options.candidateText.length,
       candidateTextPreview:

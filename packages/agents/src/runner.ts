@@ -174,6 +174,10 @@ function stringifyInput(input: unknown): string {
   return JSON.stringify(input, null, 2);
 }
 
+/** When the tool loop hits maxSteps on tool-calls, the model may never emit a text turn. */
+const TOOL_LOOP_JSON_RECOVERY_USER =
+  'The tool exploration phase finished without a final assistant text. Using the conversation and tool results above, output exactly one JSON object only: no markdown code fences, no commentary before or after. It must satisfy the output contract from the system message.';
+
 async function generateToolAugmentedAgentText(options: {
   readonly model: LanguageModelV3;
   readonly system: string;
@@ -187,6 +191,7 @@ async function generateToolAugmentedAgentText(options: {
 }): Promise<{
   readonly outputText: string;
   readonly generateResult: Awaited<ReturnType<typeof generateText>>;
+  readonly toolLoopRecoveryAttempted: boolean;
 }> {
   const gen = await generateText({
     model: options.model,
@@ -213,7 +218,21 @@ async function generateToolAugmentedAgentText(options: {
       });
     },
   });
-  const outputText = collectAssistantTextFromToolLoopResult(gen);
+  let outputText = collectAssistantTextFromToolLoopResult(gen);
+  let toolLoopRecoveryAttempted = false;
+  if (outputText.trim().length === 0) {
+    toolLoopRecoveryAttempted = true;
+    const recovery = await generateText({
+      model: options.model,
+      system: `${options.system}\n\n---\nFollow-up: do not use tools. Respond with the final JSON object only.`,
+      messages: [
+        ...gen.response.messages,
+        { role: 'user', content: TOOL_LOOP_JSON_RECOVERY_USER },
+      ],
+      stopWhen: stepCountIs(3),
+    });
+    outputText = collectAssistantTextFromToolLoopResult(recovery);
+  }
   if (outputText.length > 0) {
     options.bus.emit({
       type: 'agent.delta',
@@ -222,7 +241,7 @@ async function generateToolAugmentedAgentText(options: {
       chunk: outputText,
     });
   }
-  return { outputText, generateResult: gen };
+  return { outputText, generateResult: gen, toolLoopRecoveryAttempted };
 }
 
 function extractJsonObject(text: string): unknown {
@@ -277,6 +296,7 @@ export async function runAgent<TInput, TOutput>(
 
     let text = '';
     let toolLoopGen: Awaited<ReturnType<typeof generateText>> | undefined;
+    let toolLoopRecoveryAttempted = false;
 
     const meta = context.metadata;
     const worktreeRoot =
@@ -290,12 +310,12 @@ export async function runAgent<TInput, TOutput>(
     if (definition.id === 'planner') {
       toolAugmented = {
         tools: createPlannerToolSet(context.workingDir),
-        maxSteps: 12,
+        maxSteps: 24,
       };
     } else if (definition.id === 'architect') {
       toolAugmented = {
         tools: createArchitectToolSet(context.workingDir),
-        maxSteps: 12,
+        maxSteps: 24,
       };
     } else if (definition.id === 'generator') {
       toolAugmented = {
@@ -308,7 +328,7 @@ export async function runAgent<TInput, TOutput>(
             ? { maestroDir: maestroDirMeta }
             : {}),
         }),
-        maxSteps: 28,
+        maxSteps: 72,
       };
     } else if (definition.id === 'evaluator') {
       const evInput = inputParse.data as EvaluatorInput;
@@ -325,7 +345,7 @@ export async function runAgent<TInput, TOutput>(
           codeDiff: evInput.codeDiff,
           sprintContract: evInput.sprintContract,
         }),
-        maxSteps: 22,
+        maxSteps: 36,
       };
     } else if (definition.id === 'merger') {
       toolAugmented = {
@@ -339,7 +359,7 @@ export async function runAgent<TInput, TOutput>(
             ? { maestroDir: maestroDirMeta }
             : {}),
         }),
-        maxSteps: 20,
+        maxSteps: 32,
       };
     } else if (definition.id === 'doc-gardener') {
       toolAugmented = {
@@ -356,7 +376,7 @@ export async function runAgent<TInput, TOutput>(
             ? { codeDiff: meta.codeDiff }
             : {}),
         }),
-        maxSteps: 24,
+        maxSteps: 40,
       };
     }
 
@@ -374,6 +394,7 @@ export async function runAgent<TInput, TOutput>(
       });
       text = loop.outputText;
       toolLoopGen = loop.generateResult;
+      toolLoopRecoveryAttempted = loop.toolLoopRecoveryAttempted;
     } else {
       const result = streamText({
         model,
@@ -403,6 +424,7 @@ export async function runAgent<TInput, TOutput>(
           candidateText: text,
           parseMessage: err.message,
           generateTextAudit: serializeGenerateTextForAudit(toolLoopGen),
+          toolLoopRecoveryAttempted,
         });
         if (auditPath) {
           err.auditLogPath = auditPath;
