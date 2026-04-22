@@ -1,6 +1,6 @@
 # Agente Architect (DSFT-91)
 
-O **Architect** valida, por sprint, o plano do Planner contra `ARCHITECTURE.md` e restrições técnicas do repositório. Produz JSON validado por `architectModelOutputSchema` em `@maestro/agents`, com escopo técnico, padrões, bibliotecas e um *boundary check*. O pipeline grava as notas em `.maestro/runs/<runId>/design-notes/design-notes-sprint-<n>.md` e insere um bloco `### Architect notes` na secção correspondente de `plan.md`.
+O **Architect** valida, por sprint, o plano do Planner contra `ARCHITECTURE.md` e restrições técnicas do repositório. Produz JSON validado por `architectModelOutputSchema` em `@maestro/agents`, com escopo técnico, padrões, bibliotecas e um _boundary check_. O pipeline grava as notas em `.maestro/runs/<runId>/design-notes/design-notes-sprint-<n>.md` e insere um bloco `### Architect notes` na secção correspondente de `plan.md`.
 
 ## Entrada
 
@@ -27,13 +27,13 @@ Após o parse, `finalizeArchitectOutput` define **`approved`** como `boundaryChe
 
 O runner usa `generateText` com limite de passos (tool loop), no mesmo padrão do Planner, com o conjunto do Architect:
 
-| Ferramenta       | Função |
-|------------------|--------|
-| `readKB`         | KB Maestro e `docs/` na raiz (como no Planner). |
-| `listDirectory`  | Listagem segura sob a raiz do repo. |
-| `searchCode`     | Pesquisa literal com ripgrep. |
-| `readFile`       | Leitura de ficheiros relativos à raiz do repositório (validação de caminho partilhada com o Planner). |
-| `getDependencies`| Resumo de manifestos (`package.json`, `pnpm-workspace.yaml`, `pyproject.toml`, `go.mod`, `Cargo.toml`, etc.). |
+| Ferramenta        | Função                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------- |
+| `readKB`          | KB Maestro e `docs/` na raiz (como no Planner).                                                               |
+| `listDirectory`   | Listagem segura sob a raiz do repo.                                                                           |
+| `searchCode`      | Pesquisa literal com ripgrep.                                                                                 |
+| `readFile`        | Leitura de ficheiros relativos à raiz do repositório (validação de caminho partilhada com o Planner).         |
+| `getDependencies` | Resumo de manifestos (`package.json`, `pnpm-workspace.yaml`, `pyproject.toml`, `go.mod`, `Cargo.toml`, etc.). |
 
 Eventos `agent.tool_call` / `agent.tool_result` são emitidos no bus.
 

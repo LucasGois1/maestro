@@ -54,8 +54,13 @@ describe('LayoutGrid', () => {
     );
 
     const frame = app.lastFrame() ?? '';
-    const order = ['[pipeline]', '[activeAgent]', '[sprints]', '[sensors]', '[diff]']
-      .map((token) => frame.indexOf(token));
+    const order = [
+      '[pipeline]',
+      '[activeAgent]',
+      '[sprints]',
+      '[sensors]',
+      '[diff]',
+    ].map((token) => frame.indexOf(token));
 
     expect(order.every((index) => index >= 0)).toBe(true);
     for (let i = 1; i < order.length; i += 1) {

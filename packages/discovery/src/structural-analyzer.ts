@@ -39,7 +39,9 @@ function extKey(path: string): string {
   return base.slice(dot).toLowerCase();
 }
 
-export async function analyzeStructure(repoRoot: string): Promise<StructuralSummary> {
+export async function analyzeStructure(
+  repoRoot: string,
+): Promise<StructuralSummary> {
   const topLevelNames: string[] = [];
   const extensionCounts: Record<string, number> = {};
   const testDirectoryHints: string[] = [];

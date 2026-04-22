@@ -54,7 +54,9 @@ describe('createKBManager', () => {
     await kb.write('docs/product-specs/sample.md', '# Sample\n');
 
     expect(await kb.read('docs/product-specs/sample.md')).toBe('# Sample\n');
-    expect(await kb.list('docs/**/*.md')).toContain('docs/product-specs/sample.md');
+    expect(await kb.list('docs/**/*.md')).toContain(
+      'docs/product-specs/sample.md',
+    );
 
     const context = await kb.getAgentContext();
     expect(context.agentsMd).toContain('# AGENTS');

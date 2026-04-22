@@ -1,0 +1,29 @@
+{
+  "name": "@maestro/testkit",
+  "version": "0.0.1",
+  "description": "Shared test helpers for Maestro",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/provider": "^3.0.8",
+    "@maestro/config": "workspace:*",
+    "@maestro/core": "workspace:*",
+    "@maestro/pipeline": "workspace:*",
+    "@maestro/state": "workspace:*",
+    "ai": "^6.0.168",
+    "zod": "^4.3.6"
+  },
+  "license": "MIT"
+}

@@ -44,7 +44,9 @@ describe('Panel', () => {
   });
 
   it('renders an optional footer hint', () => {
-    const app = render(<Panel title="Sensors" footerHint="p pause · r retry" />);
+    const app = render(
+      <Panel title="Sensors" footerHint="p pause · r retry" />,
+    );
     expect(app.lastFrame()).toContain('p pause · r retry');
     app.unmount();
   });

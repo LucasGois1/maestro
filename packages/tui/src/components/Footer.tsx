@@ -1,10 +1,7 @@
 import { Box, Text } from 'ink';
 
 import { PIPELINE_FOOTER_HINTS } from '../keybindings/hotkeysCatalog.js';
-import type {
-  TuiColorMode,
-  TuiPipelineStatus,
-} from '../state/store.js';
+import type { TuiColorMode, TuiPipelineStatus } from '../state/store.js';
 
 export type FooterState = 'idle' | 'running' | 'paused' | 'overlay';
 
@@ -24,9 +21,7 @@ export function Footer({ state, colorMode = 'color' }: FooterProps) {
       borderColor={useColor ? 'gray' : undefined}
     >
       <Text dimColor={useColor}>
-        {hotkeys
-          .map(({ key, label }) => `${key} ${label}`)
-          .join('  ·  ')}
+        {hotkeys.map(({ key, label }) => `${key} ${label}`).join('  ·  ')}
       </Text>
     </Box>
   );

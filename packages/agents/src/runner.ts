@@ -20,10 +20,7 @@ import { createEvaluatorToolSet } from './evaluator-tools.js';
 import { createGeneratorToolSet } from './generator-tools.js';
 import { createMergerToolSet } from './merger-tools.js';
 import { createGardenerToolSet } from './gardener-tools.js';
-import {
-  createArchitectToolSet,
-  createPlannerToolSet,
-} from './repo-tools.js';
+import { createArchitectToolSet, createPlannerToolSet } from './repo-tools.js';
 
 function formatZodIssues(issues: readonly ZodIssue[]): string {
   return issues
@@ -63,7 +60,10 @@ export function formatAgentErrorForDisplay(error: unknown): {
   readonly detail: string;
 } {
   if (error instanceof AgentOutputParseError) {
-    const head = error.rawText.length > 3500 ? `${error.rawText.slice(0, 3500)}…` : error.rawText;
+    const head =
+      error.rawText.length > 3500
+        ? `${error.rawText.slice(0, 3500)}…`
+        : error.rawText;
     return {
       summary: 'Model output was not valid JSON',
       detail: `${error.message}\n\n--- Raw output (truncated for screen) ---\n${head}`,

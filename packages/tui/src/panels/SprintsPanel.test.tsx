@@ -31,9 +31,7 @@ describe('SprintsPanel', () => {
 
   it('renders retry indicator when retries > 0', () => {
     const app = render(
-      <SprintsPanel
-        sprints={[{ idx: 2, status: 'running', retries: 2 }]}
-      />,
+      <SprintsPanel sprints={[{ idx: 2, status: 'running', retries: 2 }]} />,
     );
 
     expect(app.lastFrame()).toContain('⟳2');

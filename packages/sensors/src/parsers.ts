@@ -20,7 +20,10 @@ function parseJson(text: string): unknown {
   }
 }
 
-function toSeverity(input: unknown, fallback: ViolationSeverity): ViolationSeverity {
+function toSeverity(
+  input: unknown,
+  fallback: ViolationSeverity,
+): ViolationSeverity {
   return input === 'info' || input === 'warn' || input === 'error'
     ? input
     : fallback;
@@ -57,7 +60,9 @@ function parseMypyJson(stdout: string): ParsedSensorOutput {
   const parsed = parseJson(stdout);
   const entries = Array.isArray(parsed)
     ? parsed
-    : parsed && typeof parsed === 'object' && Array.isArray((parsed as { errors?: unknown[] }).errors)
+    : parsed &&
+        typeof parsed === 'object' &&
+        Array.isArray((parsed as { errors?: unknown[] }).errors)
       ? (parsed as { errors: unknown[] }).errors
       : [];
 
@@ -79,7 +84,9 @@ function parseMypyJson(stdout: string): ParsedSensorOutput {
 function parsePytestJson(stdout: string): ParsedSensorOutput {
   const parsed = parseJson(stdout);
   const tests =
-    parsed && typeof parsed === 'object' && Array.isArray((parsed as { tests?: unknown[] }).tests)
+    parsed &&
+    typeof parsed === 'object' &&
+    Array.isArray((parsed as { tests?: unknown[] }).tests)
       ? (parsed as { tests: unknown[] }).tests
       : [];
 

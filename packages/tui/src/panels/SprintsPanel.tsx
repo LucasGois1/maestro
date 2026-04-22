@@ -49,9 +49,7 @@ export function SprintsPanel({
           );
         })}
       </Box>
-      {focused ? (
-        <Text dimColor={useColor}>Ver sprint → [N]</Text>
-      ) : null}
+      {focused ? <Text dimColor={useColor}>Ver sprint → [N]</Text> : null}
     </Panel>
   );
 }

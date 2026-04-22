@@ -119,9 +119,7 @@ describe('ActiveAgentPanel', () => {
 
   it('shows [l] hint only when focused', () => {
     const state = createInitialTuiState();
-    const withFocus = render(
-      <ActiveAgentPanel agent={state.agent} focused />,
-    );
+    const withFocus = render(<ActiveAgentPanel agent={state.agent} focused />);
     expect(withFocus.lastFrame()).toContain('[l] logs completos');
     withFocus.unmount();
 

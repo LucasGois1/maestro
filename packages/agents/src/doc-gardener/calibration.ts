@@ -16,8 +16,7 @@ export const DOC_GARDENER_FEW_SHOT_EXAMPLES = [
 ] as const;
 
 export function resolvedDocGardenerSystemPrompt(): string {
-  return appendCalibrationSection(
-    DOC_GARDENER_SYSTEM_PROMPT,
-    [...DOC_GARDENER_FEW_SHOT_EXAMPLES],
-  );
+  return appendCalibrationSection(DOC_GARDENER_SYSTEM_PROMPT, [
+    ...DOC_GARDENER_FEW_SHOT_EXAMPLES,
+  ]);
 }

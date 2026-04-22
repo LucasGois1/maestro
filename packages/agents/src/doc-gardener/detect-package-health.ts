@@ -3,9 +3,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-export type PackageHealthKind =
-  | 'outdated_dep'
-  | 'knip_issue';
+export type PackageHealthKind = 'outdated_dep' | 'knip_issue';
 
 export type PackageHealthFinding = {
   readonly path: string;
@@ -135,11 +133,10 @@ export async function detectPnpmOutdated(
   repoRoot: string,
   opts: RunPackageHealthOptions,
 ): Promise<readonly PackageHealthFinding[]> {
-  const r = await runCmd(
-    'pnpm',
-    ['outdated'],
-    { cwd: repoRoot, timeoutMs: opts.timeoutMs },
-  );
+  const r = await runCmd('pnpm', ['outdated'], {
+    cwd: repoRoot,
+    timeoutMs: opts.timeoutMs,
+  });
   const text = `${r.stdout}\n${r.stderr}`;
   return parsePnpmOutdatedText(text, opts.maxFindings);
 }

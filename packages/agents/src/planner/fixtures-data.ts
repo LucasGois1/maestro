@@ -53,11 +53,12 @@ export const IMPLICIT_SCOPE: {
   readonly input: { readonly prompt: string };
   readonly output: PlannerModelOutput;
 } = {
-  input: { prompt: 'Quero que as pessoas partilhem ficheiros grandes sem email' },
+  input: {
+    prompt: 'Quero que as pessoas partilhem ficheiros grandes sem email',
+  },
   output: {
     feature: 'Partilha de ficheiros',
-    overview:
-      'Partilha simples de links com expiração.\nFoco em UX mínima.',
+    overview: 'Partilha simples de links com expiração.\nFoco em UX mínima.',
     userStories: [
       {
         id: 1,

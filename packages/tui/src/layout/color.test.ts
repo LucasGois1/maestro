@@ -27,9 +27,7 @@ describe('resolveColorMode', () => {
   });
 
   it('ignores empty NO_COLOR env variable values', () => {
-    expect(resolveColorMode({ args: [], env: { NO_COLOR: '' } })).toBe(
-      'color',
-    );
+    expect(resolveColorMode({ args: [], env: { NO_COLOR: '' } })).toBe('color');
   });
 
   it('prefers the CLI flag when both are present', () => {

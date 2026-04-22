@@ -17,7 +17,9 @@ export interface KeybindingContextValue {
   readonly overlayOpen: boolean;
 }
 
-const KeybindingContextReact = createContext<KeybindingContextValue | null>(null);
+const KeybindingContextReact = createContext<KeybindingContextValue | null>(
+  null,
+);
 
 export interface KeybindingProviderProps {
   readonly focusedPanelId: TuiPanelId;

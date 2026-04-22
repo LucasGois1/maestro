@@ -14,6 +14,15 @@ importers:
       '@eslint/js':
         specifier: ^9.39.4
         version: 9.39.4
+      '@maestro/core':
+        specifier: workspace:*
+        version: link:packages/core
+      '@maestro/pipeline':
+        specifier: workspace:*
+        version: link:packages/pipeline
+      '@maestro/testkit':
+        specifier: workspace:*
+        version: link:packages/testkit
       '@types/node':
         specifier: ^25.6.0
         version: 25.6.0
@@ -281,6 +290,30 @@ importers:
 
   packages/state:
     dependencies:
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
+
+  packages/testkit:
+    dependencies:
+      '@ai-sdk/provider':
+        specifier: ^3.0.8
+        version: 3.0.8
+      '@maestro/config':
+        specifier: workspace:*
+        version: link:../config
+      '@maestro/core':
+        specifier: workspace:*
+        version: link:../core
+      '@maestro/pipeline':
+        specifier: workspace:*
+        version: link:../pipeline
+      '@maestro/state':
+        specifier: workspace:*
+        version: link:../state
+      ai:
+        specifier: ^6.0.168
+        version: 6.0.168(zod@4.3.6)
       zod:
         specifier: ^4.3.6
         version: 4.3.6

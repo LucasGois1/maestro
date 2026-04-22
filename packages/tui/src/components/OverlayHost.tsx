@@ -1,5 +1,11 @@
 import { Box, Text } from 'ink';
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from 'react';
 import type { ReactNode } from 'react';
 
 import type { TuiColorMode } from '../state/store.js';
@@ -31,7 +37,8 @@ export function OverlayHostProvider({
   onChange,
   children,
 }: OverlayHostProviderProps) {
-  const [stack, setStack] = useState<readonly OverlayDefinition[]>(initialStack);
+  const [stack, setStack] =
+    useState<readonly OverlayDefinition[]>(initialStack);
 
   const emit = useCallback(
     (next: readonly OverlayDefinition[]) => {

@@ -102,7 +102,9 @@ function pickByScopeKind(
   registrations: readonly KeybindingRegistration[],
   kind: KeybindingScope['kind'],
 ): readonly KeybindingRegistration[] {
-  return registrations.filter((registration) => registration.scope.kind === kind);
+  return registrations.filter(
+    (registration) => registration.scope.kind === kind,
+  );
 }
 
 function matchesBinding(

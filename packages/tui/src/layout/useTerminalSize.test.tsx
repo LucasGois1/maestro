@@ -54,15 +54,15 @@ describe('readStdoutSize', () => {
 
 describe('isNarrowTerminal', () => {
   it('reports narrow when columns are under the threshold', () => {
-    expect(isNarrowTerminal({ columns: SINGLE_COLUMN_THRESHOLD - 1, rows: 24 })).toBe(
-      true,
-    );
+    expect(
+      isNarrowTerminal({ columns: SINGLE_COLUMN_THRESHOLD - 1, rows: 24 }),
+    ).toBe(true);
   });
 
   it('reports not narrow when columns match the threshold', () => {
-    expect(isNarrowTerminal({ columns: SINGLE_COLUMN_THRESHOLD, rows: 24 })).toBe(
-      false,
-    );
+    expect(
+      isNarrowTerminal({ columns: SINGLE_COLUMN_THRESHOLD, rows: 24 }),
+    ).toBe(false);
   });
 });
 

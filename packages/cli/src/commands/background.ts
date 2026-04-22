@@ -16,7 +16,9 @@ type Io = {
 };
 
 const defaultIo: Io = {
+  /* v8 ignore next */
   stdout: (line) => process.stdout.write(`${line}\n`),
+  /* v8 ignore next */
   stderr: (line) => process.stderr.write(`${line}\n`),
 };
 
@@ -81,51 +83,51 @@ export function createBackgroundCommand(
     )
     .option('--skip-llm', 'Heuristics and report only (no model)')
     .option('--skip-pr', 'Do not create branches or open PRs')
-    .action(async (opts: { type: string; skipLlm?: boolean; skipPr?: boolean }) => {
-      const repoRoot = cwd();
-      const runType = parseRunType(opts.type);
-      if (runType === null) {
-        io.stderr(
-          `Invalid --type "${opts.type}". Use doc, code, or all.`,
+    .action(
+      async (opts: { type: string; skipLlm?: boolean; skipPr?: boolean }) => {
+        const repoRoot = cwd();
+        const runType = parseRunType(opts.type);
+        if (runType === null) {
+          io.stderr(`Invalid --type "${opts.type}". Use doc, code, or all.`);
+          process.exitCode = 1;
+          return;
+        }
+
+        const config = await loadConfigOrExit(io, repoRoot);
+        if (config === null) {
+          process.exitCode = 1;
+          return;
+        }
+
+        const store = resolveStore();
+        const latest = await store.latest();
+        if (latest?.status === 'running') {
+          io.stderr(
+            `A Maestro pipeline run is active (${latest.runId}, status: running). Stop or wait before running background tasks.`,
+          );
+          process.exitCode = 2;
+          return;
+        }
+
+        const bus = createEventBus();
+        const runId = randomUuid();
+
+        const result = await runBackground({
+          repoRoot,
+          runType,
+          config,
+          bus,
+          runId,
+          skipLlm: opts.skipLlm === true,
+          skipPr: opts.skipPr === true,
+        });
+
+        io.stdout(
+          `Background run finished: issuesFound=${result.issuesFound.toString()} report=${result.reportPath}`,
         );
-        process.exitCode = 1;
-        return;
-      }
-
-      const config = await loadConfigOrExit(io, repoRoot);
-      if (config === null) {
-        process.exitCode = 1;
-        return;
-      }
-
-      const store = resolveStore();
-      const latest = await store.latest();
-      if (latest?.status === 'running') {
-        io.stderr(
-          `A Maestro pipeline run is active (${latest.runId}, status: running). Stop or wait before running background tasks.`,
-        );
-        process.exitCode = 2;
-        return;
-      }
-
-      const bus = createEventBus();
-      const runId = randomUuid();
-
-      const result = await runBackground({
-        repoRoot,
-        runType,
-        config,
-        bus,
-        runId,
-        skipLlm: opts.skipLlm === true,
-        skipPr: opts.skipPr === true,
-      });
-
-      io.stdout(
-        `Background run finished: issuesFound=${result.issuesFound.toString()} report=${result.reportPath}`,
-      );
-      process.exitCode = result.issuesFound > 0 ? 1 : 0;
-    });
+        process.exitCode = result.issuesFound > 0 ? 1 : 0;
+      },
+    );
 
   return cmd;
 }

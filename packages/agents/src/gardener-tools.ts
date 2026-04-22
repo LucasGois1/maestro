@@ -10,7 +10,11 @@ import {
   parsePrUrlFromCliOutput,
   UnsupportedPlatformError,
 } from '@maestro/git';
-import { composePolicy, denyAllPrompter, runShellCommand } from '@maestro/sandbox';
+import {
+  composePolicy,
+  denyAllPrompter,
+  runShellCommand,
+} from '@maestro/sandbox';
 import { tool, type ToolSet } from 'ai';
 import { z } from 'zod';
 
@@ -71,7 +75,10 @@ export function createGardenerToolSet(ctx: GardenerToolContext): ToolSet {
       try {
         const abs = resolvePathUnderRepo(
           ctx.worktreeRoot,
-          p.trim().replace(/^[/\\]+/u, '').replace(/\\/gu, '/'),
+          p
+            .trim()
+            .replace(/^[/\\]+/u, '')
+            .replace(/\\/gu, '/'),
         );
         await mkdir(dirname(abs), { recursive: true });
         await writeFile(abs, content, 'utf8');
@@ -94,15 +101,15 @@ export function createGardenerToolSet(ctx: GardenerToolContext): ToolSet {
           cwd: ctx.worktreeRoot,
           runId: ctx.runId,
           repoRoot: ctx.repoRoot,
-          ...(ctx.maestroDir !== undefined ? { maestroDir: ctx.maestroDir } : {}),
+          ...(ctx.maestroDir !== undefined
+            ? { maestroDir: ctx.maestroDir }
+            : {}),
           policy,
           approver: denyAllPrompter,
           timeoutMs: 180_000,
         });
         const head =
-          result.exitCode === 0
-            ? 'OK'
-            : `exit ${result.exitCode.toString()}`;
+          result.exitCode === 0 ? 'OK' : `exit ${result.exitCode.toString()}`;
         const out = [head, result.stdout, result.stderr]
           .filter((s) => s.length > 0)
           .join('\n');
@@ -168,7 +175,9 @@ export function createGardenerToolSet(ctx: GardenerToolContext): ToolSet {
             bus: ctx.bus,
             policy,
             config: ctx.config,
-            ...(ctx.maestroDir !== undefined ? { maestroDir: ctx.maestroDir } : {}),
+            ...(ctx.maestroDir !== undefined
+              ? { maestroDir: ctx.maestroDir }
+              : {}),
             ...(ctx.codeDiff !== undefined ? { diff: ctx.codeDiff } : {}),
           },
           sensorId,

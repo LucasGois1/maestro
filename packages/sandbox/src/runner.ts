@@ -106,9 +106,7 @@ function approverToAudit(
   return 'system';
 }
 
-async function executeCommand(
-  options: RunCommandOptions,
-): Promise<{
+async function executeCommand(options: RunCommandOptions): Promise<{
   stdout: string;
   stderr: string;
   exitCode: number;

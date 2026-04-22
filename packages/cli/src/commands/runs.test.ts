@@ -23,6 +23,15 @@ async function run(args: string[]): Promise<void> {
   await program.parseAsync(args, { from: 'user' });
 }
 
+async function runWithConfirm(
+  args: string[],
+  confirm: (prompt: string) => Promise<boolean>,
+): Promise<void> {
+  const program = createRunsCommand({ io, store, confirm });
+  program.exitOverride();
+  await program.parseAsync(args, { from: 'user' });
+}
+
 const seedOpts = {
   branch: 'maestro/demo',
   worktreePath: '/tmp/wt',
@@ -59,9 +68,22 @@ describe('maestro runs', () => {
   });
 
   it('show prints details for a specific run', async () => {
-    await store.create({ ...seedOpts, runId: 'run-1' });
+    const created = await store.create({ ...seedOpts, runId: 'run-1' });
+    await store.update(created.runId, {
+      status: 'paused',
+      phase: 'evaluating',
+      pausedAt: '2026-04-22T00:00:00.000Z',
+      currentSprintIdx: 2,
+      retriesRemaining: 1,
+      escalation: { sprintIdx: 2, reason: 'needs human review' },
+    });
     await run(['show', 'run-1']);
-    expect(stdout.join('\n')).toMatch(/runId:\s+run-1/);
+    const detail = stdout.join('\n');
+    expect(detail).toMatch(/runId:\s+run-1/);
+    expect(detail).toContain('pausedAt:');
+    expect(detail).toContain('sprintIdx:');
+    expect(detail).toContain('retriesLeft:');
+    expect(detail).toContain('needs human review');
   });
 
   it('show exits with 1 for unknown runs', async () => {
@@ -81,6 +103,14 @@ describe('maestro runs', () => {
     expect(await store.load('run-1')).toBeNull();
   });
 
+  it('clean reports when there are no completed runs', async () => {
+    await store.create({ ...seedOpts, runId: 'run-1' });
+
+    await run(['clean']);
+
+    expect(stdout).toEqual(['No completed runs to clean.']);
+  });
+
   it('clean without --force requires confirmation and keeps runs by default', async () => {
     const created = await store.create({ ...seedOpts, runId: 'run-1' });
     await store.update(created.runId, {
@@ -90,5 +120,18 @@ describe('maestro runs', () => {
     });
     await run(['clean']);
     expect(await store.load('run-1')).not.toBeNull();
+  });
+
+  it('clean honors a positive confirmation callback', async () => {
+    const created = await store.create({ ...seedOpts, runId: 'run-1' });
+    await store.update(created.runId, {
+      status: 'completed',
+      phase: 'completed',
+      completedAt: new Date().toISOString(),
+    });
+
+    await runWithConfirm(['clean'], async () => true);
+
+    expect(await store.load('run-1')).toBeNull();
   });
 });

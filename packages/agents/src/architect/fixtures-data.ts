@@ -11,7 +11,9 @@ export const FITS_LAYERS: {
   output: {
     sprintIdx: 1,
     scopeTecnico: {
-      newFiles: [{ path: 'packages/api/src/routes/health.ts', layer: 'transport' }],
+      newFiles: [
+        { path: 'packages/api/src/routes/health.ts', layer: 'transport' },
+      ],
       filesToTouch: ['packages/api/src/app.ts'],
       testFiles: ['packages/api/test/health.test.ts'],
     },

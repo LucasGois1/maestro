@@ -29,9 +29,7 @@ async function readUtf8Optional(path: string): Promise<string | undefined> {
   }
 }
 
-async function resolveKbContext(
-  ctx: RunSensorToolContext,
-): Promise<{
+async function resolveKbContext(ctx: RunSensorToolContext): Promise<{
   readonly agentsMd: string;
   readonly goldenPrinciples: readonly string[];
 }> {

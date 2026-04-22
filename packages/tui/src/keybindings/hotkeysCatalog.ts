@@ -2,7 +2,10 @@
 
 export interface HotkeySection {
   readonly title: string;
-  readonly lines: readonly { readonly keys: string; readonly description: string }[];
+  readonly lines: readonly {
+    readonly keys: string;
+    readonly description: string;
+  }[];
 }
 
 export const GLOBAL_HOTKEYS: HotkeySection = {
@@ -12,7 +15,10 @@ export const GLOBAL_HOTKEYS: HotkeySection = {
     { keys: '[?]', description: 'This help' },
     { keys: '[k]', description: 'KB explorer (.maestro files)' },
     { keys: '[e]', description: 'Edit sprint contract (when CLI wired)' },
-    { keys: '[1-9]', description: 'Select sprint (when Sprints panel focused)' },
+    {
+      keys: '[1-9]',
+      description: 'Select sprint (when Sprints panel focused)',
+    },
   ],
 };
 
@@ -40,7 +46,10 @@ export const OVERLAY_HOTKEYS: HotkeySection = {
 };
 
 export const PIPELINE_FOOTER_HINTS: Readonly<
-  Record<'idle' | 'running' | 'paused', readonly { key: string; label: string }[]>
+  Record<
+    'idle' | 'running' | 'paused',
+    readonly { key: string; label: string }[]
+  >
 > = {
   idle: [
     { key: '[tab]', label: 'next panel' },

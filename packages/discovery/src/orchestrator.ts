@@ -37,10 +37,7 @@ export async function runInferentialDiscovery(
     computational,
     options.sampling,
   );
-  options.onProgress?.(
-    'sampling',
-    `${String(samples.length)} file sample(s)`,
-  );
+  options.onProgress?.('sampling', `${String(samples.length)} file sample(s)`);
   const bus = createEventBus();
   if (options.onMaestroEvent) {
     bus.on(options.onMaestroEvent);

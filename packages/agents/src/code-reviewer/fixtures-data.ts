@@ -32,7 +32,8 @@ export const FIXTURE_SQL_INJECTION: {
         file: 'api.py',
         line: 2,
         message: 'SQL built via string concatenation enables injection.',
-        suggestion: 'Use parameterized query: db.execute("SELECT ... WHERE id = ?", (uid,)).',
+        suggestion:
+          'Use parameterized query: db.execute("SELECT ... WHERE id = ?", (uid,)).',
       },
     ],
     summary: 'Critical: SQL concatenation introduced.',
@@ -57,7 +58,8 @@ export const FIXTURE_LONG_FUNCTION: {
         file: 'huge.ts',
         line: 1,
         message: 'Function body is ~200 lines; hard to test and review.',
-        suggestion: 'Split into smaller helpers (e.g. parseInput, validate, persist).',
+        suggestion:
+          'Split into smaller helpers (e.g. parseInput, validate, persist).',
       },
     ],
     summary: 'One maintainability warning on structure.',
@@ -82,8 +84,10 @@ export const FIXTURE_NAMING: {
         category: 'convention',
         file: 'UserSvc.ts',
         line: 1,
-        message: 'Abbreviation getUsrData is inconsistent with repo camelCase clarity (getUserData).',
-        suggestion: 'Rename to getUserData for consistency with AGENTS.md naming guidance.',
+        message:
+          'Abbreviation getUsrData is inconsistent with repo camelCase clarity (getUserData).',
+        suggestion:
+          'Rename to getUserData for consistency with AGENTS.md naming guidance.',
       },
     ],
     summary: 'Naming inconsistency flagged.',
@@ -108,8 +112,10 @@ export const FIXTURE_WEAK_TESTS: {
         category: 'testing',
         file: 'pay.test.ts',
         line: 1,
-        message: 'Assertion is tautological; does not validate payment behavior.',
-        suggestion: 'Add cases for success, failure, and edge amounts with concrete expectations.',
+        message:
+          'Assertion is tautological; does not validate payment behavior.',
+        suggestion:
+          'Add cases for success, failure, and edge amounts with concrete expectations.',
       },
     ],
     summary: 'Test file needs substantive assertions.',
@@ -190,8 +196,10 @@ export const FIXTURE_SWALLOWED_ERRORS: {
         category: 'smell',
         file: 'job.py',
         line: 4,
-        message: 'Broad except still hides failures; logging "ok" masks errors.',
-        suggestion: 'Log exception with exc_info=True, re-raise or narrow except clause.',
+        message:
+          'Broad except still hides failures; logging "ok" masks errors.',
+        suggestion:
+          'Log exception with exc_info=True, re-raise or narrow except clause.',
       },
     ],
     summary: 'Error handling obscures real failures.',

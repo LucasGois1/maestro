@@ -14,7 +14,9 @@ export function listGreenfieldTemplateIds(): readonly string[] {
   return GREENFIELD_TEMPLATE_IDS;
 }
 
-export function isGreenfieldTemplateId(name: string): name is GreenfieldTemplateId {
+export function isGreenfieldTemplateId(
+  name: string,
+): name is GreenfieldTemplateId {
   return (GREENFIELD_TEMPLATE_IDS as readonly string[]).includes(name);
 }
 

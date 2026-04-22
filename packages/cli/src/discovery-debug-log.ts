@@ -1,10 +1,7 @@
 import { appendFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import {
-  AgentOutputParseError,
-  AgentValidationError,
-} from '@maestro/agents';
+import { AgentOutputParseError, AgentValidationError } from '@maestro/agents';
 
 function stamp(): string {
   return new Date().toISOString();

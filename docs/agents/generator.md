@@ -1,6 +1,6 @@
 # Agente Generator (DSFT-92)
 
-O **Generator** implementa **um sprint de cada vez** no repositório de trabalho, usando ferramentas (ficheiros, shell com *permission model*, sensores, git) e devolve JSON validado por `generatorModelOutputSchema` em `@maestro/agents`. O pipeline grava `.maestro/runs/<runId>/checkpoints/sprint-<n>-self-eval.md` e atualiza o handoff com `handoffNotes` e lista de ficheiros alterados.
+O **Generator** implementa **um sprint de cada vez** no repositório de trabalho, usando ferramentas (ficheiros, shell com _permission model_, sensores, git) e devolve JSON validado por `generatorModelOutputSchema` em `@maestro/agents`. O pipeline grava `.maestro/runs/<runId>/checkpoints/sprint-<n>-self-eval.md` e atualiza o handoff com `handoffNotes` e lista de ficheiros alterados.
 
 ## Entrada
 
@@ -28,16 +28,16 @@ Objeto JSON único (sem fences) com:
 
 O runner usa `generateText` com limite de passos (tool loop), com `createGeneratorToolSet`:
 
-| Ferramenta    | Função |
-|---------------|--------|
-| `readFile`    | Leitura sob a raiz do repo. |
-| `writeFile`   | Cria/substitui ficheiro (caminho relativo seguro). |
-| `editFile`    | Substitui uma ocorrência única `oldStr` → `newStr`. |
-| `runShell`    | Comando na raiz via `@maestro/sandbox` / policy da config. |
-| `runSensor`   | Executa sensor por id (`.maestro/sensors.json`). |
-| `gitCommit`   | `commitSprint` com `type` / `scope?` / `subject` (Conventional Commits). |
-| `listDirectory` | Igual ao Planner. |
-| `searchCode`  | Ripgrep, igual ao Planner. |
+| Ferramenta      | Função                                                                   |
+| --------------- | ------------------------------------------------------------------------ |
+| `readFile`      | Leitura sob a raiz do repo.                                              |
+| `writeFile`     | Cria/substitui ficheiro (caminho relativo seguro).                       |
+| `editFile`      | Substitui uma ocorrência única `oldStr` → `newStr`.                      |
+| `runShell`      | Comando na raiz via `@maestro/sandbox` / policy da config.               |
+| `runSensor`     | Executa sensor por id (`.maestro/sensors.json`).                         |
+| `gitCommit`     | `commitSprint` com `type` / `scope?` / `subject` (Conventional Commits). |
+| `listDirectory` | Igual ao Planner.                                                        |
+| `searchCode`    | Ripgrep, igual ao Planner.                                               |
 
 Chrome DevTools / Playwright avançado ficam fora do MVP deste documento (evolução futura).
 

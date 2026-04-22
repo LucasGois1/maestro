@@ -8,7 +8,9 @@ export interface MaestroKbFileEntry {
 
 const PREVIEW_MAX = 4000;
 
-export function listMaestroFilesUnderRepo(repoRoot: string): MaestroKbFileEntry[] {
+export function listMaestroFilesUnderRepo(
+  repoRoot: string,
+): MaestroKbFileEntry[] {
   const base = join(repoRoot, '.maestro');
   if (!existsSync(base)) {
     return [];

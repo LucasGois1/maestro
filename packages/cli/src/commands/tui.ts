@@ -28,7 +28,9 @@ export interface TuiCommandFlags {
   readonly fixture?: string;
 }
 
-export function createTuiCommand(options: CreateTuiCommandOptions = {}): Command {
+export function createTuiCommand(
+  options: CreateTuiCommandOptions = {},
+): Command {
   const command = new Command('tui');
   command
     .description('Launch the Maestro TUI shell (optionally in demo mode)')
@@ -130,5 +132,8 @@ export function defaultRenderApp({
       ...(kbExplorer ? { kbExplorer } : {}),
       ...(editPlan ? { editPlan } : {}),
     }),
+    {
+      interactive: Boolean(process.stdin.isTTY && process.stdout.isTTY),
+    },
   );
 }

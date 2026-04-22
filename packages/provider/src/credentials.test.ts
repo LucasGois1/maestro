@@ -35,7 +35,9 @@ describe('credentials', () => {
     });
     const next = autoResolveDiscoveryModelConfig(c);
     expect(next).not.toBeNull();
-    expect(next?.defaults.discovery.model).toBe(DISCOVERY_MODEL_DEFAULTS.openai);
+    expect(next?.defaults.discovery.model).toBe(
+      DISCOVERY_MODEL_DEFAULTS.openai,
+    );
   });
 
   it('autoResolve returns null when the default provider lacks a key and several others are configured', () => {
@@ -52,11 +54,10 @@ describe('credentials', () => {
   });
 
   it('withDiscoveryAgentModel updates only discovery default model', () => {
-    const next = withDiscoveryAgentModel(
-      DEFAULT_CONFIG,
-      'openai/gpt-4o-mini',
-    );
+    const next = withDiscoveryAgentModel(DEFAULT_CONFIG, 'openai/gpt-4o-mini');
     expect(next.defaults.discovery.model).toBe('openai/gpt-4o-mini');
-    expect(next.defaults.planner.model).toBe(DEFAULT_CONFIG.defaults.planner.model);
+    expect(next.defaults.planner.model).toBe(
+      DEFAULT_CONFIG.defaults.planner.model,
+    );
   });
 });

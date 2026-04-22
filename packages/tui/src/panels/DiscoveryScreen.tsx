@@ -245,11 +245,17 @@ function DiscoveryKeysHint({
   );
 }
 
-function tailForDisplay(text: string, maxChars: number, maxCols: number): string {
+function tailForDisplay(
+  text: string,
+  maxChars: number,
+  maxCols: number,
+): string {
   const slice = text.length > maxChars ? text.slice(-maxChars) : text;
   const lines = slice.split('\n');
   const capLine = (line: string) =>
-    line.length > maxCols ? `${line.slice(0, Math.max(0, maxCols - 1))}…` : line;
+    line.length > maxCols
+      ? `${line.slice(0, Math.max(0, maxCols - 1))}…`
+      : line;
   return lines.map(capLine).join('\n');
 }
 

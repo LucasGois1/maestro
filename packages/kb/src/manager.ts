@@ -234,7 +234,10 @@ export function createKBManager(options: CreateKBManagerOptions): KBManager {
       await writeIfMissing(pathFor('AGENTS.md'), DEFAULT_AGENTS_MD);
       await writeIfMissing(pathFor('ARCHITECTURE.md'), DEFAULT_ARCHITECTURE_MD);
       await writeIfMissing(pathFor('sensors.json'), DEFAULT_SENSORS_JSON);
-      await writeIfMissing(pathFor('permissions.json'), DEFAULT_PERMISSIONS_JSON);
+      await writeIfMissing(
+        pathFor('permissions.json'),
+        DEFAULT_PERMISSIONS_JSON,
+      );
 
       for (const relativePath of DOC_INDEXES) {
         await writeIfMissing(

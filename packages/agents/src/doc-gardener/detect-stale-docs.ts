@@ -1,4 +1,5 @@
 import { readFile, stat } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
 import { join, dirname, resolve, relative } from 'node:path';
 
 import { maestroRoot } from '@maestro/state';
@@ -74,7 +75,7 @@ async function collectMarkdownFiles(
   }
   async function walkDocs(relDir: string): Promise<void> {
     const abs = join(repoRoot, relDir);
-    let entries: import('node:fs').Dirent[];
+    let entries: Dirent[];
     try {
       entries = await readdir(abs, { withFileTypes: true });
     } catch {

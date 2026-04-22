@@ -24,8 +24,8 @@ describe('resolvePathUnderRepo', () => {
   });
 
   it('rejects path traversal', () => {
-    expect(() => resolvePathUnderRepo(repo, join('..', 'etc', 'passwd'))).toThrow(
-      /escapes repository root/u,
-    );
+    expect(() =>
+      resolvePathUnderRepo(repo, join('..', 'etc', 'passwd')),
+    ).toThrow(/escapes repository root/u);
   });
 });

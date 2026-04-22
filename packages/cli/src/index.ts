@@ -39,7 +39,9 @@ function renderInkApp(_version: string, stdoutIsTTY: boolean) {
   const bus = createEventBus();
   const store = createTuiStore();
   bridgeBusToStore(bus, store);
-  const instance = render(createElement(App, { store }));
+  const instance = render(createElement(App, { store }), {
+    interactive: stdoutIsTTY && Boolean(process.stdin.isTTY),
+  });
 
   if (!stdoutIsTTY) {
     setTimeout(() => {

@@ -37,9 +37,9 @@ async function readText(path: string): Promise<string | null> {
 }
 
 function detectPythonFramework(text: string): string | undefined {
-  if (/\bfastapi\b/ui.test(text)) return 'fastapi';
-  if (/\bdjango\b/ui.test(text)) return 'django';
-  if (/\bflask\b/ui.test(text)) return 'flask';
+  if (/\bfastapi\b/iu.test(text)) return 'fastapi';
+  if (/\bdjango\b/iu.test(text)) return 'django';
+  if (/\bflask\b/iu.test(text)) return 'flask';
   return undefined;
 }
 
@@ -63,7 +63,9 @@ function hasTypeScript(pkg: Record<string, unknown>): boolean {
   return 'typescript' in deps || '@types/node' in deps;
 }
 
-export async function detectStack(repoRoot: string): Promise<StackDetectionResult> {
+export async function detectStack(
+  repoRoot: string,
+): Promise<StackDetectionResult> {
   const markers: string[] = [];
 
   const paths = {

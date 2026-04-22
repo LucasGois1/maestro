@@ -54,12 +54,7 @@ export function SensorsPanel({
     if (focusedSensorId === null || !sensors[focusedSensorId]) {
       onFocusedSensorIdChange(entries[0]?.sensorId ?? null);
     }
-  }, [
-    entries,
-    focusedSensorId,
-    onFocusedSensorIdChange,
-    sensors,
-  ]);
+  }, [entries, focusedSensorId, onFocusedSensorIdChange, sensors]);
 
   const selectedIndex = useMemo(() => {
     const i = entries.findIndex((e) => e.sensorId === focusedSensorId);
@@ -70,6 +65,7 @@ export function SensorsPanel({
     if (entries.length === 0) {
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Keep the focused sensor inside the viewport after list changes.
     setScrollTop((prev) => {
       if (selectedIndex < prev) {
         return selectedIndex;
@@ -83,7 +79,10 @@ export function SensorsPanel({
 
   const maxScroll = Math.max(0, entries.length - maxVisibleLines);
   const effectiveScroll = Math.min(scrollTop, maxScroll);
-  const visible = entries.slice(effectiveScroll, effectiveScroll + maxVisibleLines);
+  const visible = entries.slice(
+    effectiveScroll,
+    effectiveScroll + maxVisibleLines,
+  );
 
   const moveFocus = useCallback(
     (delta: number) => {
@@ -98,46 +97,32 @@ export function SensorsPanel({
     [entries, focusedSensorId, onFocusedSensorIdChange],
   );
 
-  useKeybinding(
-    { kind: 'panel', panelId: 'sensors' },
-    { key: 'down' },
-    () => {
-      moveFocus(1);
-    },
-  );
-  useKeybinding(
-    { kind: 'panel', panelId: 'sensors' },
-    { key: 'up' },
-    () => {
-      moveFocus(-1);
-    },
-  );
-  useKeybinding(
-    { kind: 'panel', panelId: 'sensors' },
-    { key: 'j' },
-    () => {
-      moveFocus(1);
-    },
-  );
-  useKeybinding(
-    { kind: 'panel', panelId: 'sensors' },
-    { key: 'k' },
-    () => {
-      moveFocus(-1);
-    },
-  );
+  useKeybinding({ kind: 'panel', panelId: 'sensors' }, { key: 'down' }, () => {
+    moveFocus(1);
+  });
+  useKeybinding({ kind: 'panel', panelId: 'sensors' }, { key: 'up' }, () => {
+    moveFocus(-1);
+  });
+  useKeybinding({ kind: 'panel', panelId: 'sensors' }, { key: 'j' }, () => {
+    moveFocus(1);
+  });
+  useKeybinding({ kind: 'panel', panelId: 'sensors' }, { key: 'k' }, () => {
+    moveFocus(-1);
+  });
 
   if (entries.length === 0) {
     return (
-      <Panel title="Sensores (paralelo)" focused={focused} colorMode={colorMode}>
+      <Panel
+        title="Sensores (paralelo)"
+        focused={focused}
+        colorMode={colorMode}
+      >
         <Text dimColor={useColor}>no sensors reporting</Text>
       </Panel>
     );
   }
 
-  const sensorsFooter = focused
-    ? 'detalhe [s] · linha [↑↓][j][k]'
-    : undefined;
+  const sensorsFooter = focused ? 'detalhe [s] · linha [↑↓][j][k]' : undefined;
 
   return (
     <Panel

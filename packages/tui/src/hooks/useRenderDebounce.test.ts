@@ -97,7 +97,9 @@ describe('createDebouncedStore', () => {
 
   it('delays subscriber notifications until the next frame window', () => {
     const store = createTuiStore();
-    const debounced = createDebouncedStore(store, { frameMs: DEFAULT_FRAME_MS });
+    const debounced = createDebouncedStore(store, {
+      frameMs: DEFAULT_FRAME_MS,
+    });
     const listener = vi.fn();
     debounced.subscribe(listener);
 
@@ -113,7 +115,9 @@ describe('createDebouncedStore', () => {
 
   it('select honours the debounce', () => {
     const store = createTuiStore();
-    const debounced = createDebouncedStore(store, { frameMs: DEFAULT_FRAME_MS });
+    const debounced = createDebouncedStore(store, {
+      frameMs: DEFAULT_FRAME_MS,
+    });
     const listener = vi.fn();
     debounced.select((state) => state.mode, listener);
 

@@ -1,6 +1,14 @@
 import type { MergerInput } from './merger-input.schema.js';
 import type { MergerModelOutput } from './merger-output.schema.js';
 
+const baseSprintOutcome: MergerInput['sprintOutcomes'][number] = {
+  sprintIdx: 0,
+  name: 'API',
+  filesChanged: ['packages/api/src/x.ts'],
+  evaluatorDecision: 'passed',
+  attempts: 1,
+};
+
 const baseInput: MergerInput = {
   runId: 'run-1',
   repoRoot: '/tmp/repo',
@@ -9,15 +17,7 @@ const baseInput: MergerInput = {
   planMarkdown: '# Plan\n',
   planSummary: 'Ship feature',
   featureName: 'Auth',
-  sprintOutcomes: [
-    {
-      sprintIdx: 0,
-      name: 'API',
-      filesChanged: ['packages/api/src/x.ts'],
-      evaluatorDecision: 'passed',
-      attempts: 1,
-    },
-  ],
+  sprintOutcomes: [baseSprintOutcome],
   aggregatedAcceptance: ['JWT works'],
   remote: { platform: 'github', url: 'https://github.com/o/r.git' },
   suggestedLabels: ['backend'],
@@ -113,7 +113,7 @@ export const FIXTURE_PARTIAL: {
     ...baseInput,
     sprintOutcomes: [
       {
-        ...baseInput.sprintOutcomes[0]!,
+        ...baseSprintOutcome,
         evaluatorDecision: 'passed',
       },
       {

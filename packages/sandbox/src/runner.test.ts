@@ -10,6 +10,7 @@ import {
   CommandDeniedError,
   CommandRejectedError,
   CommandTimedOutError,
+  denyAllPrompter,
   runShellCommand,
 } from './runner.js';
 
@@ -52,15 +53,22 @@ describe('runShellCommand', () => {
         cwd: repoRoot,
         runId: 'r2',
         repoRoot,
+        maestroDir: '.custom-maestro',
+        agentId: 'generator',
         policy: composePolicy({ mode: 'allowlist' }),
       }),
     ).rejects.toBeInstanceOf(CommandDeniedError);
 
     const audit = await readFile(
-      auditFilePath({ repoRoot, runId: 'r2' }),
+      auditFilePath({
+        repoRoot,
+        runId: 'r2',
+        maestroDir: '.custom-maestro',
+      }),
       'utf8',
     );
     const parsed = JSON.parse(audit.trim().split('\n').pop() ?? '{}');
+    expect(parsed.agentId).toBe('generator');
     expect(parsed.denyPattern).toBeDefined();
     expect(parsed.approvedBy).toBe('system');
   });
@@ -74,11 +82,51 @@ describe('runShellCommand', () => {
         cwd: repoRoot,
         runId: 'r3',
         repoRoot,
+        maestroDir: '.custom-maestro',
+        agentId: 'evaluator',
         policy: composePolicy({ mode: 'allowlist' }),
         approver,
       }),
     ).rejects.toBeInstanceOf(CommandRejectedError);
     expect(approver).toHaveBeenCalledOnce();
+    expect(approver).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: 'evaluator' }),
+    );
+
+    const audit = await readFile(
+      auditFilePath({
+        repoRoot,
+        runId: 'r3',
+        maestroDir: '.custom-maestro',
+      }),
+      'utf8',
+    );
+    const parsed = JSON.parse(audit.trim().split('\n').pop() ?? '{}');
+    expect(parsed.agentId).toBe('evaluator');
+    expect(parsed.note).toBe('rejected by user');
+  });
+
+  it('uses the default deny-all prompter when approval is required', async () => {
+    await expect(
+      denyAllPrompter({
+        cmd: 'customscript',
+        args: [],
+        commandLine: 'customscript',
+        cwd: repoRoot,
+        reason: 'unmatched',
+      }),
+    ).resolves.toEqual({ choice: 'deny' });
+
+    await expect(
+      runShellCommand({
+        cmd: 'customscript',
+        args: [],
+        cwd: repoRoot,
+        runId: 'r-default-deny',
+        repoRoot,
+        policy: composePolicy({ mode: 'allowlist' }),
+      }),
+    ).rejects.toBeInstanceOf(CommandRejectedError);
   });
 
   it('passes through when the approver says once', async () => {
@@ -117,6 +165,51 @@ describe('runShellCommand', () => {
       // command is synthetic and might exit non-zero; we care about the hook
     }
     expect(added).toContain('customscript *');
+  });
+
+  it('derives a dynamic allowlist pattern when approver says always without one', async () => {
+    const added: string[] = [];
+    const approver = vi.fn(async () => ({ choice: 'always' as const }));
+
+    const result = await runShellCommand({
+      cmd: 'git',
+      args: ['--version'],
+      cwd: repoRoot,
+      runId: 'r-derived-pattern',
+      repoRoot,
+      policy: composePolicy({ mode: 'strict' }),
+      approver,
+      onDynamicAllowlistAdd: (p) => added.push(p),
+    });
+
+    expect(result.approvedBy).toBe('user');
+    expect(added).toContain('git *');
+  });
+
+  it('records yolo approvals with agent and custom maestro directory metadata', async () => {
+    const result = await runShellCommand({
+      cmd: 'git',
+      args: ['--version'],
+      cwd: repoRoot,
+      runId: 'r-yolo',
+      repoRoot,
+      maestroDir: '.custom-maestro',
+      agentId: 'generator',
+      policy: composePolicy({ mode: 'yolo' }),
+    });
+
+    expect(result.approvedBy).toBe('yolo');
+    const audit = await readFile(
+      auditFilePath({
+        repoRoot,
+        runId: 'r-yolo',
+        maestroDir: '.custom-maestro',
+      }),
+      'utf8',
+    );
+    const parsed = JSON.parse(audit.trim().split('\n').pop() ?? '{}');
+    expect(parsed.agentId).toBe('generator');
+    expect(parsed.approvedBy).toBe('yolo');
   });
 
   it('times out long-running commands with the configured timeout', async () => {

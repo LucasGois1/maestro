@@ -143,9 +143,7 @@ type SprintOutcomeAccum = {
 
 function slugifyForExecPlan(feature: string, runId: string): string {
   const raw = `${feature}-${runId}`.toLowerCase();
-  const slug = raw
-    .replace(/[^a-z0-9]+/gu, '-')
-    .replace(/^-+|-+$/gu, '');
+  const slug = raw.replace(/[^a-z0-9]+/gu, '-').replace(/^-+|-+$/gu, '');
   return (slug.length > 0 ? slug : 'exec-plan').slice(0, 120);
 }
 
@@ -395,7 +393,10 @@ export async function runPipeline(
           message: `Architect sprintIdx ${architectResult.sprintIdx.toString()} != plan sprint.idx ${sprint.idx.toString()}; using plan idx for artifacts.`,
         });
       }
-      const designDoc = renderArchitectNotesMarkdown(architectResult, sprint.name);
+      const designDoc = renderArchitectNotesMarkdown(
+        architectResult,
+        sprint.name,
+      );
       await writeDesignNotesSprintFile(
         options.repoRoot,
         options.runId,
@@ -466,7 +467,8 @@ export async function runPipeline(
         'design-notes',
         `design-notes-sprint-${(sprintIdx + 1).toString()}.md`,
       );
-      const architectNotesText = (await readOptionalUtf8(designNotesPath)) ?? '';
+      const architectNotesText =
+        (await readOptionalUtf8(designNotesPath)) ?? '';
 
       let previousHandoff: string | undefined;
       if (sprintIdx > 0) {
@@ -696,11 +698,11 @@ export async function runPipeline(
     ].sort();
 
     const execPlanFileName = `${slugifyForExecPlan(plan.feature, options.runId)}.md`;
-    const execPlanRelativePath = completedExecPlanRelativePath(execPlanFileName);
+    const execPlanRelativePath =
+      completedExecPlanRelativePath(execPlanFileName);
 
     const mergerCfg = options.config.merger;
-    const requireDraftPr =
-      options.requireDraftPr ?? mergerCfg.requireDraftPr;
+    const requireDraftPr = options.requireDraftPr ?? mergerCfg.requireDraftPr;
 
     const mergerInput = mergerInputSchema.parse({
       runId: options.runId,

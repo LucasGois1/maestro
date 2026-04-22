@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "id": "provider-openai-smoke",
+  "provider": "openai",
+  "modelId": "gpt-5-nano",
+  "request": {
+    "prompt": "Say ok."
+  },
+  "response": {
+    "text": "ok"
+  },
+  "recordedAt": "2026-04-21T00:00:00.000Z"
+}

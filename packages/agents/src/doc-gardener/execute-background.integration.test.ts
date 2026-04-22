@@ -24,7 +24,11 @@ afterEach(async () => {
 describe('executeBackgroundGardener (integration)', () => {
   it('flags a broken markdown link via heuristics (doc)', async () => {
     await mkdir(join(repoRoot, '.maestro'), { recursive: true });
-    await writeFile(join(repoRoot, '.maestro', 'AGENTS.md'), '# Agents\n', 'utf8');
+    await writeFile(
+      join(repoRoot, '.maestro', 'AGENTS.md'),
+      '# Agents\n',
+      'utf8',
+    );
     await mkdir(join(repoRoot, 'docs'), { recursive: true });
     await writeFile(
       join(repoRoot, 'docs', 'stale.md'),

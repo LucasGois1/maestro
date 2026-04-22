@@ -58,7 +58,10 @@ describe('dispatchSensors', () => {
     );
 
     expect(order).toEqual(['block-test', 'warn-review']);
-    expect(results.map((result) => result.status)).toEqual(['passed', 'passed']);
+    expect(results.map((result) => result.status)).toEqual([
+      'passed',
+      'passed',
+    ]);
   });
 
   it('respects the configured concurrency limit', async () => {

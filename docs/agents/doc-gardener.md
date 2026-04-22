@@ -8,11 +8,11 @@ O agente **Doc Gardener** (`id: doc-gardener`, `role: background`) mantém a hig
 maestro background run [--type doc|code|all] [--skip-llm] [--skip-pr]
 ```
 
-| Opção | Significado |
-| --- | --- |
-| `--type` | `doc`: apenas verificações de docs; `code`: duplicação + Knip + `pnpm outdated`; `all`: ambos (predefinição). |
-| `--skip-llm` | Não chama o modelo; relatório com heurísticas e ferramentas. |
-| `--skip-pr` | Não cria ramos nem abre PRs (útil em CI ou sem `gh`/`glab`). |
+| Opção        | Significado                                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------------- |
+| `--type`     | `doc`: apenas verificações de docs; `code`: duplicação + Knip + `pnpm outdated`; `all`: ambos (predefinição). |
+| `--skip-llm` | Não chama o modelo; relatório com heurísticas e ferramentas.                                                  |
+| `--skip-pr`  | Não cria ramos nem abre PRs (útil em CI ou sem `gh`/`glab`).                                                  |
 
 ### Guarda de pipeline
 
@@ -20,19 +20,19 @@ Se existir um run Maestro com `status: running` no armazenamento de estado do pr
 
 ### Códigos de saída
 
-| Código | Situação |
-| --- | --- |
-| `0` | Nenhum problema contabilizado (`issuesFound === 0`). |
-| `1` | Foram encontrados problemas (`issuesFound > 0`) ou erro de opções/configuração inválida. |
-| `2` | Pipeline principal ainda em execução (guarda). |
+| Código | Situação                                                                                 |
+| ------ | ---------------------------------------------------------------------------------------- |
+| `0`    | Nenhum problema contabilizado (`issuesFound === 0`).                                     |
+| `1`    | Foram encontrados problemas (`issuesFound > 0`) ou erro de opções/configuração inválida. |
+| `2`    | Pipeline principal ainda em execução (guarda).                                           |
 
 ## Configuração (`background` em `.maestro/config.json`)
 
-| Campo | Predefinição | Descrição |
-| --- | --- | --- |
-| `background.knip` | `true` | Correr `pnpm exec knip --reporter json` em `runType` `code` ou `all`. |
-| `background.outdated` | `true` | Correr `pnpm outdated` (formato condensado) em `runType` `code` ou `all`. |
-| `background.maxFindingsPerSource` | `80` | Teto de entradas por fonte (Knip / outdated) no relatório. |
+| Campo                             | Predefinição | Descrição                                                                 |
+| --------------------------------- | ------------ | ------------------------------------------------------------------------- |
+| `background.knip`                 | `true`       | Correr `pnpm exec knip --reporter json` em `runType` `code` ou `all`.     |
+| `background.outdated`             | `true`       | Correr `pnpm outdated` (formato condensado) em `runType` `code` ou `all`. |
+| `background.maxFindingsPerSource` | `80`         | Teto de entradas por fonte (Knip / outdated) no relatório.                |
 
 ## Relatório
 
@@ -76,10 +76,10 @@ O caminho relativo ao repositório (`reportPath`) coincide com o contrato JSON d
 
 Quando há achados e **não** se passa `--skip-pr`, o fluxo tenta abrir até **dois** PRs separados:
 
-| Categoria | Label extra típico |
-| --- | --- |
-| Problemas de documentação | `doc-fix` |
-| Duplicação, Knip ou outdated | `code-cleanup` |
+| Categoria                    | Label extra típico |
+| ---------------------------- | ------------------ |
+| Problemas de documentação    | `doc-fix`          |
+| Duplicação, Knip ou outdated | `code-cleanup`     |
 
 Os PRs incluem sempre `maestro` e `background`. O branch base do PR segue o **default de `origin`** (`git symbolic-ref refs/remotes/origin/HEAD` ou `main`/`master`).
 

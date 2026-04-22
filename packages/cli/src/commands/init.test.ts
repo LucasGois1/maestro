@@ -2,17 +2,13 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Command } from 'commander';
 
-vi.mock('@maestro/kb', async () => await import('../../../../packages/kb/src/index.ts'));
+vi.mock(
+  '@maestro/kb',
+  async () => await import('../../../../packages/kb/src/index.ts'),
+);
 
 import { lintKnowledgeBase } from '@maestro/kb';
 
@@ -49,9 +45,9 @@ describe('maestro init', () => {
     program.exitOverride();
     await program.parseAsync(['init', '--no-ai'], { from: 'user' });
 
-    expect(
-      stdout.some((line) => line.includes('computational stack')),
-    ).toBe(true);
+    expect(stdout.some((line) => line.includes('computational stack'))).toBe(
+      true,
+    );
 
     await readFile(join(repoRoot, '.maestro', 'config.json'), 'utf8');
     await readFile(join(repoRoot, '.maestro', 'AGENTS.md'), 'utf8');

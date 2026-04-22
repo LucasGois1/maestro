@@ -96,8 +96,16 @@ describe('KeybindingProvider', () => {
     const router = createKeybindingRouter();
 
     function Probe() {
-      useKeybinding({ kind: 'panel', panelId: 'pipeline' }, { key: 'r' }, pipelineHandler);
-      useKeybinding({ kind: 'panel', panelId: 'sensors' }, { key: 'r' }, sensorHandler);
+      useKeybinding(
+        { kind: 'panel', panelId: 'pipeline' },
+        { key: 'r' },
+        pipelineHandler,
+      );
+      useKeybinding(
+        { kind: 'panel', panelId: 'sensors' },
+        { key: 'r' },
+        sensorHandler,
+      );
       return <Text>ready</Text>;
     }
 

@@ -1,0 +1,7 @@
+{
+  "id": "sensor-timeout",
+  "prompt": "recover when a required sensor times out",
+  "sensor": "slow-test",
+  "expectedSensorStatus": "timeout",
+  "description": "Computational sensor timeout is normalized and surfaced to the evaluator instead of crashing the dispatcher."
+}

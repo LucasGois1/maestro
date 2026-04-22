@@ -81,7 +81,11 @@ export function ListPickerScreen({
           const prefix = selected ? '› ' : '  ';
           const dim = item.dimmed === true;
           return (
-            <Box key={`${item.key}-${String(i)}`} flexDirection="column" marginBottom={0}>
+            <Box
+              key={`${item.key}-${String(i)}`}
+              flexDirection="column"
+              marginBottom={0}
+            >
               <Text
                 {...(dim ? { dimColor: true } : selected ? { bold: true } : {})}
                 {...(useColor && selected && !dim ? { color: 'green' } : {})}

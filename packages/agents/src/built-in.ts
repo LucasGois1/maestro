@@ -106,10 +106,7 @@ function mergeSectionedMarkdown(
 
 function sectionedMarkdownField(preferredOrder: readonly string[]) {
   const recordToMd = z
-    .record(
-      z.string(),
-      z.union([z.string(), z.number(), z.boolean()]),
-    )
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
     .transform((obj) => {
       const map: Record<string, string> = {};
       for (const [k, v] of Object.entries(obj)) {
@@ -223,13 +220,7 @@ export const mergerAgent: AgentDefinition<
   systemPrompt: MERGER_SYSTEM_PROMPT,
   inputSchema: mergerInputSchema,
   outputSchema: mergerModelOutputSchema,
-  tools: [
-    'readFile',
-    'writeFile',
-    'appendFile',
-    'runShell',
-    'gitLog',
-  ],
+  tools: ['readFile', 'writeFile', 'appendFile', 'runShell', 'gitLog'],
   calibration: {
     fewShotExamples: MERGER_CALIBRATION,
   },

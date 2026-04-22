@@ -85,15 +85,14 @@ export function AgentLogOverlay({
   const agentsInBuffer = useMemo(() => uniqueAgentIds(buffer), [buffer]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Clamp stale scroll after filters shrink the visible log.
     setScrollOffset((prev) =>
       Math.min(prev, Math.max(0, filtered.length - viewportLines)),
     );
   }, [filtered.length, viewportLines]);
 
   const cycleKind = useCallback(() => {
-    const i = KIND_CYCLE.indexOf(
-      kindFilter === 'all' ? 'all' : kindFilter,
-    );
+    const i = KIND_CYCLE.indexOf(kindFilter === 'all' ? 'all' : kindFilter);
     const next = KIND_CYCLE[(i + 1) % KIND_CYCLE.length];
     if (next === undefined) {
       return;
@@ -119,34 +118,25 @@ export function AgentLogOverlay({
 
   const scrollDown = useCallback(() => {
     setScrollOffset((o) =>
-      Math.max(0, Math.min(o + 1, Math.max(0, filtered.length - viewportLines))),
+      Math.max(
+        0,
+        Math.min(o + 1, Math.max(0, filtered.length - viewportLines)),
+      ),
     );
   }, [filtered.length, viewportLines]);
 
-  useKeybinding(
-    { kind: 'overlay' },
-    { key: 'k' },
-    cycleKind,
-    { enabled: !searchMode },
-  );
-  useKeybinding(
-    { kind: 'overlay' },
-    { key: 'a' },
-    cycleAgent,
-    { enabled: !searchMode },
-  );
-  useKeybinding(
-    { kind: 'overlay' },
-    { key: 'up' },
-    scrollUp,
-    { enabled: !searchMode },
-  );
-  useKeybinding(
-    { kind: 'overlay' },
-    { key: 'down' },
-    scrollDown,
-    { enabled: !searchMode },
-  );
+  useKeybinding({ kind: 'overlay' }, { key: 'k' }, cycleKind, {
+    enabled: !searchMode,
+  });
+  useKeybinding({ kind: 'overlay' }, { key: 'a' }, cycleAgent, {
+    enabled: !searchMode,
+  });
+  useKeybinding({ kind: 'overlay' }, { key: 'up' }, scrollUp, {
+    enabled: !searchMode,
+  });
+  useKeybinding({ kind: 'overlay' }, { key: 'down' }, scrollDown, {
+    enabled: !searchMode,
+  });
   useKeybinding(
     { kind: 'overlay' },
     { key: '/' },
@@ -185,10 +175,7 @@ export function AgentLogOverlay({
   );
 
   const windowed = useMemo(() => {
-    const end = Math.min(
-      filtered.length,
-      scrollOffset + viewportLines,
-    );
+    const end = Math.min(filtered.length, scrollOffset + viewportLines);
     return filtered.slice(scrollOffset, end);
   }, [filtered, scrollOffset, viewportLines]);
 
@@ -226,7 +213,11 @@ export function AgentLogOverlay({
               ? { color: 'cyan' as const }
               : {};
         return (
-          <Text key={key} {...colorProps} dimColor={entry.kind === 'delta' && useColor}>
+          <Text
+            key={key}
+            {...colorProps}
+            dimColor={entry.kind === 'delta' && useColor}
+          >
             {`${prefix} [${entry.agentId}] ${text}`}
           </Text>
         );

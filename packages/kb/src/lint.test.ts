@@ -35,7 +35,7 @@ describe('lintKnowledgeBase', () => {
     );
     await writeFile(
       join(repoRoot, '.maestro', 'ARCHITECTURE.md'),
-      ['# ARCHITECTURE', '', '## Bird\'s Eye View', 'Text'].join('\n'),
+      ['# ARCHITECTURE', '', "## Bird's Eye View", 'Text'].join('\n'),
       'utf8',
     );
 
@@ -69,7 +69,8 @@ describe('lintKnowledgeBase', () => {
     expect(
       report.issues.some(
         (issue) =>
-          issue.rule === 'missing-section' && issue.file === '.maestro/AGENTS.md',
+          issue.rule === 'missing-section' &&
+          issue.file === '.maestro/AGENTS.md',
       ),
     ).toBe(true);
   });
@@ -119,7 +120,7 @@ describe('lintKnowledgeBase', () => {
 
     await writeFile(
       join(repoRoot, '.maestro', 'ARCHITECTURE.md'),
-      ['# ARCHITECTURE', '', '## Bird\'s Eye View', 'Text'].join('\n'),
+      ['# ARCHITECTURE', '', "## Bird's Eye View", 'Text'].join('\n'),
       'utf8',
     );
 
@@ -139,8 +140,15 @@ describe('lintKnowledgeBase', () => {
     await kb.init();
 
     const base = await kb.read('AGENTS.md');
-    const padding = Array.from({ length: 151 }, (_, index) => `pad ${index + 1}`).join('\n');
-    await writeFile(join(repoRoot, '.maestro', 'AGENTS.md'), `${base}\n${padding}\n`, 'utf8');
+    const padding = Array.from(
+      { length: 151 },
+      (_, index) => `pad ${index + 1}`,
+    ).join('\n');
+    await writeFile(
+      join(repoRoot, '.maestro', 'AGENTS.md'),
+      `${base}\n${padding}\n`,
+      'utf8',
+    );
 
     const report = await lintKnowledgeBase({ repoRoot });
     expect(report.issues).toEqual([

@@ -81,9 +81,7 @@ describe('App', () => {
   });
 
   it('renders without ANSI escape codes when colorMode is no-color', () => {
-    const app = render(
-      <App terminalSize={SIZE_WIDE} colorMode="no-color" />,
-    );
+    const app = render(<App terminalSize={SIZE_WIDE} colorMode="no-color" />);
     // eslint-disable-next-line no-control-regex
     const ansiRegex = /\u001B\[/;
     expect(ansiRegex.test(app.lastFrame() ?? '')).toBe(false);
@@ -204,9 +202,7 @@ describe('App', () => {
         agent: {
           ...state.agent,
           activeAgentId: 'gen',
-          messageLog: [
-            { kind: 'delta', agentId: 'gen', at: 1, text: 'hi' },
-          ],
+          messageLog: [{ kind: 'delta', agentId: 'gen', at: 1, text: 'hi' }],
         },
       }));
     });

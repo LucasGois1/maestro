@@ -80,12 +80,30 @@ describe('maestro config', () => {
     expect(stdout).toEqual(['***masked***']);
   });
 
+  it('get exits when the path is missing', async () => {
+    await run(['get', 'does.not.exist']);
+
+    expect(process.exitCode).toBe(1);
+    expect(stderr).toEqual(['Path not found: does.not.exist']);
+  });
+
   it('set writes to the project config and validates', async () => {
     await run(['set', 'permissions.mode', 'yolo']);
     const file = JSON.parse(
       await readFile(join(cwd, '.maestro', 'config.json'), 'utf8'),
     );
     expect(file.permissions.mode).toBe('yolo');
+  });
+
+  it('set writes global secret values but prints them masked', async () => {
+    await run(['set', 'providers.openai.apiKey', 'sk-test', '--global']);
+    const file = JSON.parse(
+      await readFile(join(home, '.maestro', 'config.json'), 'utf8'),
+    );
+
+    expect(file.providers.openai.apiKey).toBe('sk-test');
+    expect(stdout[0]).toContain('***masked***');
+    expect(stdout[0]).toContain('global');
   });
 
   it('set rejects invalid values without writing', async () => {
@@ -101,6 +119,19 @@ describe('maestro config', () => {
       JSON.stringify({ permissions: { mode: 'chaotic' } }),
     );
     await run(['validate']);
+    expect(process.exitCode).toBe(1);
+    expect(stderr.join('\n')).toMatch(/Configuration is invalid/);
+  });
+
+  it('list reports invalid configs through the shared loader path', async () => {
+    await mkdir(join(cwd, '.maestro'), { recursive: true });
+    await writeFile(
+      join(cwd, '.maestro', 'config.json'),
+      JSON.stringify({ permissions: { mode: 'chaotic' } }),
+    );
+
+    await run(['list']);
+
     expect(process.exitCode).toBe(1);
     expect(stderr.join('\n')).toMatch(/Configuration is invalid/);
   });

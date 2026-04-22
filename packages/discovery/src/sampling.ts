@@ -22,7 +22,10 @@ const PREFERRED_ROOT_FILES = new Set([
   'gemfile',
 ]);
 
-async function tryRead(relPath: string, repoRoot: string): Promise<FileSample | null> {
+async function tryRead(
+  relPath: string,
+  repoRoot: string,
+): Promise<FileSample | null> {
   const full = join(repoRoot, relPath);
   try {
     const content = await readFile(full, 'utf8');

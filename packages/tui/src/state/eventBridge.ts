@@ -274,7 +274,9 @@ function handlePipelineEvent(
             history: closed,
           },
           sprints: state.sprints.map((sprint) =>
-            sprint.status === 'running' ? { ...sprint, status: 'done' } : sprint,
+            sprint.status === 'running'
+              ? { ...sprint, status: 'done' }
+              : sprint,
           ),
         };
       });

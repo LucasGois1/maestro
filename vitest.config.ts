@@ -5,6 +5,32 @@ import { coverageConfigDefaults, defineConfig } from 'vitest/config';
 
 const workspaceRoot = path.dirname(fileURLToPath(import.meta.url));
 
+const workspacePackageAliases = [
+  'agents',
+  'config',
+  'contract',
+  'core',
+  'discovery',
+  'git',
+  'kb',
+  'pipeline',
+  'provider',
+  'sandbox',
+  'sensors',
+  'state',
+  'testkit',
+  'tui',
+].map((packageName) => ({
+  find: `@maestro/${packageName}`,
+  replacement: path.join(
+    workspaceRoot,
+    'packages',
+    packageName,
+    'src',
+    'index.ts',
+  ),
+}));
+
 export function createPackageVitestConfig(packageDirectory: string) {
   const packageName = path.basename(packageDirectory);
 
@@ -38,6 +64,9 @@ export function createPackageVitestConfig(packageDirectory: string) {
 }
 
 export default defineConfig({
+  resolve: {
+    alias: workspacePackageAliases,
+  },
   test: {
     passWithNoTests: true,
   },

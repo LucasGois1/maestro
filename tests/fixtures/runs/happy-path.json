@@ -1,0 +1,7 @@
+{
+  "id": "happy-path",
+  "prompt": "ship deterministic auth fixture",
+  "sprints": 2,
+  "expectedStatus": "completed",
+  "description": "Planner -> Architect -> Generator -> Evaluator -> Merger completes with all evaluators passing."
+}

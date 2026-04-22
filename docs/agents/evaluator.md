@@ -17,14 +17,14 @@ The **Evaluator** is stage 4 of the pipeline. It checks the sprint contract, the
 
 ## Tools
 
-| Tool | Role |
-|------|------|
-| `readFile` | Read text under **worktree** root |
-| `runShell` | Shell with cwd = worktree; sandbox policy applies |
-| `runSensor` | Registered sensors from `.maestro/sensors.json` |
+| Tool              | Role                                                              |
+| ----------------- | ----------------------------------------------------------------- |
+| `readFile`        | Read text under **worktree** root                                 |
+| `runShell`        | Shell with cwd = worktree; sandbox policy applies                 |
+| `runSensor`       | Registered sensors from `.maestro/sensors.json`                   |
 | `navigateBrowser` | **v0.1:** HTTP GET snapshot of a public URL (not Chrome DevTools) |
-| `querySqlite` | Read-only `SELECT` via `sqlite3` CLI if installed |
-| `callApi` | HTTP to allowed hosts; localhost / private ranges blocked |
+| `querySqlite`     | Read-only `SELECT` via `sqlite3` CLI if installed                 |
+| `callApi`         | HTTP to allowed hosts; localhost / private ranges blocked         |
 
 ## Files written
 

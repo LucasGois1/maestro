@@ -14,7 +14,14 @@
   "scripts": {
     "build": "pnpm --filter @maestro/sensors run build && pnpm -r --if-present --sequential --filter '!@maestro/sensors' run build",
     "test": "pnpm -r --if-present test",
+    "test:unit": "pnpm -r --if-present test",
+    "test:integration": "vitest run --config vitest.config.ts tests/integration",
+    "test:replay": "vitest run --config vitest.config.ts tests/replay",
+    "test:record": "MAESTRO_VCR_MODE=record vitest run --config vitest.config.ts tests/replay",
+    "test:evals": "pnpm --filter @maestro/testkit build && tsx tests/evals/code-reviewer/run-eval.ts",
     "test:coverage": "pnpm -r --if-present test:coverage",
+    "prompts:check": "pnpm --filter @maestro/agents exec vitest run -t \"system prompt\"",
+    "prompts:update": "pnpm --filter @maestro/agents exec vitest run -t \"system prompt\" -u",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -25,6 +32,9 @@
     "release": "pnpm build && changeset publish"
   },
   "devDependencies": {
+    "@maestro/core": "workspace:*",
+    "@maestro/pipeline": "workspace:*",
+    "@maestro/testkit": "workspace:*",
     "@changesets/cli": "^2.31.0",
     "@eslint/js": "^9.39.4",
     "@types/node": "^25.6.0",

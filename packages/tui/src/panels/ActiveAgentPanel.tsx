@@ -66,11 +66,7 @@ export function ActiveAgentPanel({
             const key = `${entry.at.toString()}-${index.toString()}-${entry.kind}`;
             if (entry.kind === 'decision') {
               return (
-                <Text
-                  key={key}
-                  {...(useColor ? { color: 'yellow' } : {})}
-                  bold
-                >
+                <Text key={key} {...(useColor ? { color: 'yellow' } : {})} bold>
                   {`${prefix} ${text}`}
                 </Text>
               );
@@ -100,9 +96,7 @@ export function ActiveAgentPanel({
           {`error: ${agent.error}`}
         </Text>
       ) : null}
-      {focused ? (
-        <Text dimColor={useColor}>[l] logs completos</Text>
-      ) : null}
+      {focused ? <Text dimColor={useColor}>[l] logs completos</Text> : null}
     </Panel>
   );
 }

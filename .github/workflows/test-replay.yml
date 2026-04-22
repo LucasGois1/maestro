@@ -1,17 +1,11 @@
-# Replay tests (record/replay cassettes) — camada 3 da estratégia de testes
-# descrita em DSFT-97. Mantém-se como job separado porque pode ser mais lento
-# e dependerá de fixtures gravadas com modelos reais (Haiku/Flash/nano).
-#
-# Ativado via workflow_dispatch enquanto o harness de record/replay ainda não
-# existe. Quando DSFT-97 introduzir o runner, trocar para `pull_request` /
-# `schedule` conforme a política de custo definida.
-
 name: Test (Replay)
 
 on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
-  # TODO(DSFT-97): habilitar em pull_request quando o harness de replay
-  # estiver disponível em @maestro/core.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,8 +13,10 @@ concurrency:
 
 jobs:
   replay:
-    name: Replay cassettes
+    name: Replay Cassettes
     runs-on: ubuntu-latest
+    env:
+      MAESTRO_VCR_MODE: replay
     steps:
       - uses: actions/checkout@v4
 
@@ -37,9 +33,4 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run replay suite
-        run: |
-          if pnpm -r --if-present test:replay; then
-            echo "Replay suite executed."
-          else
-            echo "::notice::No replay suite defined yet (DSFT-97 pending). Skipping."
-          fi
+        run: pnpm test:replay

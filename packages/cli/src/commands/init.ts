@@ -113,9 +113,7 @@ export function createInitCommand(options: InitCommandOptions = {}): Command {
             detail: `Greenfield template applied: ${flags.template}`,
             now: new Date(),
           });
-          io.stdout(
-            `Initialized .maestro/ from template "${flags.template}".`,
-          );
+          io.stdout(`Initialized .maestro/ from template "${flags.template}".`);
           await commitIfRequested(flags, repoRoot, io);
           return;
         }
@@ -148,9 +146,7 @@ export function createInitCommand(options: InitCommandOptions = {}): Command {
         }
 
         const useDiscoveryTui =
-          process.stdout.isTTY &&
-          process.stdin.isTTY &&
-          !flags.apply;
+          process.stdout.isTTY && process.stdin.isTTY && !flags.apply;
 
         if (useDiscoveryTui) {
           const setup = await runDiscoveryProviderSetupInk({
@@ -193,9 +189,7 @@ export function createInitCommand(options: InitCommandOptions = {}): Command {
             );
           } else {
             await writeDiscoveryDraft(repoRoot, outcome.docs);
-            io.stdout(
-              'Discovery draft saved under .maestro/.discovery-draft/',
-            );
+            io.stdout('Discovery draft saved under .maestro/.discovery-draft/');
           }
           await kb.appendLog({
             event: 'project.initialized',

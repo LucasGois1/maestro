@@ -39,7 +39,9 @@ export function evaluatorPassFromDecision(
 export function evaluatorFailuresForGenerator(
   output: EvaluatorModelOutput,
 ): string[] {
-  const fromActions = output.suggestedActions.filter((s) => s.trim().length > 0);
+  const fromActions = output.suggestedActions.filter(
+    (s) => s.trim().length > 0,
+  );
   if (fromActions.length > 0) {
     return fromActions;
   }

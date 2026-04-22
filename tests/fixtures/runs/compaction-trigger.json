@@ -1,0 +1,7 @@
+{
+  "id": "compaction-trigger",
+  "prompt": "ship a long sprint that requires handoff context",
+  "sprints": 2,
+  "expectedArtifact": ".maestro/runs/<run-id>/checkpoints/sprint-1-handoff.md",
+  "description": "Represents the long-sprint context-management path; the next sprint consumes the previous handoff."
+}

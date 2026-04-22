@@ -1,5 +1,9 @@
 import type { EventBus } from '@maestro/core';
-import { composePolicy, type ApprovalPrompter, type Policy } from '@maestro/sandbox';
+import {
+  composePolicy,
+  type ApprovalPrompter,
+  type Policy,
+} from '@maestro/sandbox';
 import type { MaestroConfig } from '@maestro/config';
 
 import type { InferentialAgentRegistry as AgentRegistry } from './inferential-agent-types.js';

@@ -40,7 +40,10 @@ export function KbExplorerOverlay({
   );
 
   const [index, setIndex] = useState(0);
-  const safeIndex = Math.min(Math.max(0, index), Math.max(0, sorted.length - 1));
+  const safeIndex = Math.min(
+    Math.max(0, index),
+    Math.max(0, sorted.length - 1),
+  );
 
   const bump = useCallback(
     (delta: number) => {

@@ -15,7 +15,10 @@ import {
   type PackageHealthFinding,
 } from './detect-package-health.js';
 import { detectStaleDocumentation } from './detect-stale-docs.js';
-import type { GardenerOutput, GardenerPrOpened } from './gardener-output.schema.js';
+import type {
+  GardenerOutput,
+  GardenerPrOpened,
+} from './gardener-output.schema.js';
 import {
   mergeOpenPrDeps,
   openPrForCategory,
@@ -274,9 +277,7 @@ export async function executeBackgroundGardener(
     knipFindings,
     outdatedFindings,
     prSkippedDirty,
-    ...(agentText.length > 0
-      ? { agentSummary: agentText.slice(0, 8000) }
-      : {}),
+    ...(agentText.length > 0 ? { agentSummary: agentText.slice(0, 8000) } : {}),
   });
   await writeFile(reportPath, reportBody, 'utf8');
 

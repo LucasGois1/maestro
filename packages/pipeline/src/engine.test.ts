@@ -418,9 +418,13 @@ describe('runPipeline (happy path)', () => {
     const env = makeEnv();
     const generatorInputs: unknown[] = [];
     let evalCalls = 0;
+    const firstSprint = plannerModelOutput.sprints[0];
+    if (!firstSprint) {
+      throw new Error('planner fixture must contain at least one sprint');
+    }
     const oneSprintPlan: PlannerModelOutput = {
       ...plannerModelOutput,
-      sprints: [plannerModelOutput.sprints[0]!],
+      sprints: [firstSprint],
     };
     const executor = buildExecutor({
       planner: () => oneSprintPlan,

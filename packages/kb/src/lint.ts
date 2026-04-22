@@ -69,7 +69,10 @@ function findHeadings(content: string): string[] {
     .filter((heading): heading is string => heading !== undefined);
 }
 
-function collectDuplicateHeadings(file: string, headings: string[]): KBLintIssue[] {
+function collectDuplicateHeadings(
+  file: string,
+  headings: string[],
+): KBLintIssue[] {
   const seen = new Set<string>();
   const duplicates = new Set<string>();
 
@@ -125,9 +128,10 @@ function relativePath(root: string, filePath: string): string {
   return filePath.slice(root.length + 1).replace(/\\/gu, '/');
 }
 
-function appendMissingArchitectureSections(
-  content: string,
-): { content: string; changed: boolean } {
+function appendMissingArchitectureSections(content: string): {
+  content: string;
+  changed: boolean;
+} {
   const headings = new Set(findHeadings(content));
   const missing = REQUIRED_ARCHITECTURE_SECTIONS.filter(
     (heading) => !headings.has(heading),
@@ -150,9 +154,10 @@ function appendMissingArchitectureSections(
   };
 }
 
-function appendMissingAgentsSections(
-  content: string,
-): { content: string; changed: boolean } {
+function appendMissingAgentsSections(content: string): {
+  content: string;
+  changed: boolean;
+} {
   const headings = new Set(findHeadings(content));
   const missing = REQUIRED_AGENTS_SECTIONS.filter(
     (heading) => !headings.has(heading),
@@ -274,7 +279,9 @@ async function runLint(
     ),
   );
   issues.push(...(await collectBrokenLinks(agentsPath, root, agentsMd)));
-  issues.push(...(await collectBrokenLinks(architecturePath, root, architectureMd)));
+  issues.push(
+    ...(await collectBrokenLinks(architecturePath, root, architectureMd)),
+  );
 
   return { issues, fixedFiles };
 }

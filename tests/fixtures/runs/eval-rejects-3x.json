@@ -1,0 +1,9 @@
+{
+  "id": "eval-rejects-3x",
+  "prompt": "ship fixture that keeps failing evaluator",
+  "sprints": 1,
+  "expectedStatus": "paused",
+  "expectedPhase": "escalated",
+  "retries": 3,
+  "description": "Evaluator rejects every attempt until the retry budget is exhausted and the run escalates."
+}

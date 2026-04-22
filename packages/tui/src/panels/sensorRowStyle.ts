@@ -69,7 +69,9 @@ export function formatSensorRow(
   const prefix = sensorKindPrefix(sensor.kind);
   const status = sensorStatusLabel(sensor.status);
   const dur =
-    sensor.durationMs !== null ? ` (${formatDurationMs(sensor.durationMs)})` : '';
+    sensor.durationMs !== null
+      ? ` (${formatDurationMs(sensor.durationMs)})`
+      : '';
   const msg = sensor.message
     ? ` · ${sensor.message.length > maxMessageLen ? `${sensor.message.slice(0, maxMessageLen)}…` : sensor.message}`
     : '';

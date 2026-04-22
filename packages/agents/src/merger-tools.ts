@@ -5,7 +5,11 @@ import type { MaestroConfig } from '@maestro/config';
 import type { EventBus } from '@maestro/core';
 import { getGitLogOneline } from '@maestro/git';
 import { maestroRoot } from '@maestro/state';
-import { composePolicy, denyAllPrompter, runShellCommand } from '@maestro/sandbox';
+import {
+  composePolicy,
+  denyAllPrompter,
+  runShellCommand,
+} from '@maestro/sandbox';
 import { tool, type ToolSet } from 'ai';
 import { z } from 'zod';
 
@@ -69,7 +73,10 @@ function resolveMaestroPath(
   maestroDir?: string,
 ): string {
   const root = maestroRoot(repoRoot, maestroDir);
-  const norm = relativePath.trim().replace(/^[/\\]+/u, '').replace(/\\/gu, '/');
+  const norm = relativePath
+    .trim()
+    .replace(/^[/\\]+/u, '')
+    .replace(/\\/gu, '/');
   const abs = join(root, norm);
   const relRoot = relative(root, abs);
   if (relRoot.startsWith('..') || relRoot.includes('..')) {
@@ -110,7 +117,10 @@ export function createMergerToolSet(
       try {
         const abs = resolvePathUnderRepo(
           ctx.worktreeRoot,
-          p.trim().replace(/^[/\\]+/u, '').replace(/\\/gu, '/'),
+          p
+            .trim()
+            .replace(/^[/\\]+/u, '')
+            .replace(/\\/gu, '/'),
         );
         await mkdir(dirname(abs), { recursive: true });
         await writeFile(abs, content, 'utf8');
@@ -149,15 +159,15 @@ export function createMergerToolSet(
           cwd: ctx.worktreeRoot,
           runId: ctx.runId,
           repoRoot: ctx.repoRoot,
-          ...(ctx.maestroDir !== undefined ? { maestroDir: ctx.maestroDir } : {}),
+          ...(ctx.maestroDir !== undefined
+            ? { maestroDir: ctx.maestroDir }
+            : {}),
           policy,
           approver: denyAllPrompter,
           timeoutMs: 180_000,
         });
         const head =
-          result.exitCode === 0
-            ? 'OK'
-            : `exit ${result.exitCode.toString()}`;
+          result.exitCode === 0 ? 'OK' : `exit ${result.exitCode.toString()}`;
         const out = [head, result.stdout, result.stderr]
           .filter((s) => s.length > 0)
           .join('\n');
@@ -174,7 +184,10 @@ export function createMergerToolSet(
     execute: async (input) => {
       if (hooks?.gitLog) {
         const payload: { maxCount?: number; revisionRange?: string } = {};
-        if (input.revisionRange !== undefined && input.revisionRange.length > 0) {
+        if (
+          input.revisionRange !== undefined &&
+          input.revisionRange.length > 0
+        ) {
           payload.revisionRange = input.revisionRange;
         }
         if (input.maxCount !== undefined) {
@@ -183,7 +196,10 @@ export function createMergerToolSet(
         return hooks.gitLog(payload);
       }
       try {
-        if (input.revisionRange !== undefined && input.revisionRange.length > 0) {
+        if (
+          input.revisionRange !== undefined &&
+          input.revisionRange.length > 0
+        ) {
           return await getGitLogOneline({
             cwd: ctx.worktreeRoot,
             revisionRange: input.revisionRange,

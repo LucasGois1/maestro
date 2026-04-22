@@ -32,10 +32,7 @@ import {
   FEEDBACK_HISTORY_OVERLAY_ID,
   createFeedbackHistoryOverlay,
 } from './panels/FeedbackHistoryOverlay.js';
-import {
-  HELP_OVERLAY_ID,
-  createHelpOverlay,
-} from './panels/HelpOverlay.js';
+import { HELP_OVERLAY_ID, createHelpOverlay } from './panels/HelpOverlay.js';
 import {
   KB_EXPLORER_OVERLAY_ID,
   createKbExplorerOverlay,
@@ -126,15 +123,17 @@ export function App({
     ...(editPlan ? { editPlan } : {}),
   };
   const content = (
-    <OverlayHostProvider
-      initialStack={initialOverlay ? [initialOverlay] : []}
-    >
+    <OverlayHostProvider initialStack={initialOverlay ? [initialOverlay] : []}>
       <AppBody {...bodyProps} />
     </OverlayHostProvider>
   );
 
   if (terminalSize) {
-    return <TerminalSizeProvider value={terminalSize}>{content}</TerminalSizeProvider>;
+    return (
+      <TerminalSizeProvider value={terminalSize}>
+        {content}
+      </TerminalSizeProvider>
+    );
   }
   return content;
 }
@@ -326,9 +325,7 @@ function AppShell({
     if (alreadyOpen) {
       return;
     }
-    overlayHost.push(
-      createAgentLogOverlay(store.getState().agent, colorMode),
-    );
+    overlayHost.push(createAgentLogOverlay(store.getState().agent, colorMode));
   }, [colorMode, overlayHost, store]);
 
   useKeybinding(
@@ -427,7 +424,11 @@ function AppShell({
     );
   }, [colorMode, overlayHost, setDiffPreviewMode, store]);
 
-  useKeybinding({ kind: 'panel', panelId: 'diff' }, { key: 'd' }, cycleDiffFile);
+  useKeybinding(
+    { kind: 'panel', panelId: 'diff' },
+    { key: 'd' },
+    cycleDiffFile,
+  );
   useKeybinding({ kind: 'panel', panelId: 'diff' }, { key: 'p' }, () => {
     setDiffPreviewMode('preview');
   });
@@ -504,7 +505,17 @@ function AppShell({
   );
 }
 
-const SPRINT_DIGITS: readonly string[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const SPRINT_DIGITS: readonly string[] = [
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
+];
 
 function useSprintDigitKeybindings(onSelect: (idx: number) => void): void {
   const context = useKeybindingContext();

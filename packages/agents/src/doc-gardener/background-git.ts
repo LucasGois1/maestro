@@ -19,7 +19,10 @@ export async function resolveDefaultBranch(
     }
   }
   for (const b of ['main', 'master']) {
-    const v = await run(['rev-parse', '--verify', b], { cwd, allowNonZero: true });
+    const v = await run(['rev-parse', '--verify', b], {
+      cwd,
+      allowNonZero: true,
+    });
     if (v.code === 0) return b;
   }
   return 'main';

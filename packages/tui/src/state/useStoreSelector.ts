@@ -21,7 +21,10 @@ export function useStoreSelector<T>(
 
   const getSnapshot = useCallback(() => {
     const next = selector(store.getState());
-    if (cachedRef.current !== null && equalityFn(cachedRef.current.value, next)) {
+    if (
+      cachedRef.current !== null &&
+      equalityFn(cachedRef.current.value, next)
+    ) {
       return cachedRef.current.value;
     }
     cachedRef.current = { value: next };

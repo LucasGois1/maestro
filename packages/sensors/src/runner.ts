@@ -1,4 +1,3 @@
-/// <reference path="./maestro-agents-shim.d.ts" />
 import { resolve } from 'node:path';
 
 import { mapCodeReviewModelToViolations } from './code-review-mapper.js';
@@ -61,6 +60,17 @@ export type SensorRunContext = {
   readonly config?: MaestroConfig;
 };
 
+const AGENTS_RUNTIME_PACKAGE: string = '@maestro/agents';
+
+type AgentsRuntimeModule = {
+  readonly codeReviewerAgent: AnyAgentDefinition;
+  readonly runAgent: AgentRunner;
+};
+
+async function importAgentsRuntime(): Promise<AgentsRuntimeModule> {
+  return (await import(AGENTS_RUNTIME_PACKAGE)) as AgentsRuntimeModule;
+}
+
 function emitCompleted(
   bus: EventBus,
   runId: string,
@@ -83,9 +93,7 @@ function mapFailureStatus(
   return onFail === 'warn' ? 'warned' : 'failed';
 }
 
-function isTimedOutError(
-  error: unknown,
-): error is {
+function isTimedOutError(error: unknown): error is {
   readonly message: string;
   readonly timeoutMs: number;
   readonly stdout: string;
@@ -99,9 +107,10 @@ function isTimedOutError(
   );
 }
 
-function resolveCommand(
-  sensor: ComputationalSensorDefinition,
-): { cmd: string; args: string[] } {
+function resolveCommand(sensor: ComputationalSensorDefinition): {
+  cmd: string;
+  args: string[];
+} {
   if (sensor.args.length > 0) {
     return {
       cmd: sensor.command,
@@ -163,7 +172,10 @@ function splitCommandString(command: string): string[] {
   return parts;
 }
 
-function resolveCwd(sensor: ComputationalSensorDefinition, repoRoot: string): string {
+function resolveCwd(
+  sensor: ComputationalSensorDefinition,
+  repoRoot: string,
+): string {
   if (!sensor.cwd) {
     return repoRoot;
   }
@@ -185,9 +197,10 @@ function buildInferentialAgentInput(
   return { diff: context.diff ?? '' };
 }
 
-function resolveLegacyVerdictFindingsOutput(
-  output: unknown,
-): { status: 'passed' | 'failed'; violations: readonly Violation[] } {
+function resolveLegacyVerdictFindingsOutput(output: unknown): {
+  status: 'passed' | 'failed';
+  violations: readonly Violation[];
+} {
   if (
     output &&
     typeof output === 'object' &&
@@ -383,7 +396,7 @@ async function resolveAgentDefinition(
   if (fromRegistry) {
     return fromRegistry;
   }
-  const { codeReviewerAgent } = await import('@maestro/agents');
+  const { codeReviewerAgent } = await importAgentsRuntime();
   if (sensor.agent === codeReviewerAgent.id) {
     return codeReviewerAgent;
   }
@@ -394,7 +407,7 @@ async function runInferentialSensor(
   sensor: InferentialSensorDefinition,
   context: SensorRunContext,
 ): Promise<SensorResult> {
-  const { runAgent } = await import('@maestro/agents');
+  const { runAgent } = await importAgentsRuntime();
   const agentRunner = context.agentRunner ?? runAgent;
   const definition = await resolveAgentDefinition(sensor, context.registry);
 

@@ -53,9 +53,7 @@ export async function runKbRefresh(
     repoRoot: options.repoRoot,
     config: options.config,
     runId: options.runId ?? 'kb-refresh',
-    ...(preferPaths !== undefined
-      ? { sampling: { preferPaths } }
-      : {}),
+    ...(preferPaths !== undefined ? { sampling: { preferPaths } } : {}),
   });
 
   await applyDiscoveryToKb(options.repoRoot, docs);

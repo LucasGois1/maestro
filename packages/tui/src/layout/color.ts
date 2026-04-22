@@ -7,7 +7,9 @@ export interface ResolveColorModeInput {
 
 const NO_COLOR_FLAGS = new Set(['--no-color', '--no-colors']);
 
-export function resolveColorMode(input: ResolveColorModeInput = {}): TuiColorMode {
+export function resolveColorMode(
+  input: ResolveColorModeInput = {},
+): TuiColorMode {
   const args = input.args ?? [];
   const env = input.env ?? {};
 

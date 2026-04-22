@@ -14,9 +14,9 @@ import { resolveDefaultBranch } from './background-git.js';
 import type { GardenerPrOpened } from './gardener-output.schema.js';
 
 export type OpenPrDeps = {
-  readonly detectRemote: (options: DetectRemoteOptions) => ReturnType<
-    typeof detectRemote
-  >;
+  readonly detectRemote: (
+    options: DetectRemoteOptions,
+  ) => ReturnType<typeof detectRemote>;
   readonly runGit: GitRunner;
   readonly executePr: (
     options: ExecPrOptions,

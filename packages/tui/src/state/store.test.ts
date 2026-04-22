@@ -123,7 +123,8 @@ describe('createTuiStore', () => {
       listener,
       {
         equalityFn: (a, b) =>
-          a.length === b.length && a.every((value, index) => value === b[index]),
+          a.length === b.length &&
+          a.every((value, index) => value === b[index]),
       },
     );
 

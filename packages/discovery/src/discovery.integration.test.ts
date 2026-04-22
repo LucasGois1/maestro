@@ -80,7 +80,11 @@ describe('runInferentialDiscovery (mocked agent)', () => {
       '[project]\nname = "demo"\nversion = "0.1.0"\n',
       'utf8',
     );
-    await writeFile(join(repoRoot, 'src', 'app.py'), 'def main():\n  pass\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'src', 'app.py'),
+      'def main():\n  pass\n',
+      'utf8',
+    );
   });
 
   afterEach(async () => {
@@ -117,7 +121,11 @@ describe('runInferentialDiscovery Node fixture (mocked agent)', () => {
       JSON.stringify({ name: 'demo', version: '1.0.0' }),
       'utf8',
     );
-    await writeFile(join(repoRoot, 'index.ts'), 'export const x = 1;\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'index.ts'),
+      'export const x = 1;\n',
+      'utf8',
+    );
   });
 
   afterEach(async () => {
@@ -150,7 +158,11 @@ describe('runInferentialDiscovery Go fixture (mocked agent)', () => {
       'module example.com/demo\n\ngo 1.22\n',
       'utf8',
     );
-    await writeFile(join(repoRoot, 'main.go'), 'package main\nfunc main() {}\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'main.go'),
+      'package main\nfunc main() {}\n',
+      'utf8',
+    );
   });
 
   afterEach(async () => {

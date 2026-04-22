@@ -1,0 +1,7 @@
+{
+  "id": "permission-denied",
+  "prompt": "block a denied shell command",
+  "sensor": "dangerous-command",
+  "expectedSensorStatus": "error",
+  "description": "Permission model denials become structured sensor errors for the evaluator feedback loop."
+}

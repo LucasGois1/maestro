@@ -357,7 +357,8 @@ export function playDemoEvents(
   const schedule: (cb: () => void, ms: number) => unknown =
     options.schedule ?? ((cb, ms) => setTimeout(cb, ms));
   const clear: (handle: unknown) => void =
-    options.clear ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
+    options.clear ??
+    ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
 
   const handles: unknown[] = [];
   let cumulativeDelay = 0;

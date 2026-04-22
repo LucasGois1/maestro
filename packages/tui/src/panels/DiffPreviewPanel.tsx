@@ -51,8 +51,7 @@ function DiffUnifiedBody({
   useKeybinding({ kind: 'panel', panelId: 'diff' }, { key: 'j' }, scrollDown);
   useKeybinding({ kind: 'panel', panelId: 'diff' }, { key: 'k' }, scrollUp);
 
-  const pathLine =
-    activePath !== null ? activePath : '(nenhum arquivo ativo)';
+  const pathLine = activePath !== null ? activePath : '(nenhum arquivo ativo)';
 
   return (
     <Box flexDirection="column">
@@ -107,13 +106,17 @@ export function DiffPreviewPanel({
         <Text dimColor={useColor}>{fb.failure}</Text>
         <Text dimColor={useColor}>{`↪ ${loc}`}</Text>
         {fb.suggestedAction ? (
-          <Text dimColor={useColor}>{`ação sugerida: ${fb.suggestedAction}`}</Text>
+          <Text
+            dimColor={useColor}
+          >{`ação sugerida: ${fb.suggestedAction}`}</Text>
         ) : null}
       </Box>
     );
   } else if (diffPreview.mode === 'feedback') {
     body = (
-      <Text dimColor={useColor}>(sem feedback — aguarde evaluator.feedback)</Text>
+      <Text dimColor={useColor}>
+        (sem feedback — aguarde evaluator.feedback)
+      </Text>
     );
   } else if (diffPreview.unifiedDiff.length === 0) {
     body = <Text dimColor={useColor}>(aguardando diff…)</Text>;

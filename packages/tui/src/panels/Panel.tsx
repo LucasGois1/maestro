@@ -24,13 +24,12 @@ export function Panel({
   const borderColor = useColor ? (focused ? 'cyan' : 'gray') : undefined;
   const titleMarker = focused ? '◉' : '○';
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor={borderColor}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor={borderColor}>
       <Box paddingX={1}>
-        <Text bold={useColor && focused} {...(useColor ? { color: 'white' } : {})}>
+        <Text
+          bold={useColor && focused}
+          {...(useColor ? { color: 'white' } : {})}
+        >
           {`${titleMarker} ${title}`}
         </Text>
         {testId ? <Text>{` [${testId}]`}</Text> : null}

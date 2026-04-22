@@ -5,12 +5,7 @@ import { KeybindingProvider } from '../keybindings/index.js';
 
 import { FeedbackHistoryOverlay } from './FeedbackHistoryOverlay.js';
 
-function entry(
-  at: number,
-  attempt: number,
-  failure: string,
-  criterion = 'c',
-) {
+function entry(at: number, attempt: number, failure: string, criterion = 'c') {
   return {
     at,
     sprintIdx: 1 as number | null,

@@ -1,12 +1,23 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  completedExecPlanRelativePath,
+  execPlansActiveDir,
+  execPlansCompletedDir,
   feedbackPath,
   handoffPath,
+  maestroRoot,
+  runCheckpointsDir,
   projectLogPath,
   runContractsDir,
+  runFeedbackDir,
+  runLogsDir,
+  runMetaPath,
+  runPlanPath,
   runRoot,
   runStatePath,
+  runsRoot,
+  selfEvalPath,
 } from './paths.js';
 
 const opts = { repoRoot: '/repo', runId: 'r1' };
@@ -38,5 +49,39 @@ describe('path helpers', () => {
 
   it('resolves the project log', () => {
     expect(projectLogPath('/repo')).toBe('/repo/.maestro/log.md');
+  });
+
+  it('resolves roots with the default maestro directory', () => {
+    expect(maestroRoot('/repo')).toBe('/repo/.maestro');
+    expect(runsRoot('/repo')).toBe('/repo/.maestro/runs');
+  });
+
+  it('resolves roots with a custom maestro directory', () => {
+    expect(maestroRoot('/repo', '.custom')).toBe('/repo/.custom');
+    expect(runsRoot('/repo', '.custom')).toBe('/repo/.custom/runs');
+    expect(projectLogPath('/repo', '.custom')).toBe('/repo/.custom/log.md');
+  });
+
+  it('resolves run metadata, plan, logs, checkpoints, and feedback dirs', () => {
+    expect(runMetaPath(opts)).toBe('/repo/.maestro/runs/r1/meta.json');
+    expect(runPlanPath(opts)).toBe('/repo/.maestro/runs/r1/plan.md');
+    expect(runLogsDir(opts)).toBe('/repo/.maestro/runs/r1/logs');
+    expect(runCheckpointsDir(opts)).toBe('/repo/.maestro/runs/r1/checkpoints');
+    expect(runFeedbackDir(opts)).toBe('/repo/.maestro/runs/r1/feedback');
+  });
+
+  it('resolves self-eval and exec-plan paths', () => {
+    expect(selfEvalPath({ ...opts, sprint: 4 })).toBe(
+      '/repo/.maestro/runs/r1/checkpoints/sprint-4-self-eval.md',
+    );
+    expect(execPlansCompletedDir('/repo')).toBe(
+      '/repo/.maestro/docs/exec-plans/completed',
+    );
+    expect(execPlansActiveDir('/repo')).toBe(
+      '/repo/.maestro/docs/exec-plans/active',
+    );
+    expect(completedExecPlanRelativePath('auth-flow.md')).toBe(
+      '.maestro/docs/exec-plans/completed/auth-flow.md',
+    );
   });
 });

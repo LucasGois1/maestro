@@ -4,22 +4,20 @@ import { dirname } from 'node:path';
 import type { MaestroConfig } from '@maestro/config';
 import type { EventBus } from '@maestro/core';
 import { commitSprint } from '@maestro/git';
-import { composePolicy, denyAllPrompter, runShellCommand } from '@maestro/sandbox';
+import {
+  composePolicy,
+  denyAllPrompter,
+  runShellCommand,
+} from '@maestro/sandbox';
 import { tool, type ToolSet } from 'ai';
 import { z } from 'zod';
 
 import { resolvePathUnderRepo } from './planner/safe-repo-path.js';
 import { executeRunSensorTool } from './run-sensor-tool.js';
-import {
-  createPlannerToolSet,
-  readRepoFileContent,
-} from './repo-tools.js';
+import { createPlannerToolSet, readRepoFileContent } from './repo-tools.js';
 
 const readFileInput = z.object({
-  path: z
-    .string()
-    .min(1)
-    .describe('Caminho relativo à raiz do repositório.'),
+  path: z.string().min(1).describe('Caminho relativo à raiz do repositório.'),
 });
 
 const writeFileInput = z.object({
@@ -103,7 +101,10 @@ export function createGeneratorToolSet(
       try {
         const abs = resolvePathUnderRepo(
           ctx.repoRoot,
-          p.trim().replace(/^[/\\]+/u, '').replace(/\\/gu, '/'),
+          p
+            .trim()
+            .replace(/^[/\\]+/u, '')
+            .replace(/\\/gu, '/'),
         );
         await mkdir(dirname(abs), { recursive: true });
         await writeFile(abs, content, 'utf8');
@@ -122,7 +123,10 @@ export function createGeneratorToolSet(
       try {
         const abs = resolvePathUnderRepo(
           ctx.repoRoot,
-          p.trim().replace(/^[/\\]+/u, '').replace(/\\/gu, '/'),
+          p
+            .trim()
+            .replace(/^[/\\]+/u, '')
+            .replace(/\\/gu, '/'),
         );
         const before = await readFile(abs, 'utf8');
         const ix = before.indexOf(oldStr);
@@ -153,15 +157,15 @@ export function createGeneratorToolSet(
           cwd: ctx.repoRoot,
           runId: ctx.runId,
           repoRoot: ctx.repoRoot,
-          ...(ctx.maestroDir !== undefined ? { maestroDir: ctx.maestroDir } : {}),
+          ...(ctx.maestroDir !== undefined
+            ? { maestroDir: ctx.maestroDir }
+            : {}),
           policy,
           approver: denyAllPrompter,
           timeoutMs: 120_000,
         });
         const head =
-          result.exitCode === 0
-            ? 'OK'
-            : `exit ${result.exitCode.toString()}`;
+          result.exitCode === 0 ? 'OK' : `exit ${result.exitCode.toString()}`;
         const out = [head, result.stdout, result.stderr]
           .filter((s) => s.length > 0)
           .join('\n');
@@ -182,7 +186,9 @@ export function createGeneratorToolSet(
           repoRoot: ctx.repoRoot,
           runId: ctx.runId,
           bus: ctx.bus,
-          ...(ctx.maestroDir !== undefined ? { maestroDir: ctx.maestroDir } : {}),
+          ...(ctx.maestroDir !== undefined
+            ? { maestroDir: ctx.maestroDir }
+            : {}),
           policy,
           config: ctx.config,
         },

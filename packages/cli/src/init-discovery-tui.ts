@@ -36,8 +36,10 @@ function buildDiffSnippet(path: string, before: string, after: string): string {
   if (before === after) {
     return `--- ${path}\n(no changes)\n`;
   }
-  const minus = before.length > 0 ? before.split('\n').map((l) => `-${l}`) : ['- '];
-  const plus = after.length > 0 ? after.split('\n').map((l) => `+${l}`) : ['+ '];
+  const minus =
+    before.length > 0 ? before.split('\n').map((l) => `-${l}`) : ['- '];
+  const plus =
+    after.length > 0 ? after.split('\n').map((l) => `+${l}`) : ['+ '];
   return [`--- ${path}`, ...minus, ...plus].join('\n');
 }
 

@@ -17,11 +17,11 @@ Após o parse, o pipeline chama `normalizePlannerModelOutput` para injetar `runI
 
 O runner usa `generateText` com `stopWhen: stepCountIs(12)` e três ferramentas registadas:
 
-| Ferramenta        | Função |
-|-------------------|--------|
-| `readKB`          | Lê ficheiros sob a KB Maestro (caminhos relativos a `.maestro/`, p.ex. `AGENTS.md`) ou `docs/...` na raiz do repositório. |
-| `listDirectory`   | Lista ficheiros recursivamente até profundidade limitada (ignora `node_modules`, `.git`, `dist`). |
-| `searchCode`      | Pesquisa literal com **ripgrep** (`rg`) no repositório; se `rg` não existir, devolve mensagem explícita. |
+| Ferramenta      | Função                                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `readKB`        | Lê ficheiros sob a KB Maestro (caminhos relativos a `.maestro/`, p.ex. `AGENTS.md`) ou `docs/...` na raiz do repositório. |
+| `listDirectory` | Lista ficheiros recursivamente até profundidade limitada (ignora `node_modules`, `.git`, `dist`).                         |
+| `searchCode`    | Pesquisa literal com **ripgrep** (`rg`) no repositório; se `rg` não existir, devolve mensagem explícita.                  |
 
 Os eventos `agent.tool_call` e `agent.tool_result` são emitidos no bus para a TUI.
 

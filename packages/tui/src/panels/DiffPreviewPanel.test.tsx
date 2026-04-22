@@ -15,7 +15,9 @@ function renderDiff(ui: ReactElement) {
   );
 }
 
-function baseDiff(overrides: Partial<TuiDiffPreviewState> = {}): TuiDiffPreviewState {
+function baseDiff(
+  overrides: Partial<TuiDiffPreviewState> = {},
+): TuiDiffPreviewState {
   return {
     mode: 'diff',
     activePath: null,

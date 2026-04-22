@@ -58,7 +58,12 @@ export async function patchPlanFileWithArchitectNotes(
   embeddedBlock: string,
   maestroDir = '.maestro',
 ): Promise<void> {
-  const path = join(maestroRoot(repoRoot, maestroDir), 'runs', runId, 'plan.md');
+  const path = join(
+    maestroRoot(repoRoot, maestroDir),
+    'runs',
+    runId,
+    'plan.md',
+  );
   const content = await readFile(path, 'utf8');
   const next = appendArchitectNotesToPlanMarkdown(
     content,

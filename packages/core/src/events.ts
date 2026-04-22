@@ -172,7 +172,11 @@ export type ContextEvent =
       readonly path: string;
     };
 
-export type MaestroEvent = AgentEvent | PipelineEvent | SensorEvent | ContextEvent;
+export type MaestroEvent =
+  | AgentEvent
+  | PipelineEvent
+  | SensorEvent
+  | ContextEvent;
 
 export type AgentEventType = AgentEvent['type'];
 export type PipelineEventType = PipelineEvent['type'];

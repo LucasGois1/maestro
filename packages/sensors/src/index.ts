@@ -10,10 +10,7 @@ export {
   type SensorsFile,
 } from './schema.js';
 
-export {
-  dispatchSensors,
-  type DispatchSensorsOptions,
-} from './dispatcher.js';
+export { dispatchSensors, type DispatchSensorsOptions } from './dispatcher.js';
 
 export { parseSensorOutput, type ParseSensorOutputOptions } from './parsers.js';
 

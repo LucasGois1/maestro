@@ -36,7 +36,10 @@ const listDirectoryInput = z.object({
 });
 
 const searchCodeInput = z.object({
-  query: z.string().min(1).describe('Literal search string (passed to ripgrep).'),
+  query: z
+    .string()
+    .min(1)
+    .describe('Literal search string (passed to ripgrep).'),
   maxLines: z
     .number()
     .int()
@@ -129,7 +132,11 @@ async function searchWithRipgrep(
     const t = stdout.trim();
     return t.length > 0 ? t.slice(0, 12_000) : 'Sem resultados.';
   } catch (e: unknown) {
-    const err = e as { code?: number | string; stderr?: string; message?: string };
+    const err = e as {
+      code?: number | string;
+      stderr?: string;
+      message?: string;
+    };
     if (err.code === 1) {
       return 'Sem resultados.';
     }
@@ -173,9 +180,7 @@ export async function summarizeDependencies(repoRoot: string): Promise<string> {
 
   try {
     const g = await readFile(join(repoRoot, 'go.mod'), 'utf8');
-    chunks.push(
-      `go.mod (excerpt):\n${g.split('\n').slice(0, 35).join('\n')}`,
-    );
+    chunks.push(`go.mod (excerpt):\n${g.split('\n').slice(0, 35).join('\n')}`);
   } catch {
     // skip
   }
@@ -244,9 +249,7 @@ export function createPlannerToolSet(repoRoot: string): ToolSet {
           out.length > 400
             ? `\n… (${out.length.toString()} ficheiros, truncado)`
             : '';
-        return lines.length > 0
-          ? `${lines.join('\n')}${suffix}`
-          : '(vazio)';
+        return lines.length > 0 ? `${lines.join('\n')}${suffix}` : '(vazio)';
       } catch (e) {
         return `Erro: ${e instanceof Error ? e.message : String(e)}`;
       }

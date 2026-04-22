@@ -7,7 +7,9 @@ export const SIMPLE_ONE_FILE: {
   input: { sprintIdx: 1, sprintName: 'Health check' },
   output: {
     sprintIdx: 1,
-    filesChanged: [{ path: 'packages/api/src/routes/health.ts', changeType: 'added' }],
+    filesChanged: [
+      { path: 'packages/api/src/routes/health.ts', changeType: 'added' },
+    ],
     commits: [
       {
         sha: 'abc1234',

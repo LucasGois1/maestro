@@ -22,7 +22,12 @@ function formatEntryHeader(entry: TuiFeedbackEntry): string {
 
 /** Lines present in `next` but not in `prev` (split by newline). */
 function linesOnlyIn(next: string, prev: string): string[] {
-  const a = new Set(prev.split('\n').map((s) => s.trim()).filter(Boolean));
+  const a = new Set(
+    prev
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
   return next
     .split('\n')
     .map((s) => s.trim())
@@ -38,6 +43,7 @@ export function FeedbackHistoryOverlay({
 
   const maxPairLeft = Math.max(0, entries.length - 2);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Clamp the current pair when history shrinks.
     setPairLeft((p) => Math.min(p, maxPairLeft));
   }, [entries.length, maxPairLeft]);
 
@@ -99,7 +105,9 @@ export function FeedbackHistoryOverlay({
             <Text dimColor={useColor}>{entry.failure}</Text>
             <Text dimColor={useColor}>{`local: ${loc}`}</Text>
             {entry.suggestedAction ? (
-              <Text dimColor={useColor}>{`ação: ${entry.suggestedAction}`}</Text>
+              <Text
+                dimColor={useColor}
+              >{`ação: ${entry.suggestedAction}`}</Text>
             ) : null}
           </Box>
         );
@@ -115,7 +123,9 @@ export function FeedbackHistoryOverlay({
           </Text>
           {deltaLines.removed.length > 0 ? (
             <Box flexDirection="column">
-              <Text {...(useColor ? { color: 'red' } : {})}>só na anterior</Text>
+              <Text {...(useColor ? { color: 'red' } : {})}>
+                só na anterior
+              </Text>
               {deltaLines.removed.map((line, i) => (
                 <Text key={`rm-${i.toString()}`} dimColor={useColor}>
                   {`- ${line}`}
@@ -125,7 +135,9 @@ export function FeedbackHistoryOverlay({
           ) : null}
           {deltaLines.added.length > 0 ? (
             <Box flexDirection="column" marginTop={1}>
-              <Text {...(useColor ? { color: 'green' } : {})}>só na seguinte</Text>
+              <Text {...(useColor ? { color: 'green' } : {})}>
+                só na seguinte
+              </Text>
               {deltaLines.added.map((line, i) => (
                 <Text key={`add-${i.toString()}`} dimColor={useColor}>
                   {`+ ${line}`}
@@ -134,7 +146,9 @@ export function FeedbackHistoryOverlay({
             </Box>
           ) : null}
           {deltaLines.added.length === 0 && deltaLines.removed.length === 0 ? (
-            <Text dimColor={useColor}>(texto de falha idêntico entre as duas)</Text>
+            <Text dimColor={useColor}>
+              (texto de falha idêntico entre as duas)
+            </Text>
           ) : null}
         </Box>
       ) : null}

@@ -2,10 +2,7 @@ import { join } from 'node:path';
 
 export const MAESTRO_DIR = '.maestro';
 /** Subárvore `docs/exec-plans` dentro de `.maestro/`. */
-export const EXEC_PLANS_RELATIVE_SEGMENTS = [
-  'docs',
-  'exec-plans',
-] as const;
+export const EXEC_PLANS_RELATIVE_SEGMENTS = ['docs', 'exec-plans'] as const;
 export const RUNS_DIR = 'runs';
 export const CONTRACTS_DIR = 'contracts';
 export const CHECKPOINTS_DIR = 'checkpoints';
@@ -67,7 +64,9 @@ export function handoffPath(opts: RunPathOptions & { sprint: number }): string {
   return join(runCheckpointsDir(opts), `sprint-${opts.sprint}-handoff.md`);
 }
 
-export function selfEvalPath(opts: RunPathOptions & { sprint: number }): string {
+export function selfEvalPath(
+  opts: RunPathOptions & { sprint: number },
+): string {
   return join(runCheckpointsDir(opts), `sprint-${opts.sprint}-self-eval.md`);
 }
 

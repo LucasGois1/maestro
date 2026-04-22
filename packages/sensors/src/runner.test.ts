@@ -10,21 +10,24 @@ import { runSensor, type AgentRunner, type ShellRunner } from './runner.js';
 
 describe('runSensor', () => {
   it('maps computational failures to warned when onFail is warn', async () => {
-    const shellRunner = vi.fn<ShellRunner>(async () => ({
-      exitCode: 1,
-      stdout: JSON.stringify([
-        {
-          code: 'F401',
-          message: 'unused import',
-          filename: 'app.py',
-          location: { row: 2, column: 1 },
-        },
-      ]),
-      stderr: '',
-      durationMs: 25,
-      decision: { kind: 'allow', reason: 'allowlist' },
-      approvedBy: 'allowlist',
-    } satisfies RunCommandResult));
+    const shellRunner = vi.fn<ShellRunner>(
+      async () =>
+        ({
+          exitCode: 1,
+          stdout: JSON.stringify([
+            {
+              code: 'F401',
+              message: 'unused import',
+              filename: 'app.py',
+              location: { row: 2, column: 1 },
+            },
+          ]),
+          stderr: '',
+          durationMs: 25,
+          decision: { kind: 'allow', reason: 'allowlist' },
+          approvedBy: 'allowlist',
+        }) satisfies RunCommandResult,
+    );
 
     const result = await runSensor(
       {
@@ -179,14 +182,17 @@ describe('runSensor', () => {
   });
 
   it('uses cwd when provided for computational sensors', async () => {
-    const shellRunner = vi.fn<ShellRunner>(async ({ cwd }) => ({
-      exitCode: 0,
-      stdout: cwd ?? '',
-      stderr: '',
-      durationMs: 1,
-      decision: { kind: 'allow', reason: 'allowlist' },
-      approvedBy: 'allowlist',
-    } satisfies RunCommandResult));
+    const shellRunner = vi.fn<ShellRunner>(
+      async ({ cwd }) =>
+        ({
+          exitCode: 0,
+          stdout: cwd ?? '',
+          stderr: '',
+          durationMs: 1,
+          decision: { kind: 'allow', reason: 'allowlist' },
+          approvedBy: 'allowlist',
+        }) satisfies RunCommandResult,
+    );
 
     await runSensor(
       {

@@ -43,7 +43,11 @@ describe('detectStack', () => {
   });
 
   it('detects Ruby from Gemfile', async () => {
-    await writeFile(join(root, 'Gemfile'), "source 'https://rubygems.org'\n", 'utf8');
+    await writeFile(
+      join(root, 'Gemfile'),
+      "source 'https://rubygems.org'\n",
+      'utf8',
+    );
     const r = await detectStack(root);
     expect(r.kind).toBe('ruby');
     expect(r.markers).toContain('Gemfile');

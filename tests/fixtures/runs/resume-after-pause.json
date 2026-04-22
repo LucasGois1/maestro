@@ -1,0 +1,7 @@
+{
+  "id": "resume-after-pause",
+  "prompt": "pause and resume a deterministic run",
+  "expectedFirstStatus": "paused",
+  "expectedFinalStatus": "completed",
+  "description": "Pipeline pauses at a phase boundary and resumes with a fresh executor."
+}

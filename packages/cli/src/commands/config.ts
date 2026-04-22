@@ -23,7 +23,9 @@ type Io = {
 };
 
 const defaultIo: Io = {
+  /* v8 ignore next */
   stdout: (line) => process.stdout.write(`${line}\n`),
+  /* v8 ignore next */
   stderr: (line) => process.stderr.write(`${line}\n`),
 };
 

@@ -384,9 +384,7 @@ export function createInitialTuiState(
   };
 }
 
-export function createTuiStore(
-  initial: Partial<TuiState> = {},
-): TuiStore {
+export function createTuiStore(initial: Partial<TuiState> = {}): TuiStore {
   let state = createInitialTuiState(initial);
   const listeners = new Set<() => void>();
 
@@ -459,9 +457,7 @@ export function computeStageStatuses(
   };
 
   const currentIndex =
-    pipeline.stage === null
-      ? -1
-      : PIPELINE_STAGE_ORDER.indexOf(pipeline.stage);
+    pipeline.stage === null ? -1 : PIPELINE_STAGE_ORDER.indexOf(pipeline.stage);
 
   if (currentIndex !== -1) {
     for (let i = 0; i < currentIndex; i += 1) {

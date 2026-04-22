@@ -29,7 +29,7 @@ export function SensorsDetailOverlay({
   const primaryId =
     focusedSensorId !== null && sensors[focusedSensorId]
       ? focusedSensorId
-      : entries[0]?.sensorId ?? null;
+      : (entries[0]?.sensorId ?? null);
   const primary = primaryId ? sensors[primaryId] : undefined;
   const rest = entries.filter((s) => s.sensorId !== primaryId);
 

@@ -9,7 +9,9 @@ type Io = {
 };
 
 const defaultIo: Io = {
+  /* v8 ignore next */
   stdout: (line) => process.stdout.write(`${line}\n`),
+  /* v8 ignore next */
   stderr: (line) => process.stderr.write(`${line}\n`),
 };
 
@@ -59,7 +61,9 @@ export function createKBCommand(options: KbCommandOptions = {}): Command {
     });
 
   kb.command('refresh')
-    .description('Re-run inferential discovery to refresh AGENTS.md and ARCHITECTURE.md')
+    .description(
+      'Re-run inferential discovery to refresh AGENTS.md and ARCHITECTURE.md',
+    )
     .action(async () => {
       const repoRoot = cwd();
       const { resolved: config } = await loadConfig({ cwd: repoRoot });

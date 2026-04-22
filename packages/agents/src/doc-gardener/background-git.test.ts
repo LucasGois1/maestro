@@ -5,7 +5,10 @@ import { isWorkingTreeClean, resolveDefaultBranch } from './background-git.js';
 describe('background-git', () => {
   it('resolveDefaultBranch reads origin/HEAD symbolic ref', async () => {
     const run = vi.fn(async (args: readonly string[]) => {
-      if (args[0] === 'symbolic-ref' && args[1] === 'refs/remotes/origin/HEAD') {
+      if (
+        args[0] === 'symbolic-ref' &&
+        args[1] === 'refs/remotes/origin/HEAD'
+      ) {
         return {
           stdout: 'refs/remotes/origin/develop\n',
           stderr: '',

@@ -5,7 +5,12 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { vi } from 'vitest';
 
-vi.mock('@maestro/kb', async () => await import('../../../../packages/kb/src/index.ts'));
+vi.mock(
+  '@maestro/kb',
+  async () => await import('../../../../packages/kb/src/index.ts'),
+);
+
+import { createKBManager } from '@maestro/kb';
 
 import { createKBCommand } from './kb.js';
 
@@ -51,10 +56,35 @@ describe('maestro kb', () => {
     await mkdir(join(repoRoot, '.maestro'), { recursive: true });
     await writeFile(
       join(repoRoot, '.maestro', 'ARCHITECTURE.md'),
-      '# ARCHITECTURE\n\n## Bird\'s Eye View\n',
+      "# ARCHITECTURE\n\n## Bird's Eye View\n",
       'utf8',
     );
-    await writeFile(join(repoRoot, '.maestro', 'AGENTS.md'), '# AGENTS\n', 'utf8');
+    await writeFile(
+      join(repoRoot, '.maestro', 'AGENTS.md'),
+      [
+        '# AGENTS',
+        '',
+        '## Header',
+        'Header.',
+        '',
+        '## Repo Map',
+        'Map.',
+        '',
+        '## Docs',
+        'Docs.',
+        '',
+        '## Essential Commands',
+        'Commands.',
+        '',
+        '## Critical Conventions',
+        'Conventions.',
+        '',
+        '## Escalation Path',
+        'Escalation.',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
 
     await run(['lint', '--fix']);
 
@@ -65,5 +95,28 @@ describe('maestro kb', () => {
     );
     expect(architecture).toContain('## Code Map');
     expect(stdout.join('\n')).toMatch(/fixed/i);
+  });
+
+  it('lint reports a valid knowledge base', async () => {
+    await createKBManager({ repoRoot }).init();
+
+    await run(['lint']);
+
+    expect(process.exitCode).toBe(0);
+    expect(stdout).toEqual(['KB is valid.']);
+  });
+
+  it('refresh exits when discovery is disabled', async () => {
+    await mkdir(join(repoRoot, '.maestro'), { recursive: true });
+    await writeFile(
+      join(repoRoot, '.maestro', 'config.json'),
+      JSON.stringify({ discovery: { enabled: false } }),
+      'utf8',
+    );
+
+    await run(['refresh']);
+
+    expect(process.exitCode).toBe(1);
+    expect(stderr).toEqual(['Discovery is disabled in config.']);
   });
 });

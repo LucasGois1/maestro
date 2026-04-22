@@ -47,8 +47,6 @@ export type ArchitectPipelineResult = ArchitectModelOutput & {
 export function finalizeArchitectOutput(
   raw: ArchitectModelOutput,
 ): ArchitectPipelineResult {
-  const approved =
-    raw.escalation === undefined &&
-    raw.boundaryCheck === 'ok';
+  const approved = raw.escalation === undefined && raw.boundaryCheck === 'ok';
   return { ...raw, approved };
 }

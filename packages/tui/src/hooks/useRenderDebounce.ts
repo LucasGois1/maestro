@@ -24,8 +24,11 @@ export function createFrameThrottle(
   options: FrameThrottleOptions = {},
 ): FrameThrottle {
   const frameMs = options.frameMs ?? DEFAULT_FRAME_MS;
-  const schedule: ScheduleFn = options.schedule ?? ((cb, ms) => setTimeout(cb, ms));
-  const clear: ClearFn = options.clear ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
+  const schedule: ScheduleFn =
+    options.schedule ?? ((cb, ms) => setTimeout(cb, ms));
+  const clear: ClearFn =
+    options.clear ??
+    ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
 
   let pending: unknown = null;
   let pendingListener: (() => void) | null = null;

@@ -52,9 +52,7 @@ function formatAcceptance(
   for (const id of userStoryIds) {
     const st = storyById.get(id);
     if (st) {
-      lines.push(
-        `Como ${st.role}, quero ${st.action} para ${st.value}.`,
-      );
+      lines.push(`Como ${st.role}, quero ${st.action} para ${st.value}.`);
     } else {
       lines.push(`Critério (user story #${id.toString()}).`);
     }
@@ -74,9 +72,7 @@ export function normalizePlannerModelOutput(
     throw new Error(`Planner escalation: ${raw.escalationReason}`);
   }
 
-  const storyById = new Map(
-    raw.userStories.map((s) => [s.id, s] as const),
-  );
+  const storyById = new Map(raw.userStories.map((s) => [s.id, s] as const));
 
   const sprints: PlannerPipelineSprint[] = raw.sprints.map((sp) => {
     const acceptance = formatAcceptance(
@@ -99,8 +95,7 @@ export function normalizePlannerModelOutput(
   });
 
   const overview = raw.overview.trim();
-  const summary =
-    overview.split('\n')[0]?.trim() ?? overview.slice(0, 200);
+  const summary = overview.split('\n')[0]?.trim() ?? overview.slice(0, 200);
 
   return {
     runId: ctx.runId,

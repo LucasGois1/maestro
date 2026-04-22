@@ -1,7 +1,10 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { completedExecPlanRelativePath, execPlansCompletedDir } from './paths.js';
+import {
+  completedExecPlanRelativePath,
+  execPlansCompletedDir,
+} from './paths.js';
 
 export type WriteCompletedExecPlanOptions = {
   readonly repoRoot: string;

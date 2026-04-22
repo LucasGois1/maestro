@@ -14,14 +14,20 @@ export function mapCodeReviewModelToViolations(output: unknown): {
   readonly parsed: CodeReviewOutput;
 } {
   const parsed = codeReviewOutputSchema.parse(output);
-  const hasErrorSeverity = parsed.violations.some((v) => v.severity === 'error');
+  const hasErrorSeverity = parsed.violations.some(
+    (v) => v.severity === 'error',
+  );
   const logicalFailed = !parsed.pass || hasErrorSeverity;
 
   const violations: Violation[] = parsed.violations.map((v) => ({
     rule: 'code-review',
     message: v.message,
     severity:
-      v.severity === 'warning' ? 'warn' : v.severity === 'info' ? 'info' : 'error',
+      v.severity === 'warning'
+        ? 'warn'
+        : v.severity === 'info'
+          ? 'info'
+          : 'error',
     path: v.file,
     ...(v.line !== undefined ? { line: v.line } : {}),
     source: 'code-reviewer',

@@ -3,7 +3,11 @@ import { promisify } from 'node:util';
 
 import type { MaestroConfig } from '@maestro/config';
 import type { EventBus } from '@maestro/core';
-import { composePolicy, denyAllPrompter, runShellCommand } from '@maestro/sandbox';
+import {
+  composePolicy,
+  denyAllPrompter,
+  runShellCommand,
+} from '@maestro/sandbox';
 import { tool, type ToolSet } from 'ai';
 import { z } from 'zod';
 
@@ -14,10 +18,7 @@ import { executeRunSensorTool } from './run-sensor-tool.js';
 const execFileAsync = promisify(execFile);
 
 const readFileInput = z.object({
-  path: z
-    .string()
-    .min(1)
-    .describe('Relative path under the worktree root.'),
+  path: z.string().min(1).describe('Relative path under the worktree root.'),
 });
 
 const runShellInput = z.object({
@@ -30,11 +31,17 @@ const runSensorInput = z.object({
 });
 
 const navigateBrowserInput = z.object({
-  url: z.string().min(1).describe('http(s) URL — HTTP snapshot only, not real browser.'),
+  url: z
+    .string()
+    .min(1)
+    .describe('http(s) URL — HTTP snapshot only, not real browser.'),
 });
 
 const querySqliteInput = z.object({
-  dbPath: z.string().min(1).describe('SQLite file path relative to worktree root.'),
+  dbPath: z
+    .string()
+    .min(1)
+    .describe('SQLite file path relative to worktree root.'),
   sql: z.string().min(1).describe('Single SELECT statement.'),
 });
 
@@ -149,15 +156,15 @@ export function createEvaluatorToolSet(
           cwd: ctx.worktreeRoot,
           runId: ctx.runId,
           repoRoot: ctx.repoRoot,
-          ...(ctx.maestroDir !== undefined ? { maestroDir: ctx.maestroDir } : {}),
+          ...(ctx.maestroDir !== undefined
+            ? { maestroDir: ctx.maestroDir }
+            : {}),
           policy,
           approver: denyAllPrompter,
           timeoutMs: 120_000,
         });
         const head =
-          result.exitCode === 0
-            ? 'OK'
-            : `exit ${result.exitCode.toString()}`;
+          result.exitCode === 0 ? 'OK' : `exit ${result.exitCode.toString()}`;
         const out = [head, result.stdout, result.stderr]
           .filter((s) => s.length > 0)
           .join('\n');
@@ -177,7 +184,9 @@ export function createEvaluatorToolSet(
           repoRoot: ctx.repoRoot,
           runId: ctx.runId,
           bus: ctx.bus,
-          ...(ctx.maestroDir !== undefined ? { maestroDir: ctx.maestroDir } : {}),
+          ...(ctx.maestroDir !== undefined
+            ? { maestroDir: ctx.maestroDir }
+            : {}),
           policy,
           config: ctx.config,
           ...(ctx.codeDiff !== undefined ? { diff: ctx.codeDiff } : {}),
@@ -246,7 +255,10 @@ export function createEvaluatorToolSet(
       try {
         const abs = resolvePathUnderRepo(
           ctx.worktreeRoot,
-          dbPath.trim().replace(/^[/\\]+/u, '').replace(/\\/gu, '/'),
+          dbPath
+            .trim()
+            .replace(/^[/\\]+/u, '')
+            .replace(/\\/gu, '/'),
         );
         const { stdout, stderr } = await execFileAsync(
           'sqlite3',

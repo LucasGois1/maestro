@@ -1,10 +1,6 @@
 import { Box, Text } from 'ink';
 
-import type {
-  TuiColorMode,
-  TuiHeaderState,
-  TuiMode,
-} from '../state/store.js';
+import type { TuiColorMode, TuiHeaderState, TuiMode } from '../state/store.js';
 
 export interface HeaderProps {
   readonly mode: TuiMode;

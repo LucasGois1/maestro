@@ -51,10 +51,7 @@ export {
 
 export { getWorkingTreeDiff } from './working-tree-diff.js';
 
-export {
-  getGitLogOneline,
-  type GitLogOnelineOptions,
-} from './git-log.js';
+export { getGitLogOneline, type GitLogOnelineOptions } from './git-log.js';
 
 export {
   buildPrCommand,
