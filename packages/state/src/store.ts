@@ -1,3 +1,4 @@
+import type { Dirent } from 'node:fs';
 import { readFile, readdir, rm } from 'node:fs/promises';
 
 import { writeAtomicJson } from './atomic.js';
@@ -163,16 +164,17 @@ export function createStateStore(options: CreateStateStoreOptions): StateStore {
 
     async list() {
       const root = runsRoot(repoRoot, maestroDir);
-      let entries: string[];
+      let dirents: Dirent[];
       try {
-        entries = await readdir(root);
+        dirents = await readdir(root, { withFileTypes: true });
       } catch (error) {
         if (isEnoent(error)) return [];
         throw error;
       }
       const states: RunState[] = [];
-      for (const entry of entries) {
-        const state = await readState(entry);
+      for (const dirent of dirents) {
+        if (!dirent.isDirectory()) continue;
+        const state = await readState(dirent.name);
         if (state) states.push(state);
       }
       return states.sort((a, b) =>

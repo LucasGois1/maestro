@@ -129,6 +129,53 @@ export {
   type MergerToolHooks,
 } from './merger-tools.js';
 export {
+  DOC_GARDENER_FEW_SHOT_EXAMPLES,
+  resolvedDocGardenerSystemPrompt,
+} from './doc-gardener/calibration.js';
+export {
+  executeBackgroundGardener,
+  type ExecuteBackgroundOptions,
+  type ExecuteBackgroundResult,
+} from './doc-gardener/execute-background.js';
+export {
+  analyzeDuplicateSourceFiles,
+  detectCodeDriftHeuristic,
+} from './doc-gardener/detect-code-drift.js';
+export { detectStaleDocumentation } from './doc-gardener/detect-stale-docs.js';
+export {
+  gardenerInputSchema,
+  gardenerRunTypeSchema,
+  type GardenerInput,
+} from './doc-gardener/gardener-input.schema.js';
+export {
+  gardenerBreakdownSchema,
+  gardenerOutputSchema,
+  type GardenerBreakdown,
+  type GardenerOutput,
+  type GardenerPrOpened,
+} from './doc-gardener/gardener-output.schema.js';
+export {
+  isWorkingTreeClean,
+  resolveDefaultBranch,
+} from './doc-gardener/background-git.js';
+export {
+  detectKnipIssues,
+  detectPnpmOutdated,
+  parseKnipReporterJson,
+  parsePnpmOutdatedText,
+  type PackageHealthFinding,
+} from './doc-gardener/detect-package-health.js';
+export {
+  mergeOpenPrDeps,
+  openPrForCategory,
+  type OpenPrDeps,
+} from './doc-gardener/open-pr-category.js';
+export { DOC_GARDENER_SYSTEM_PROMPT } from './doc-gardener/system-prompt.js';
+export {
+  createGardenerToolSet,
+  type GardenerToolContext,
+} from './gardener-tools.js';
+export {
   CODE_REVIEWER_FEW_SHOT_EXAMPLES,
   resolvedCodeReviewerSystemPrompt,
 } from './code-reviewer/calibration.js';

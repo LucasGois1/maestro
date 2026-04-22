@@ -8,6 +8,7 @@ export {
   PERMISSION_MODES,
   PROVIDER_NAMES,
   type AgentName,
+  type BackgroundConfig,
   type BranchingStrategy,
   type MaestroConfig,
   type MaestroConfigInput,

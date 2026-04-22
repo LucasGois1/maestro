@@ -23,6 +23,10 @@ import { CODE_REVIEWER_FEW_SHOT_EXAMPLES as CODE_REVIEWER_CALIBRATION } from './
 import { codeReviewInputSchema } from './code-reviewer/code-review-input.schema.js';
 import { codeReviewOutputSchema } from '@maestro/sensors';
 import { CODE_REVIEWER_SYSTEM_PROMPT } from './code-reviewer/system-prompt.js';
+import { DOC_GARDENER_FEW_SHOT_EXAMPLES } from './doc-gardener/calibration.js';
+import { gardenerInputSchema } from './doc-gardener/gardener-input.schema.js';
+import { gardenerOutputSchema } from './doc-gardener/gardener-output.schema.js';
+import { DOC_GARDENER_SYSTEM_PROMPT } from './doc-gardener/system-prompt.js';
 
 const textInputSchema = z.object({ prompt: z.string().min(1) });
 
@@ -31,16 +35,6 @@ const architectInputSchema = z.object({
   architecture: z.string().min(1),
   sprint: z.unknown(),
   sprintIdx: z.number().int().nonnegative(),
-});
-
-const docGardenerOutputSchema = z.object({
-  updates: z.array(
-    z.object({
-      path: z.string(),
-      reason: z.string(),
-    }),
-  ),
-  deletions: z.array(z.string()).default([]),
 });
 
 const discoveryInputSchema = z.object({
@@ -256,15 +250,17 @@ export const codeReviewerAgent: AgentDefinition<
 };
 
 export const docGardenerAgent: AgentDefinition<
-  { repoRoot: string },
-  z.infer<typeof docGardenerOutputSchema>
+  z.infer<typeof gardenerInputSchema>,
+  z.infer<typeof gardenerOutputSchema>
 > = {
   id: 'doc-gardener',
   role: 'background',
-  systemPrompt:
-    'You are the Maestro Doc Gardener. Suggest doc updates and stale-doc deletions. Reply with JSON {updates[], deletions[]}.',
-  inputSchema: z.object({ repoRoot: z.string() }),
-  outputSchema: docGardenerOutputSchema,
+  systemPrompt: DOC_GARDENER_SYSTEM_PROMPT,
+  inputSchema: gardenerInputSchema,
+  outputSchema: gardenerOutputSchema,
+  calibration: {
+    fewShotExamples: DOC_GARDENER_FEW_SHOT_EXAMPLES,
+  },
 };
 
 export const discoveryAgent: AgentDefinition<

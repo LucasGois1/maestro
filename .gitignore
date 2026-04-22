@@ -22,6 +22,7 @@ dist/
 # vite / vitest caches
 .vite/
 **/.vite/
+**/.vitest-tmp/
 
 # misc
 .DS_Store

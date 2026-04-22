@@ -8,6 +8,7 @@ import { render } from 'ink';
 import { createElement } from 'react';
 
 import { createAbortCommand } from './commands/abort.js';
+import { createBackgroundCommand } from './commands/background.js';
 import { createConfigCommand } from './commands/config.js';
 import { createGitCommand } from './commands/git.js';
 import { createInitCommand } from './commands/init.js';
@@ -59,6 +60,7 @@ function createProgram(version: string) {
   program.addCommand(createGitCommand());
   program.addCommand(createKBCommand());
   program.addCommand(createRunsCommand());
+  program.addCommand(createBackgroundCommand());
   program.addCommand(createTuiCommand());
 
   return program;

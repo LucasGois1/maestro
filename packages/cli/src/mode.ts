@@ -5,6 +5,7 @@ const VERSION_FLAGS = new Set(['-V', '--version']);
 
 export const KNOWN_SUBCOMMANDS = new Set([
   'abort',
+  'background',
   'config',
   'git',
   'init',

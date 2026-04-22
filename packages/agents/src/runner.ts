@@ -19,6 +19,7 @@ import type { EvaluatorInput } from './evaluator/evaluator-input.schema.js';
 import { createEvaluatorToolSet } from './evaluator-tools.js';
 import { createGeneratorToolSet } from './generator-tools.js';
 import { createMergerToolSet } from './merger-tools.js';
+import { createGardenerToolSet } from './gardener-tools.js';
 import {
   createArchitectToolSet,
   createPlannerToolSet,
@@ -319,6 +320,23 @@ export async function runAgent<TInput, TOutput>(
             : {}),
         }),
         maxSteps: 20,
+      };
+    } else if (definition.id === 'doc-gardener') {
+      toolAugmented = {
+        tools: createGardenerToolSet({
+          repoRoot: context.workingDir,
+          worktreeRoot,
+          config,
+          runId: context.runId,
+          bus,
+          ...(maestroDirMeta !== undefined
+            ? { maestroDir: maestroDirMeta }
+            : {}),
+          ...(typeof meta.codeDiff === 'string'
+            ? { codeDiff: meta.codeDiff }
+            : {}),
+        }),
+        maxSteps: 24,
       };
     }
 

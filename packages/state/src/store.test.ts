@@ -1,9 +1,10 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { runsRoot } from './paths.js';
 import {
   createStateStore,
   StateStoreError,
@@ -62,6 +63,14 @@ describe('StateStore', () => {
     await expect(
       s.update('missing', { phase: 'planning' }),
     ).rejects.toBeInstanceOf(StateStoreError);
+  });
+
+  it('list() ignores files under runs/ (e.g. .gitkeep)', async () => {
+    const s = store();
+    await s.create(baseOpts);
+    await writeFile(join(runsRoot(repoRoot), '.gitkeep'), '\n', 'utf8');
+    const all = await s.list();
+    expect(all.map((r) => r.runId)).toEqual(['run-1']);
   });
 
   it('list() returns runs ordered by lastUpdatedAt desc', async () => {

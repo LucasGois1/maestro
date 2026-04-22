@@ -117,6 +117,15 @@ const mergerSchema = z
   })
   .strict();
 
+/** Opções do agente Doc Gardener / `maestro background run`. */
+const backgroundSchema = z
+  .object({
+    knip: z.boolean().default(true),
+    outdated: z.boolean().default(true),
+    maxFindingsPerSource: z.number().int().min(1).max(500).default(80),
+  })
+  .strict();
+
 export const configSchema = z
   .object({
     version: z.literal(1).default(1),
@@ -126,10 +135,12 @@ export const configSchema = z
     branching: branchingSchema.prefault({}),
     discovery: discoverySchema.prefault({}),
     merger: mergerSchema.prefault({}),
+    background: backgroundSchema.prefault({}),
   })
   .strict();
 
 export type MaestroConfigInput = z.input<typeof configSchema>;
 export type MaestroConfig = z.output<typeof configSchema>;
+export type BackgroundConfig = z.infer<typeof backgroundSchema>;
 
 export const DEFAULT_CONFIG: MaestroConfig = configSchema.parse({});
