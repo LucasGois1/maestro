@@ -14,6 +14,10 @@ import type {
 } from './definition.js';
 import { generateText, stepCountIs, type ToolSet } from 'ai';
 
+import {
+  serializeGenerateTextForAudit,
+  writeAgentParseAuditLog,
+} from './agent-output-audit.js';
 import { appendCalibrationSection } from './calibration-format.js';
 import type { EvaluatorInput } from './evaluator/evaluator-input.schema.js';
 import { createEvaluatorToolSet } from './evaluator-tools.js';
@@ -21,6 +25,7 @@ import { createGeneratorToolSet } from './generator-tools.js';
 import { createMergerToolSet } from './merger-tools.js';
 import { createGardenerToolSet } from './gardener-tools.js';
 import { createArchitectToolSet, createPlannerToolSet } from './repo-tools.js';
+import { collectAssistantTextFromToolLoopResult } from './tool-loop-text.js';
 
 function formatZodIssues(issues: readonly ZodIssue[]): string {
   return issues
@@ -32,6 +37,9 @@ function formatZodIssues(issues: readonly ZodIssue[]): string {
 }
 
 export class AgentOutputParseError extends Error {
+  /** Populated when a tool-loop audit file was written under the run's `logs/` dir. */
+  public auditLogPath?: string;
+
   constructor(
     message: string,
     public readonly rawText: string,
@@ -64,9 +72,16 @@ export function formatAgentErrorForDisplay(error: unknown): {
       error.rawText.length > 3500
         ? `${error.rawText.slice(0, 3500)}…`
         : error.rawText;
+    const auditPath = error.auditLogPath;
+    const audit =
+      typeof auditPath === 'string' &&
+      auditPath.length > 0 &&
+      !error.message.includes(auditPath)
+        ? `\n\nAudit log: ${auditPath}`
+        : '';
     return {
       summary: 'Model output was not valid JSON',
-      detail: `${error.message}\n\n--- Raw output (truncated for screen) ---\n${head}`,
+      detail: `${error.message}${audit}\n\n--- Raw output (truncated for screen) ---\n${head}`,
     };
   }
   if (error instanceof AgentValidationError) {
@@ -169,7 +184,10 @@ async function generateToolAugmentedAgentText(options: {
   readonly workingDir: string;
   readonly tools: ToolSet;
   readonly maxSteps: number;
-}): Promise<string> {
+}): Promise<{
+  readonly outputText: string;
+  readonly generateResult: Awaited<ReturnType<typeof generateText>>;
+}> {
   const gen = await generateText({
     model: options.model,
     system: options.system,
@@ -195,15 +213,16 @@ async function generateToolAugmentedAgentText(options: {
       });
     },
   });
-  if (gen.text.length > 0) {
+  const outputText = collectAssistantTextFromToolLoopResult(gen);
+  if (outputText.length > 0) {
     options.bus.emit({
       type: 'agent.delta',
       agentId: options.agentId,
       runId: options.runId,
-      chunk: gen.text,
+      chunk: outputText,
     });
   }
-  return gen.text;
+  return { outputText, generateResult: gen };
 }
 
 function extractJsonObject(text: string): unknown {
@@ -257,6 +276,7 @@ export async function runAgent<TInput, TOutput>(
     const prompt = stringifyInput(inputParse.data);
 
     let text = '';
+    let toolLoopGen: Awaited<ReturnType<typeof generateText>> | undefined;
 
     const meta = context.metadata;
     const worktreeRoot =
@@ -341,7 +361,7 @@ export async function runAgent<TInput, TOutput>(
     }
 
     if (toolAugmented) {
-      text = await generateToolAugmentedAgentText({
+      const loop = await generateToolAugmentedAgentText({
         model,
         system,
         prompt,
@@ -352,6 +372,8 @@ export async function runAgent<TInput, TOutput>(
         tools: toolAugmented.tools,
         maxSteps: toolAugmented.maxSteps,
       });
+      text = loop.outputText;
+      toolLoopGen = loop.generateResult;
     } else {
       const result = streamText({
         model,
@@ -370,7 +392,25 @@ export async function runAgent<TInput, TOutput>(
       }
     }
 
-    const outputCandidate = extractJsonObject(text);
+    let outputCandidate: unknown;
+    try {
+      outputCandidate = extractJsonObject(text);
+    } catch (err) {
+      if (err instanceof AgentOutputParseError && toolLoopGen !== undefined) {
+        const auditPath = await writeAgentParseAuditLog({
+          context,
+          agentId: definition.id,
+          candidateText: text,
+          parseMessage: err.message,
+          generateTextAudit: serializeGenerateTextForAudit(toolLoopGen),
+        });
+        if (auditPath) {
+          err.auditLogPath = auditPath;
+          err.message = `${err.message}\nAudit: ${auditPath}`;
+        }
+      }
+      throw err;
+    }
     const outputParse = definition.outputSchema.safeParse(outputCandidate);
     if (!outputParse.success) {
       const issues = outputParse.error.issues;

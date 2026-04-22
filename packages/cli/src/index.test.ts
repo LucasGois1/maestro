@@ -12,7 +12,6 @@ vi.mock('ink', () => ({
 
 vi.mock('@maestro/tui', () => ({
   App: () => null,
-  bridgeBusToStore: vi.fn(() => () => undefined),
   createTuiStore: vi.fn(() => ({
     getState: vi.fn(() => ({ mode: 'idle' })),
     setState: vi.fn(),

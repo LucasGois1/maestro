@@ -20,4 +20,13 @@ describe('activeAgentWorkingHint', () => {
       'Agente a trabalhar…',
     );
   });
+
+  it('uses agent-only hint when stage is unknown', () => {
+    expect(activeAgentWorkingHint('generator', null)).toBe(
+      'Geração em curso…',
+    );
+    expect(activeAgentWorkingHint('code-reviewer', null)).toBe(
+      'Revisão de código em curso…',
+    );
+  });
 });

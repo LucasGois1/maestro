@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createEventBus, type MaestroEvent } from '@maestro/core';
-import { createTuiStore } from '@maestro/tui';
+import { bridgeBusToStore, createTuiStore } from '@maestro/tui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { editSprintContractMock, inkRenderMock, resolveContractPathMock } =
@@ -105,11 +105,24 @@ describe('createTuiCommand', () => {
   });
 
   it('passes a shared bus that demo events feed into', () => {
-    const renderApp = vi.fn(() => ({ unmount: vi.fn() }));
+    const renderApp = vi.fn(
+      (args: { bus: ReturnType<typeof createEventBus>; store: unknown }) => {
+        const dispose = bridgeBusToStore(
+          args.bus,
+          args.store as ReturnType<typeof createTuiStore>,
+        );
+        return {
+          unmount: vi.fn(() => {
+            dispose();
+          }),
+        };
+      },
+    );
     const command = createTuiCommand({
       renderApp: renderApp as never,
       startDemo: (bus: { emit(event: MaestroEvent): void }) => {
         bus.emit({ type: 'pipeline.started', runId: 'r1' });
+        return { cancel: vi.fn(), totalDurationMs: 0 };
       },
       env: {},
     });

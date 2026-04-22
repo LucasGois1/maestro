@@ -54,6 +54,28 @@ describe('ActiveAgentPanel', () => {
     app.unmount();
   });
 
+  it('shows spinner status line above log when pipeline is running with output', () => {
+    const state = createInitialTuiState();
+    const app = render(
+      <ActiveAgentPanel
+        agent={{
+          ...state.agent,
+          activeAgentId: 'generator',
+          messageLog: [
+            { kind: 'delta', agentId: 'generator', at: 1, text: 'x' },
+          ],
+        }}
+        pipelineStage="generating"
+        pipelineStatus="running"
+      />,
+    );
+
+    const frame = app.lastFrame() ?? '';
+    expect(frame).toContain('Geração em curso');
+    expect(frame).toContain('> x');
+    app.unmount();
+  });
+
   it('shows idle placeholder when agent is active but pipeline is not running', () => {
     const state = createInitialTuiState();
     const app = render(

@@ -1,5 +1,4 @@
 import { Box, Text } from 'ink';
-import type { ReactNode } from 'react';
 
 import type { PipelineStageName } from '@maestro/core';
 
@@ -46,35 +45,6 @@ function entryPrefix(kind: TuiAgentLogEntry['kind']): string {
   }
 }
 
-function emptyLogPlaceholder(options: {
-  readonly activeAgentId: string | null;
-  readonly showWorkingSpinner: boolean;
-  readonly spinner: string;
-  readonly pipelineStage: PipelineStageName | null;
-  readonly useColor: boolean;
-}): ReactNode {
-  if (options.activeAgentId === null) {
-    return <Text dimColor={options.useColor}>(sem agente ativo)</Text>;
-  }
-  if (options.showWorkingSpinner) {
-    return (
-      <Box flexDirection="column">
-        <Text {...(options.useColor ? { color: 'cyan' } : {})}>
-          {options.spinner.length > 0 ? `${options.spinner} ` : ''}
-          {activeAgentWorkingHint(
-            options.activeAgentId,
-            options.pipelineStage,
-          )}
-        </Text>
-        <Text dimColor={options.useColor}>
-          A aguardar tokens ou ferramentas do agente…
-        </Text>
-      </Box>
-    );
-  }
-  return <Text dimColor={options.useColor}>(sem saída ainda)</Text>;
-}
-
 export function ActiveAgentPanel({
   agent,
   pipelineStage = null,
@@ -88,11 +58,13 @@ export function ActiveAgentPanel({
   const lastDecision =
     agent.decisions.length > 0 ? agent.decisions.at(-1) : undefined;
   const pipelineRunning = pipelineStatus === 'running';
-  const showWorkingSpinner =
-    pipelineRunning &&
-    agent.activeAgentId !== null &&
-    visible.length === 0;
-  const spinner = useSpinnerFrame({ enabled: showWorkingSpinner });
+  const spinnerEnabled =
+    pipelineRunning && agent.activeAgentId !== null;
+  const spinner = useSpinnerFrame({ enabled: spinnerEnabled });
+  const workingHint =
+    agent.activeAgentId !== null
+      ? activeAgentWorkingHint(agent.activeAgentId, pipelineStage)
+      : '';
 
   return (
     <Panel
@@ -100,14 +72,22 @@ export function ActiveAgentPanel({
       focused={focused}
       colorMode={colorMode}
     >
+      {spinnerEnabled ? (
+        <Text {...(useColor ? { color: 'cyan' } : {})}>
+          {spinner.length > 0 ? `${spinner} ` : ''}
+          {workingHint}
+        </Text>
+      ) : null}
       {visible.length === 0 ? (
-        emptyLogPlaceholder({
-          activeAgentId: agent.activeAgentId,
-          showWorkingSpinner,
-          spinner,
-          pipelineStage,
-          useColor,
-        })
+        agent.activeAgentId === null ? (
+          <Text dimColor={useColor}>(sem agente ativo)</Text>
+        ) : spinnerEnabled ? (
+          <Text dimColor={useColor}>
+            A aguardar tokens ou ferramentas do agente…
+          </Text>
+        ) : (
+          <Text dimColor={useColor}>(sem saída ainda)</Text>
+        )
       ) : (
         <Box flexDirection="column">
           {visible.map((entry, index) => {

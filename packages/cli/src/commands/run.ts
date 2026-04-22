@@ -17,7 +17,7 @@ import {
   type PipelineRunResult,
 } from '@maestro/pipeline';
 import { createStateStore, type StateStore } from '@maestro/state';
-import { App, bridgeBusToStore, createTuiStore } from '@maestro/tui';
+import { App, createTuiStore } from '@maestro/tui';
 import { Command } from 'commander';
 import { render, type Instance } from 'ink';
 import { createElement } from 'react';
@@ -191,7 +191,6 @@ export function createRunCommand(options: RunCommandOptions = {}): Command {
 
       const bus = createEventBus();
       const tuiStore = createTuiStore();
-      bridgeBusToStore(bus, tuiStore);
       const stdoutIsTTY = options.stdoutIsTTY ?? process.stdout.isTTY;
       const commandExecutor = createTuiCommandExecutor({
         repoRoot,

@@ -2,7 +2,6 @@ import { createEventBus } from '@maestro/core';
 import { editSprintContract, resolveContractPath } from '@maestro/contract';
 import {
   App,
-  bridgeBusToStore,
   createTuiStore,
   playDemoEvents,
   resolveColorMode,
@@ -53,7 +52,6 @@ export function createTuiCommand(
 
       const bus = createEventBus();
       const store = createTuiStore({ colorMode });
-      bridgeBusToStore(bus, store);
 
       const repoRoot = cwd();
       const kbFiles = listMaestroFilesUnderRepo(repoRoot);

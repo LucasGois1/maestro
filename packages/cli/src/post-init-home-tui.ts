@@ -5,7 +5,6 @@ import { editSprintContract, resolveContractPath } from '@maestro/contract';
 import { createStateStore } from '@maestro/state';
 import {
   App,
-  bridgeBusToStore,
   createTuiStore,
   resolveColorMode,
   type TuiState,
@@ -31,7 +30,6 @@ export function mountPostInitHomeShell(options: {
   const colorMode = resolveColorMode({ args: [], env });
   const bus = createEventBus();
   const store = createTuiStore({ mode: 'idle', colorMode });
-  bridgeBusToStore(bus, store);
   const stateStore = createStateStore({ repoRoot: options.repoRoot });
   const kbFiles = listMaestroFilesUnderRepo(options.repoRoot);
   const commandExecutor = createTuiCommandExecutor({

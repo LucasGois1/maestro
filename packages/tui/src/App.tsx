@@ -1,5 +1,5 @@
 import { Box } from 'ink';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
 import type { EventBus } from '@maestro/core';
 
 import {
@@ -113,7 +113,7 @@ export function App({
     }
   }, [activeStore, colorMode]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!bus) {
       return;
     }

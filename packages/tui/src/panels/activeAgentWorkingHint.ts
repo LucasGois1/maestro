@@ -32,5 +32,24 @@ export function activeAgentWorkingHint(
         break;
     }
   }
-  return 'Agente a trabalhar…';
+  switch (agentId) {
+    case 'planner':
+      return 'Planeamento em curso…';
+    case 'architect':
+      return 'Arquitetura em curso…';
+    case 'generator':
+      return 'Geração em curso…';
+    case 'evaluator':
+      return 'Avaliação em curso…';
+    case 'merger':
+      return 'Integração em curso…';
+    case 'code-reviewer':
+      return 'Revisão de código em curso…';
+    case 'doc-gardener':
+      return 'Manutenção de documentação em curso…';
+    case 'discovery':
+      return 'Descoberta do repositório em curso…';
+    default:
+      return 'Agente a trabalhar…';
+  }
 }

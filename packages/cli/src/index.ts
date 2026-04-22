@@ -3,7 +3,7 @@ import { cwd } from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 import { createEventBus } from '@maestro/core';
-import { App, bridgeBusToStore, createTuiStore } from '@maestro/tui';
+import { App, createTuiStore } from '@maestro/tui';
 import { Command } from 'commander';
 import { render } from 'ink';
 import { createElement } from 'react';
@@ -42,7 +42,6 @@ type ExecuteCliFromProcessOptions = {
 function renderInkApp(_version: string, stdoutIsTTY: boolean) {
   const bus = createEventBus();
   const store = createTuiStore();
-  bridgeBusToStore(bus, store);
   const commandExecutor = createTuiCommandExecutor({
     repoRoot: cwd(),
     bus,

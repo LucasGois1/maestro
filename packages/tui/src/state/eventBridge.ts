@@ -29,6 +29,11 @@ const DEFAULT_DELTA_BUFFER_CHARS = 8_000;
 const DEFAULT_DECISION_BUFFER_SIZE = 200;
 const DEFAULT_LOG_BUFFER_SIZE = 120;
 
+/**
+ * Subscribes once to `bus` and mirrors events into `store`. When using the TUI
+ * `App` with the same `bus` and `store`, avoid calling this from the CLI as well:
+ * `App` already subscribes in a `useLayoutEffect` (double subscription duplicates log lines).
+ */
 export function bridgeBusToStore(
   bus: EventBus,
   store: TuiStore,
