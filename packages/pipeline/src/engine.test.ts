@@ -523,11 +523,10 @@ describe('runPipeline (happy path)', () => {
   it('binds agent workingDir to worktree and passes dual roots to generator input', async () => {
     const env = makeEnv();
     const wt = await mkdtemp(join(tmpdir(), 'maestro-pipeline-wt-'));
-    await mkdir(join(wt, '.maestro'), { recursive: true });
-    await writeFile(join(wt, '.maestro', 'ARCHITECTURE.md'), '# WT\n', 'utf8');
 
     const contexts: AgentContext[] = [];
     const generatorInputs: unknown[] = [];
+    const architectInputs: unknown[] = [];
 
     const executor: AgentExecutor = async ({
       definition,
@@ -535,6 +534,9 @@ describe('runPipeline (happy path)', () => {
       context,
     }) => {
       contexts.push(context);
+      if (definition.id === 'architect') {
+        architectInputs.push(input);
+      }
       if (definition.id === 'generator') {
         generatorInputs.push(input);
       }
@@ -581,6 +583,12 @@ describe('runPipeline (happy path)', () => {
       expect(generatorInputs[0]).toMatchObject({
         implementationRoot: wt,
         stateRepoRoot: repoRoot,
+      });
+
+      expect(architectInputs[0]).toMatchObject({
+        architecture: expect.stringContaining(
+          'Module boundaries and layers as documented.',
+        ),
       });
     } finally {
       await rm(wt, { recursive: true, force: true });

@@ -443,7 +443,7 @@ export async function runPipeline(
     await writePlanFile(options.repoRoot, options.runId, plan, maestroDir);
 
     const architectureDoc = await loadArchitectureDocument(
-      implementationRoot(options),
+      options.repoRoot,
       options.architecture,
       maestroDir,
     );
