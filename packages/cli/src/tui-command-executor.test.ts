@@ -248,6 +248,15 @@ describe('createTuiCommandExecutor', () => {
       providerDefaults: {},
       now: () => new Date('2026-05-01T12:00:00.000Z'),
     });
+    await store.update('infer-me', {
+      status: 'failed',
+      phase: 'planning',
+      failure: {
+        message: 'fixture',
+        at: 'planning',
+        failedAt: '2026-05-01T12:00:01.000Z',
+      },
+    });
 
     await expect(execute('resume')).resolves.toEqual({
       level: 'info',

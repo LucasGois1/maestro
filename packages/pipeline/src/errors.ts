@@ -27,3 +27,10 @@ export class PipelineRunNotFoundError extends Error {
     this.name = 'PipelineRunNotFoundError';
   }
 }
+
+export class PipelineResumeNotAllowedError extends Error {
+  constructor(runId: string, status: string) {
+    super(`Run "${runId}" cannot be resumed (status: ${status})`);
+    this.name = 'PipelineResumeNotAllowedError';
+  }
+}

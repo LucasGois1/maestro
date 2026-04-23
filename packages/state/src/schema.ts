@@ -26,7 +26,32 @@ export const PIPELINE_STAGES = [
 
 export type PipelineStage = (typeof PIPELINE_STAGES)[number];
 
+/** Estágio operacional onde ocorreu um erro (alinha com `PipelineStageName` em `@maestro/core`). */
+export const PIPELINE_FAILURE_AT = [
+  'discovering',
+  'planning',
+  'architecting',
+  'contracting',
+  'generating',
+  'evaluating',
+  'merging',
+] as const;
+
+export type PipelineFailureAt = (typeof PIPELINE_FAILURE_AT)[number];
+
+export const pipelineFailureAtSchema = z.enum(PIPELINE_FAILURE_AT);
+
 const isoString = z.iso.datetime();
+
+export const runFailureSchema = z
+  .object({
+    message: z.string().min(1),
+    at: pipelineFailureAtSchema,
+    failedAt: isoString,
+  })
+  .strict();
+
+export type RunFailure = z.output<typeof runFailureSchema>;
 
 export const runStateSchema = z
   .object({
@@ -42,6 +67,8 @@ export const runStateSchema = z
     lastUpdatedAt: isoString,
     pausedAt: isoString.optional(),
     completedAt: isoString.optional(),
+    /** Presente quando `status === 'failed'`; `null` limpa após retomada ou conclusão. */
+    failure: z.union([runFailureSchema, z.null()]).optional(),
     escalation: z
       .object({
         reason: z.string().min(1),

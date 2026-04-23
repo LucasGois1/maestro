@@ -12,6 +12,8 @@ export const FEEDBACK_DIR = 'feedback';
 export const STATE_FILE = 'state.json';
 export const META_FILE = 'meta.json';
 export const PLAN_FILE = 'plan.md';
+/** Snapshot JSON do `PlannerOutput` normalizado (retomada sem re-planear). */
+export const PLAN_SNAPSHOT_FILE = 'plan.snapshot.json';
 export const PROJECT_LOG_FILE = 'log.md';
 
 export type RunPathOptions = {
@@ -42,6 +44,19 @@ export function runMetaPath(opts: RunPathOptions): string {
 
 export function runPlanPath(opts: RunPathOptions): string {
   return join(runRoot(opts), PLAN_FILE);
+}
+
+export function runPlanSnapshotPath(opts: RunPathOptions): string {
+  return join(runRoot(opts), PLAN_SNAPSHOT_FILE);
+}
+
+export function sprintOutcomeCheckpointPath(
+  opts: RunPathOptions & { readonly sprintOneBased: number },
+): string {
+  return join(
+    runCheckpointsDir(opts),
+    `sprint-${opts.sprintOneBased.toString()}-outcome.json`,
+  );
 }
 
 export function runContractsDir(opts: RunPathOptions): string {

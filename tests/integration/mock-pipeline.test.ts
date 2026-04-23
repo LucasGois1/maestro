@@ -279,4 +279,65 @@ describe('DSFT-97 integration fixtures with mocked LLMs', () => {
       await fixture.cleanup();
     }
   });
+
+  it('resume after generator failure skips planner when plan snapshot exists', async () => {
+    const fixture = await createRunFixture({
+      runId: 'gen-fail-resume',
+      prompt: 'ship slice',
+    });
+    let generatorFailures = 0;
+    let plannerCallsOnResume = 0;
+    try {
+      await expect(
+        runPipeline({
+          runId: fixture.runId,
+          prompt: fixture.prompt,
+          branch: fixture.branch,
+          worktreePath: fixture.repoRoot,
+          repoRoot: fixture.repoRoot,
+          store: fixture.store,
+          bus: fixture.bus,
+          config: fixture.config,
+          executor: executorFor({
+            planner: () => plannerOutput(1),
+            architect: architectOk,
+            generator: (input) => {
+              generatorFailures += 1;
+              if (generatorFailures === 1) {
+                throw new Error('generator unavailable');
+              }
+              return generatorOk(input);
+            },
+            evaluator: evaluatorPassed,
+            merger: () => mergerOk(fixture.branch),
+          }),
+        }),
+      ).rejects.toThrow('generator unavailable');
+
+      expect((await fixture.store.load(fixture.runId))?.status).toBe('failed');
+
+      const result = await resumePipeline({
+        repoRoot: fixture.repoRoot,
+        store: fixture.store,
+        bus: createEventBus(),
+        config: fixture.config,
+        runId: fixture.runId,
+        executor: executorFor({
+          planner: () => {
+            plannerCallsOnResume += 1;
+            throw new Error('planner must not run on resume');
+          },
+          architect: architectOk,
+          generator: generatorOk,
+          evaluator: evaluatorPassed,
+          merger: () => mergerOk(fixture.branch),
+        }),
+      });
+
+      expect(plannerCallsOnResume).toBe(0);
+      expect(result.state.status).toBe('completed');
+    } finally {
+      await fixture.cleanup();
+    }
+  });
 });

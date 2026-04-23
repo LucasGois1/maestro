@@ -47,4 +47,19 @@ describe('runStateSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('accepts failed status with failure payload and operational phase', () => {
+    const parsed = runStateSchema.parse({
+      ...valid,
+      status: 'failed',
+      phase: 'generating',
+      failure: {
+        message: 'provider error',
+        at: 'generating',
+        failedAt: '2026-04-20T00:05:00.000Z',
+      },
+    });
+    expect(parsed.failure?.at).toBe('generating');
+    expect(parsed.phase).toBe('generating');
+  });
 });

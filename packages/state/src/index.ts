@@ -1,11 +1,16 @@
 export const STATE_PACKAGE_NAME = '@maestro/state';
 
 export {
+  PIPELINE_FAILURE_AT,
   PIPELINE_STAGES,
   RUN_STATUSES,
+  pipelineFailureAtSchema,
+  runFailureSchema,
   runMetaSchema,
   runStateSchema,
+  type PipelineFailureAt,
   type PipelineStage,
+  type RunFailure,
   type RunMeta,
   type RunState,
   type RunStateInput,
@@ -22,6 +27,7 @@ export {
   MAESTRO_DIR,
   META_FILE,
   PLAN_FILE,
+  PLAN_SNAPSHOT_FILE,
   PROJECT_LOG_FILE,
   RUNS_DIR,
   STATE_FILE,
@@ -38,6 +44,8 @@ export {
   runLogsDir,
   runMetaPath,
   runPlanPath,
+  runPlanSnapshotPath,
+  sprintOutcomeCheckpointPath,
   runRoot,
   runStatePath,
   runsRoot,

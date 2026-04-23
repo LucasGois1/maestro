@@ -4,6 +4,7 @@ import { ConfigValidationError, type LoadedConfig } from '@maestro/config';
 import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import { createEventBus, type EventBus } from '@maestro/core';
 import {
+  PipelineResumeNotAllowedError,
   PipelineRunNotFoundError,
   resumePipeline,
   type PipelineRunResult,
@@ -129,6 +130,8 @@ export function createResumeCommand(
         }
       } catch (error) {
         if (error instanceof PipelineRunNotFoundError) {
+          io.stderr(error.message);
+        } else if (error instanceof PipelineResumeNotAllowedError) {
           io.stderr(error.message);
         } else {
           io.stderr((error as Error).message);

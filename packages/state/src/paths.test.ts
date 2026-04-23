@@ -14,7 +14,9 @@ import {
   runLogsDir,
   runMetaPath,
   runPlanPath,
+  runPlanSnapshotPath,
   runRoot,
+  sprintOutcomeCheckpointPath,
   runStatePath,
   runsRoot,
   selfEvalPath,
@@ -65,6 +67,12 @@ describe('path helpers', () => {
   it('resolves run metadata, plan, logs, checkpoints, and feedback dirs', () => {
     expect(runMetaPath(opts)).toBe('/repo/.maestro/runs/r1/meta.json');
     expect(runPlanPath(opts)).toBe('/repo/.maestro/runs/r1/plan.md');
+    expect(runPlanSnapshotPath(opts)).toBe(
+      '/repo/.maestro/runs/r1/plan.snapshot.json',
+    );
+    expect(sprintOutcomeCheckpointPath({ ...opts, sprintOneBased: 2 })).toBe(
+      '/repo/.maestro/runs/r1/checkpoints/sprint-2-outcome.json',
+    );
     expect(runLogsDir(opts)).toBe('/repo/.maestro/runs/r1/logs');
     expect(runCheckpointsDir(opts)).toBe('/repo/.maestro/runs/r1/checkpoints');
     expect(runFeedbackDir(opts)).toBe('/repo/.maestro/runs/r1/feedback');

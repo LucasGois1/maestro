@@ -15,6 +15,7 @@ import type {
   MergerModelOutput,
   PlannerModelOutput,
 } from '@maestro/agents';
+import { normalizePlannerModelOutput } from '@maestro/agents';
 
 import {
   DEFAULT_MAX_PLAN_REPLANS,
@@ -23,6 +24,7 @@ import {
 } from './engine.js';
 import { PipelineEscalationError, PipelinePauseError } from './errors.js';
 import type { AgentExecutor } from './executor.js';
+import { serializePlanMarkdown } from './plan-markdown.js';
 import { resumePipeline } from './resume.js';
 
 let repoRoot: string;
@@ -902,5 +904,99 @@ describe('resumePipeline', () => {
         repoRoot,
       }),
     ).rejects.toThrow(/No run/);
+  });
+
+  it('resume with plan snapshot skips planner and architect when sprint artifacts exist', async () => {
+    const env = makeEnv();
+    const runId = 'r-snapshot-resume';
+    const oneSprintPlanner: PlannerModelOutput = {
+      escalationReason: null,
+      feature: 'Solo',
+      overview: 'Single sprint resume fixture.',
+      userStories: [{ id: 1, role: 'user', action: 'x', value: 'y' }],
+      aiFeatures: [],
+      sprints: [
+        {
+          idx: 1,
+          name: 'Only',
+          objective: 'Only sprint',
+          userStoryIds: [1],
+          dependsOn: [],
+          complexity: 'low',
+          keyFeatures: ['a'],
+        },
+      ],
+    };
+    const plan = normalizePlannerModelOutput(oneSprintPlanner, {
+      runId,
+      prompt: 'resume me',
+    });
+    const runDir = join(repoRoot, '.maestro', 'runs', runId);
+    await mkdir(join(runDir, 'contracts'), { recursive: true });
+    await mkdir(join(runDir, 'design-notes'), { recursive: true });
+    await writeFile(join(runDir, 'plan.snapshot.json'), JSON.stringify(plan), 'utf8');
+    await writeFile(
+      join(runDir, 'plan.md'),
+      serializePlanMarkdown(plan),
+      'utf8',
+    );
+    await writeFile(
+      join(runDir, 'contracts', 'sprint-1.md'),
+      '---\nsprint: 1\n---\nbody',
+      'utf8',
+    );
+    await writeFile(
+      join(runDir, 'design-notes', 'design-notes-sprint-1.md'),
+      '# Design notes sprint 1\n',
+      'utf8',
+    );
+
+    await env.store.create({
+      runId,
+      branch: 'maestro/demo',
+      worktreePath: repoRoot,
+      prompt: 'resume me',
+      userAgent: 'test',
+      providerDefaults: {},
+    });
+    await env.store.update(runId, {
+      status: 'failed',
+      phase: 'generating',
+      failure: {
+        message: 'generator boom',
+        at: 'generating',
+        failedAt: new Date().toISOString(),
+      },
+    });
+
+    let plannerCalls = 0;
+    let architectCalls = 0;
+    const executor = buildExecutor({
+      planner: () => {
+        plannerCalls += 1;
+        throw new Error('planner should not run');
+      },
+      architect: () => {
+        architectCalls += 1;
+        throw new Error('architect should not run');
+      },
+      generator: (input) => mockGeneratorOk(input),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () => mockMergerModelOutput('maestro/demo'),
+    });
+
+    const resumeBus = createEventBus();
+    const result = await resumePipeline({
+      runId,
+      store: env.store,
+      bus: resumeBus,
+      config: env.config,
+      executor,
+      repoRoot,
+    });
+
+    expect(plannerCalls).toBe(0);
+    expect(architectCalls).toBe(0);
+    expect(result.state.status).toBe('completed');
   });
 });

@@ -217,6 +217,10 @@ export {
   type PlannerOutput,
   type PlannerPipelineSprint,
 } from './planner/normalize.js';
+export {
+  plannerOutputSnapshotSchema,
+  type PlannerOutputSnapshot,
+} from './planner/planner-output-snapshot.schema.js';
 
 export function registerBuiltInAgents(registry: {
   register(def: AnyAgentDefinition): void;

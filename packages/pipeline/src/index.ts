@@ -18,5 +18,6 @@ export { defaultAgentExecutor, type AgentExecutor } from './executor.js';
 export {
   PipelineEscalationError,
   PipelinePauseError,
+  PipelineResumeNotAllowedError,
   PipelineRunNotFoundError,
 } from './errors.js';

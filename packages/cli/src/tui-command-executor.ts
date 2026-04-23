@@ -200,7 +200,7 @@ async function executeResume(options: {
 
     let runId: string | undefined = explicitRunId;
     if (runId === undefined) {
-      const last = await options.store.latestStarted();
+      const last = await options.store.latestResumable();
       if (!last) {
         return {
           level: 'error',

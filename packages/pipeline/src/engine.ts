@@ -12,6 +12,7 @@ import {
   mergerInputSchema,
   mergerModelOutputSchema,
   normalizePlannerModelOutput,
+  plannerOutputSnapshotSchema,
   plannerAgent,
   renderArchitectNotesMarkdown,
   type AgentContext,
@@ -39,9 +40,13 @@ import {
   handoffPath,
   maestroRoot,
   runPlanPath,
+  runPlanSnapshotPath,
+  sprintOutcomeCheckpointPath,
   writeCompletedExecPlan,
   writeHandoff,
   writeSprintSelfEval,
+  type PipelineFailureAt,
+  type PipelineStage,
   type RunState,
   type StateStore,
 } from '@maestro/state';
@@ -172,6 +177,208 @@ function slugifyForExecPlan(feature: string, runId: string): string {
   return (slug.length > 0 ? slug : 'exec-plan').slice(0, 120);
 }
 
+function canAutoResumeFromCheckpoint(state: RunState): boolean {
+  if (state.status === 'failed') return true;
+  if (state.status === 'paused' && state.phase !== 'escalated') return true;
+  return false;
+}
+
+function mapRunPhaseToFailureAt(phase: PipelineStage | undefined): PipelineFailureAt {
+  switch (phase) {
+    case 'discovering':
+    case 'planning':
+    case 'architecting':
+    case 'contracting':
+    case 'generating':
+    case 'evaluating':
+    case 'merging':
+      return phase;
+    default:
+      return 'planning';
+  }
+}
+
+function preservedPipelinePhaseAfterFailure(
+  current: RunState | null,
+  at: PipelineFailureAt,
+): PipelineStage {
+  if (!current) return at;
+  const p = current.phase;
+  if (
+    p === 'idle' ||
+    p === 'discovering' ||
+    p === 'planning' ||
+    p === 'architecting' ||
+    p === 'contracting' ||
+    p === 'generating' ||
+    p === 'evaluating' ||
+    p === 'merging'
+  ) {
+    return p;
+  }
+  return at;
+}
+
+function pipelineStageNameForFailureEvent(
+  phase: PipelineStage | undefined,
+  failure: RunState['failure'],
+): PipelineStageName {
+  if (failure && typeof failure === 'object' && 'at' in failure) {
+    return failure.at;
+  }
+  return mapRunPhaseToFailureAt(phase);
+}
+
+async function readOptionalUtf8(filePath: string): Promise<string | undefined> {
+  try {
+    return await readFile(filePath, 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
+async function writePlanSnapshotFile(
+  repoRoot: string,
+  runId: string,
+  plan: PlannerOutput,
+  maestroDir: string | undefined,
+): Promise<void> {
+  const path = runPlanSnapshotPath({
+    repoRoot,
+    runId,
+    ...(maestroDir !== undefined ? { maestroDir } : {}),
+  });
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, `${JSON.stringify(plan)}\n`, 'utf8');
+}
+
+async function tryLoadPlanSnapshot(
+  repoRoot: string,
+  runId: string,
+  maestroDir: string | undefined,
+): Promise<PlannerOutput | null> {
+  const path = runPlanSnapshotPath({
+    repoRoot,
+    runId,
+    ...(maestroDir !== undefined ? { maestroDir } : {}),
+  });
+  const raw = await readOptionalUtf8(path);
+  if (raw === undefined || raw.trim().length === 0) return null;
+  try {
+    const parsed = plannerOutputSnapshotSchema.parse(JSON.parse(raw) as unknown);
+    return parsed as PlannerOutput;
+  } catch {
+    return null;
+  }
+}
+
+async function handoffExistsForSprint(
+  repoRoot: string,
+  runId: string,
+  sprintOneBased: number,
+  maestroDir: string | undefined,
+): Promise<boolean> {
+  const path = handoffPath({
+    repoRoot,
+    runId,
+    sprint: sprintOneBased,
+    ...(maestroDir !== undefined ? { maestroDir } : {}),
+  });
+  const text = await readOptionalUtf8(path);
+  return text !== undefined && text.trim().length > 0;
+}
+
+async function firstIncompleteSprintIndex(
+  repoRoot: string,
+  runId: string,
+  plan: PlannerOutput,
+  maestroDir: string | undefined,
+): Promise<number> {
+  for (let sprintIdx = 0; sprintIdx < plan.sprints.length; sprintIdx += 1) {
+    const exists = await handoffExistsForSprint(
+      repoRoot,
+      runId,
+      sprintIdx + 1,
+      maestroDir,
+    );
+    if (!exists) return sprintIdx;
+  }
+  return plan.sprints.length;
+}
+
+async function sprintContractAndDesignNotesExist(
+  repoRoot: string,
+  runId: string,
+  sprintIdx: number,
+  maestroDir: string | undefined,
+): Promise<boolean> {
+  const root = maestroRoot(repoRoot, maestroDir);
+  const contractPath = join(
+    root,
+    'runs',
+    runId,
+    'contracts',
+    `sprint-${(sprintIdx + 1).toString()}.md`,
+  );
+  const designNotesPath = join(
+    root,
+    'runs',
+    runId,
+    'design-notes',
+    `design-notes-sprint-${(sprintIdx + 1).toString()}.md`,
+  );
+  const c = await readOptionalUtf8(contractPath);
+  const d = await readOptionalUtf8(designNotesPath);
+  return (
+    c !== undefined &&
+    c.trim().length > 0 &&
+    d !== undefined &&
+    d.trim().length > 0
+  );
+}
+
+async function writeSprintOutcomeCheckpoint(
+  options: PipelineRunOptions,
+  sprintOneBased: number,
+  outcome: SprintOutcomeAccum,
+  maestroDir: string | undefined,
+): Promise<void> {
+  const path = sprintOutcomeCheckpointPath({
+    repoRoot: options.repoRoot,
+    runId: options.runId,
+    sprintOneBased,
+    ...(maestroDir !== undefined ? { maestroDir } : {}),
+  });
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, `${JSON.stringify(outcome)}\n`, 'utf8');
+}
+
+async function loadCompletedSprintOutcomes(
+  options: PipelineRunOptions,
+  firstIncompleteSprintIdx: number,
+  maestroDir: string | undefined,
+): Promise<SprintOutcomeAccum[]> {
+  const out: SprintOutcomeAccum[] = [];
+  for (let i = 0; i < firstIncompleteSprintIdx; i += 1) {
+    const path = sprintOutcomeCheckpointPath({
+      repoRoot: options.repoRoot,
+      runId: options.runId,
+      sprintOneBased: i + 1,
+      ...(maestroDir !== undefined ? { maestroDir } : {}),
+    });
+    const raw = await readOptionalUtf8(path);
+    if (raw === undefined || raw.trim().length === 0) {
+      return [];
+    }
+    try {
+      out.push(JSON.parse(raw) as SprintOutcomeAccum);
+    } catch {
+      return [];
+    }
+  }
+  return out;
+}
+
 function renderCompletedExecPlanMarkdown(options: {
   readonly runId: string;
   readonly branch: string;
@@ -257,6 +464,7 @@ async function writePlanFile(
   const path = join(repoRoot, maestroDir, 'runs', runId, 'plan.md');
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, serializePlanMarkdown(plan), 'utf8');
+  await writePlanSnapshotFile(repoRoot, runId, plan, maestroDir);
 }
 
 async function writeInitialContract(
@@ -439,8 +647,54 @@ export async function runPipeline(
   try {
     const maxPlanReplans = options.maxPlanReplans ?? DEFAULT_MAX_PLAN_REPLANS;
     let planReplansUsed = 0;
-    let plan = await runPlannerPhase(options, executor, undefined);
-    await writePlanFile(options.repoRoot, options.runId, plan, maestroDir);
+    const didAutoResume =
+      options.resume === true &&
+      existing !== null &&
+      canAutoResumeFromCheckpoint(existing);
+
+    let plan: PlannerOutput;
+    let startSprintIdx = 0;
+
+    if (didAutoResume) {
+      const snapped = await tryLoadPlanSnapshot(
+        options.repoRoot,
+        options.runId,
+        maestroDir,
+      );
+      if (snapped) {
+        plan = snapped;
+        await options.store.update(options.runId, {
+          status: 'running',
+          failure: null,
+        });
+        startSprintIdx = await firstIncompleteSprintIndex(
+          options.repoRoot,
+          options.runId,
+          plan,
+          maestroDir,
+        );
+        const loaded = await loadCompletedSprintOutcomes(
+          options,
+          startSprintIdx,
+          maestroDir,
+        );
+        if (loaded.length === startSprintIdx) {
+          for (const row of loaded) {
+            sprintOutcomes.push(row);
+          }
+        } else {
+          plan = await runPlannerPhase(options, executor, undefined);
+          await writePlanFile(options.repoRoot, options.runId, plan, maestroDir);
+          startSprintIdx = 0;
+        }
+      } else {
+        plan = await runPlannerPhase(options, executor, undefined);
+        await writePlanFile(options.repoRoot, options.runId, plan, maestroDir);
+      }
+    } else {
+      plan = await runPlannerPhase(options, executor, undefined);
+      await writePlanFile(options.repoRoot, options.runId, plan, maestroDir);
+    }
 
     const architectureDoc = await loadArchitectureDocument(
       options.repoRoot,
@@ -448,8 +702,15 @@ export async function runPipeline(
       maestroDir,
     );
 
+    let replanLoopPass = 0;
     replanLoop: for (;;) {
-      for (let sprintIdx = 0; sprintIdx < plan.sprints.length; sprintIdx += 1) {
+      const sprintLoopStart = replanLoopPass === 0 ? startSprintIdx : 0;
+      replanLoopPass += 1;
+      for (
+        let sprintIdx = sprintLoopStart;
+        sprintIdx < plan.sprints.length;
+        sprintIdx += 1
+      ) {
       assertNotAborted(options.abortSignal, 'architecting');
       const sprint = plan.sprints[sprintIdx];
       if (!sprint) continue;
@@ -460,7 +721,21 @@ export async function runPipeline(
         totalSprints: plan.sprints.length,
       });
 
-      // architecting
+      const resumeFirstIncomplete =
+        didAutoResume &&
+        sprintIdx === startSprintIdx &&
+        replanLoopPass === 1;
+      const skipArchitectAndContract =
+        resumeFirstIncomplete &&
+        (await sprintContractAndDesignNotesExist(
+          options.repoRoot,
+          options.runId,
+          sprintIdx,
+          maestroDir,
+        ));
+
+      // architecting + contracting (skipped when resuming a sprint with artifacts on disk)
+      if (!skipArchitectAndContract) {
       await updatePhase(options, 'architecting', {
         currentSprintIdx: sprintIdx,
       });
@@ -576,6 +851,7 @@ export async function runPipeline(
         sprint,
         maestroDir,
       );
+      }
 
       // generating + evaluating with retry budget
       const root = maestroRoot(options.repoRoot, maestroDir);
@@ -783,6 +1059,18 @@ export async function runPipeline(
         evaluator: evaluatorOutput,
       });
 
+      await writeSprintOutcomeCheckpoint(
+        options,
+        sprintIdx + 1,
+        {
+          sprintIdx,
+          attempts,
+          generator: parsedGenerator,
+          evaluator: evaluatorOutput,
+        },
+        maestroDir,
+      );
+
       await writeHandoff({
         repoRoot: options.repoRoot,
         runId: options.runId,
@@ -951,6 +1239,7 @@ export async function runPipeline(
       status: 'completed',
       phase: 'completed',
       completedAt,
+      failure: null,
     });
 
     options.bus.emit({
@@ -982,16 +1271,30 @@ export async function runPipeline(
 
     const message = error instanceof Error ? error.message : String(error);
     const current = await options.store.load(options.runId);
-    const at = (current?.phase ?? 'planning') as PipelineStageName;
+    const failureAt = mapRunPhaseToFailureAt(current?.phase);
+    const eventAt = pipelineStageNameForFailureEvent(
+      current?.phase,
+      current?.failure,
+    );
+    const preservedPhase = preservedPipelinePhaseAfterFailure(
+      current,
+      failureAt,
+    );
+    const failedAt = new Date().toISOString();
     await options.store.update(options.runId, {
       status: 'failed',
-      phase: 'failed',
+      phase: preservedPhase,
+      failure: {
+        message,
+        at: failureAt,
+        failedAt,
+      },
     });
     options.bus.emit({
       type: 'pipeline.failed',
       runId: options.runId,
       error: message,
-      at,
+      at: eventAt,
     });
     throw error;
   }
@@ -1018,14 +1321,6 @@ function extractChangedFiles(generatorOutput: unknown): readonly string[] {
     return list.filter((f): f is string => typeof f === 'string');
   }
   return [];
-}
-
-async function readOptionalUtf8(filePath: string): Promise<string | undefined> {
-  try {
-    return await readFile(filePath, 'utf8');
-  } catch {
-    return undefined;
-  }
 }
 
 function extractDefaults(

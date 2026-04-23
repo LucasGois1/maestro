@@ -111,6 +111,36 @@ describe('StateStore', () => {
     expect((await s.latestStarted())?.runId).toBe('newer');
   });
 
+  it('latestResumable() prefers failed/paused runs and ignores completed', async () => {
+    const s = createStateStore({ repoRoot });
+    await s.create({
+      ...baseOpts,
+      runId: 'done',
+      now: () => new Date('2026-04-22T00:00:00.000Z'),
+    });
+    await s.update('done', {
+      status: 'completed',
+      phase: 'completed',
+      completedAt: '2026-04-22T00:01:00.000Z',
+    });
+    await s.create({
+      ...baseOpts,
+      runId: 'boom',
+      now: () => new Date('2026-04-21T00:00:00.000Z'),
+    });
+    await s.update('boom', {
+      status: 'failed',
+      phase: 'generating',
+      failure: {
+        message: 'x',
+        at: 'generating',
+        failedAt: '2026-04-21T00:02:00.000Z',
+      },
+    });
+
+    expect((await s.latestResumable())?.runId).toBe('boom');
+  });
+
   it('delete() removes the run directory', async () => {
     const s = store();
     await s.create(baseOpts);

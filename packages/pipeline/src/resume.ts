@@ -1,6 +1,9 @@
 import type { StateStore } from '@maestro/state';
 
-import { PipelineRunNotFoundError } from './errors.js';
+import {
+  PipelineResumeNotAllowedError,
+  PipelineRunNotFoundError,
+} from './errors.js';
 import {
   runPipeline,
   type PipelineRunOptions,
@@ -21,10 +24,14 @@ export async function resumePipeline(
   const target =
     options.runId !== undefined
       ? await store.load(options.runId)
-      : await store.latestStarted();
+      : await store.latestResumable();
 
   if (!target) {
     throw new PipelineRunNotFoundError(options.runId ?? '(latest)');
+  }
+
+  if (target.status === 'completed' || target.status === 'canceled') {
+    throw new PipelineResumeNotAllowedError(target.runId, target.status);
   }
 
   return runPipeline({
