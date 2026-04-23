@@ -17,6 +17,9 @@ describe('configSchema', () => {
     expect(result.defaults['code-reviewer'].model).toBe(
       'anthropic/claude-sonnet-4-6',
     );
+    expect(result.defaults['sensor-setup'].model).toBe(
+      'anthropic/claude-sonnet-4-6',
+    );
   });
 
   it('accepts a fully populated config', () => {

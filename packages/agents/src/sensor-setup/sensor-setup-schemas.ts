@@ -1,19 +1,24 @@
 import { z } from 'zod';
 
+/**
+ * Strict JSON-schema shape for provider structured output: every property must be
+ * listed in `required` (OpenAI / response_format). No Zod `.default()` on object
+ * fields — defaults are applied after parse in callers when needed.
+ */
 export const sensorSetupCandidateSchema = z
   .object({
     id: z.string().min(1).max(64),
     command: z.string().min(1),
-    args: z.array(z.string()).default([]),
-    cwd: z.string().min(1).optional(),
-    onFail: z.enum(['block', 'warn']).default('block'),
-    rationale: z.string().max(500).default(''),
+    args: z.array(z.string()),
+    cwd: z.union([z.string().min(1), z.null()]),
+    onFail: z.enum(['block', 'warn']),
+    rationale: z.string().max(500),
   })
   .strict();
 
 export const sensorSetupAgentOutputSchema = z
   .object({
-    candidates: z.array(sensorSetupCandidateSchema).max(12).default([]),
+    candidates: z.array(sensorSetupCandidateSchema).max(12),
   })
   .strict();
 

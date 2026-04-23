@@ -175,5 +175,9 @@ export {
   createFrameThrottle,
   useRenderDebounce,
 } from './hooks/useRenderDebounce.js';
+export {
+  useSpinnerFrame,
+  type UseSpinnerFrameOptions,
+} from './hooks/useSpinnerFrame.js';
 
 export { DEMO_SCRIPT, playDemoEvents } from './fixtures/demo-events.js';

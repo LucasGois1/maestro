@@ -104,10 +104,18 @@ function mergeSectionedMarkdown(
   return parts.join('\n\n');
 }
 
+/**
+ * Sectioned markdown as either one string or a fixed-key object (no z.record — OpenAI
+ * structured outputs reject JSON Schema `propertyNames` from record types).
+ */
 function sectionedMarkdownField(preferredOrder: readonly string[]) {
-  const recordToMd = z
-    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
-    .transform((obj) => {
+  const shape = Object.fromEntries(
+    preferredOrder.map((key) => [key, z.string()] as [string, z.ZodString]),
+  ) as z.ZodRawShape;
+  const objectToMd = z
+    .object(shape)
+    .strict()
+    .transform((obj: Record<string, unknown>) => {
       const map: Record<string, string> = {};
       for (const [k, v] of Object.entries(obj)) {
         map[k] = typeof v === 'string' ? v : String(v);
@@ -116,7 +124,7 @@ function sectionedMarkdownField(preferredOrder: readonly string[]) {
     })
     .pipe(z.string().min(1));
 
-  return z.union([z.string().min(1), recordToMd]);
+  return z.union([z.string().min(1), objectToMd]);
 }
 
 const discoveryOutputSchema = z.object({
@@ -262,7 +270,7 @@ export const discoveryAgent: AgentDefinition<
   role: 'background',
   systemPrompt: `You are the Maestro Discovery agent. Given structured repo metadata and small file samples, produce JSON only (no markdown fences) with keys "agentsMd" and "architectureMd".
 
-Prefer each value as a single markdown STRING (full document body). If you structure by section instead, you may use a JSON object whose keys are section titles and values are markdown strings for that section — both shapes are accepted.
+Prefer each value as a single markdown STRING (full document body). If you structure by section instead, use a JSON object with exactly these string keys (use empty string \"\" for a section you skip): for agentsMd — Header, Repo Map, Docs, Essential Commands, Critical Conventions, Escalation Path; for architectureMd — Bird's Eye View, Code Map, Cross-Cutting Concerns, Module Boundaries, Data Flow.
 
 Do not put markdown fenced code blocks (triple backticks) inside JSON string values — they break JSON escaping. Use indented lines or one-line shell examples instead.
 

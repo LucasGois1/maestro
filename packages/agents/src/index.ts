@@ -78,6 +78,7 @@ export { PLANNER_SYSTEM_PROMPT } from './planner/system-prompt.js';
 export {
   createArchitectToolSet,
   createPlannerToolSet,
+  createSensorSetupToolSet,
   summarizeDependencies,
 } from './repo-tools.js';
 export {

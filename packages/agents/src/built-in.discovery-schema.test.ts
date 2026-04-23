@@ -17,10 +17,17 @@ describe('discoveryOutputSchema', () => {
       agentsMd: {
         Header: '# AGENTS.md\n\n## Repo Map\n- Root',
         'Repo Map': 'unexpected extra',
+        Docs: '',
+        'Essential Commands': '',
+        'Critical Conventions': '',
+        'Escalation Path': '',
       },
       architectureMd: {
         "Bird's Eye View": 'One paragraph.',
         'Code Map': 'Packages listed here.',
+        'Cross-Cutting Concerns': '',
+        'Module Boundaries': '',
+        'Data Flow': '',
       },
     });
     expect(out.agentsMd).toContain('# AGENTS.md');

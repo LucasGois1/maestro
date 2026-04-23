@@ -5,10 +5,16 @@ import type {
 } from '@ai-sdk/provider';
 import { createEventBus, type AgentEvent } from '@maestro/core';
 import { MockLanguageModelV3, simulateReadableStream } from 'ai/test';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { DEFAULT_CONFIG } from '@maestro/config';
 import { z } from 'zod';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AgentContext, AgentDefinition } from './definition.js';
+import { sensorSetupAgent } from './sensor-setup/sensor-setup-agent.js';
 import {
   AgentOutputParseError,
   AgentValidationError,
@@ -197,5 +203,38 @@ describe('runAgent', () => {
       }),
     ).rejects.toThrow();
     expect(onError).toHaveBeenCalledOnce();
+  });
+
+  it('runs sensor-setup with tool loop and accepts structured JSON output', async () => {
+    const bus = createEventBus();
+    const dir = await mkdtemp(join(tmpdir(), 'maestro-sensor-agent-'));
+    try {
+      await writeFile(join(dir, 'README.md'), '# hi', 'utf8');
+      const input = {
+        repoRoot: dir,
+        stackKind: 'unknown',
+        stackMarkers: [] as string[],
+        stackHintsJson: '{}',
+        topLevelNames: ['README.md'],
+        packageJsonScriptsJson: null as string | null,
+        heuristicSummary: '(none)',
+      };
+      const result = await runAgent({
+        definition: sensorSetupAgent,
+        input,
+        context: {
+          agentId: 'sensor-setup',
+          runId: 't',
+          workingDir: dir,
+          metadata: {},
+        },
+        bus,
+        model: mockModel('{"candidates":[]}'),
+        config: DEFAULT_CONFIG,
+      });
+      expect(result.output).toEqual({ candidates: [] });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -1,8 +1,8 @@
 import type { MaestroConfig } from '@maestro/config';
-import { runSensorCandidateInference } from '@maestro/discovery';
 import type { KBManager } from '@maestro/kb';
 import { loadSensorsFile } from '@maestro/sensors';
 
+import { runSensorCandidateInferenceWithProgressInk } from './init-sensor-inference-wait.js';
 import { runInitSensorsWizard } from './init-sensors-wizard.js';
 
 type Io = {
@@ -52,17 +52,24 @@ export async function runSensorSetupAfterKbInit(options: {
   }
 
   const useLlm = options.flags.ai !== false;
-  const { candidates } = await runSensorCandidateInference({
+  const { candidates, llmWarning } = await runSensorCandidateInferenceWithProgressInk({
     repoRoot: options.repoRoot,
     config: options.config,
     useLlm,
+    env: process.env,
   });
+
+  if (llmWarning !== undefined) {
+    options.io.stderr(`AI sensor suggestions unavailable: ${llmWarning}`);
+  }
 
   const existing = await loadSensorsFile({ repoRoot: options.repoRoot });
   const wizard = await runInitSensorsWizard({
+    repoRoot: options.repoRoot,
     candidates,
     initialSensors: existing.sensors,
     env: process.env,
+    ...(llmWarning !== undefined ? { llmWarning } : {}),
   });
 
   if (wizard.kind === 'abort') {

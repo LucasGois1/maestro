@@ -8,6 +8,7 @@ import { runComputationalDiscovery } from './computational.js';
 import {
   buildCatalogSensorCandidates,
   buildHeuristicSensorCandidates,
+  mergeSensorCandidateLayers,
 } from './sensor-candidates.js';
 
 let repoRoot: string;
@@ -60,5 +61,64 @@ describe('buildCatalogSensorCandidates', () => {
       'sonar-scanner',
     ]);
     expect(list.every((c) => c.onFail === 'warn')).toBe(true);
+  });
+});
+
+describe('mergeSensorCandidateLayers', () => {
+  it('prefers LLM over heuristic for the same id', () => {
+    const merged = mergeSensorCandidateLayers([
+      [
+        {
+          id: 'test',
+          command: 'pnpm',
+          args: ['run', 'test'],
+          onFail: 'block',
+          rationale: 'from llm',
+          source: 'llm',
+        },
+      ],
+      [
+        {
+          id: 'test',
+          command: 'npm',
+          args: ['run', 'test'],
+          onFail: 'block',
+          rationale: 'from heuristic',
+          source: 'heuristic',
+        },
+      ],
+    ]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.command).toBe('pnpm');
+    expect(merged[0]?.source).toBe('llm');
+  });
+
+  it('prefers heuristic over catalog for the same id', () => {
+    const merged = mergeSensorCandidateLayers([
+      [],
+      [
+        {
+          id: 'semgrep-auto',
+          command: 'semgrep',
+          args: ['check', '.'],
+          onFail: 'block',
+          rationale: 'heuristic override shape',
+          source: 'heuristic',
+        },
+      ],
+      [
+        {
+          id: 'semgrep-auto',
+          command: 'semgrep',
+          args: ['--config', 'auto'],
+          onFail: 'warn',
+          rationale: 'catalog',
+          source: 'catalog',
+        },
+      ],
+    ]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.source).toBe('heuristic');
+    expect(merged[0]?.args).toEqual(['check', '.']);
   });
 });

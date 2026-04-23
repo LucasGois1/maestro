@@ -316,3 +316,69 @@ export function createArchitectToolSet(
 
   return { ...base, readFile, getDependencies } as ToolSet;
 }
+
+/**
+ * Read-only repo tools for the sensor-setup agent (`maestro init`): discover build/test
+ * commands from manifests, Makefiles, CI, etc. No shell execution.
+ */
+export function createSensorSetupToolSet(repoRoot: string): ToolSet {
+  const listDirectory = tool({
+    description:
+      'List files under a path relative to the repository root (limited depth; skips node_modules, .git, dist).',
+    inputSchema: listDirectoryInput,
+    execute: async ({ relativePath: rel, maxDepth: md }) => {
+      const relNorm = (rel ?? '').trim().replace(/^[/\\]+/u, '');
+      const maxDepth = md ?? 3;
+      try {
+        const base = resolvePathUnderRepo(repoRoot, relNorm);
+        const out: string[] = [];
+        await listDirRecursive(base, relNorm, maxDepth, 0, out);
+        out.sort((a, b) => a.localeCompare(b));
+        const lines = out.slice(0, 400);
+        const suffix =
+          out.length > 400
+            ? `\n… (${out.length.toString()} files, truncated)`
+            : '';
+        return lines.length > 0 ? `${lines.join('\n')}${suffix}` : '(empty)';
+      } catch (e) {
+        return `Error: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    },
+  });
+
+  const readFile = tool({
+    description:
+      'Read a text file under the repository root (relative path; large files truncated).',
+    inputSchema: readFileToolInput,
+    execute: async ({ path: p }) => {
+      const norm = p.trim().replace(/^[/\\]+/u, '');
+      try {
+        return await readRepoFileContent(
+          repoRoot,
+          norm.replace(/\\/gu, '/'),
+        );
+      } catch (e) {
+        return `Error reading file: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    },
+  });
+
+  const searchCode = tool({
+    description:
+      'Literal code search with ripgrep (rg) from the repository root.',
+    inputSchema: searchCodeInput,
+    execute: async ({ query, maxLines: ml }) => {
+      const maxLines = ml ?? 40;
+      return searchWithRipgrep(repoRoot, query, maxLines);
+    },
+  });
+
+  const getDependencies = tool({
+    description:
+      'Summarize declared dependencies (package.json, go.mod, Cargo.toml, pyproject.toml).',
+    inputSchema: z.object({}),
+    execute: async () => summarizeDependencies(repoRoot),
+  });
+
+  return { listDirectory, readFile, searchCode, getDependencies } as ToolSet;
+}

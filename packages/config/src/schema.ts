@@ -83,6 +83,9 @@ const defaultsSchema = z
     discovery: agentDefaultSchema.prefault({
       model: 'anthropic/claude-sonnet-4-6',
     }),
+    'sensor-setup': agentDefaultSchema.prefault({
+      model: 'anthropic/claude-sonnet-4-6',
+    }),
   })
   .strict();
 

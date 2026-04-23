@@ -34,7 +34,13 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-function mergeById(layers: readonly SensorInitCandidate[][]): SensorInitCandidate[] {
+/**
+ * Merges layers left to right: first occurrence of each `id` wins.
+ * Pass highest-priority layer first (LLM, then heuristic, then catalog).
+ */
+export function mergeSensorCandidateLayers(
+  layers: readonly SensorInitCandidate[][],
+): SensorInitCandidate[] {
   const map = new Map<string, SensorInitCandidate>();
   for (const layer of layers) {
     for (const c of layer) {
@@ -306,11 +312,14 @@ export type RunSensorCandidateInferenceOptions = {
 export type RunSensorCandidateInferenceResult = {
   readonly computational: ComputationalDiscoveryResult;
   readonly candidates: SensorInitCandidate[];
+  /** Set when useLlm was true but the LLM pass failed; heuristic + catalog are still returned. */
+  readonly llmWarning?: string;
 };
 
 /**
- * Stack scan + heuristic/catalog sensor suggestions, optionally merged with an LLM pass
- * using the same model ref as discovery (`defaults.discovery.model`).
+ * Stack scan + heuristic/catalog sensor suggestions, optionally merged with an LLM pass.
+ * Uses `defaults.discovery.model` so `maestro init` reuses the discovery model (and provider
+ * credentials) chosen in the per-agent model wizard immediately before this step.
  */
 export async function runSensorCandidateInference(
   options: RunSensorCandidateInferenceOptions,
@@ -323,7 +332,8 @@ export async function runSensorCandidateInference(
   const catalog = buildCatalogSensorCandidates(computational.stack.kind);
   const scriptsJson = await readPackageScriptsJson(options.repoRoot);
 
-  const layers: SensorInitCandidate[][] = [heuristic, catalog];
+  const llmLayer: SensorInitCandidate[] = [];
+  let llmWarning: string | undefined;
 
   if (options.useLlm) {
     try {
@@ -334,7 +344,8 @@ export async function runSensorCandidateInference(
         heuristic,
         scriptsJson,
       );
-      const model = getModel(options.config.defaults.discovery.model, {
+      const modelRef = options.config.defaults.discovery.model;
+      const model = getModel(modelRef, {
         config: options.config,
       });
       const { output } = await runAgent({
@@ -350,23 +361,29 @@ export async function runSensorCandidateInference(
         config: options.config,
         model,
       });
-      const llmList: SensorInitCandidate[] = output.candidates.map((c) => ({
-        id: c.id,
-        command: c.command,
-        args: c.args,
-        ...(c.cwd !== undefined ? { cwd: c.cwd } : {}),
-        onFail: c.onFail,
-        rationale: c.rationale.length > 0 ? c.rationale : 'Model-suggested sensor.',
-        source: 'llm' as const,
-      }));
-      layers.push(llmList);
-    } catch {
-      /* keep heuristic + catalog */
+      llmLayer.push(
+        ...output.candidates.map((c) => ({
+          id: c.id,
+          command: c.command,
+          args: c.args,
+          ...(c.cwd != null && c.cwd.length > 0 ? { cwd: c.cwd } : {}),
+          onFail: c.onFail,
+          rationale:
+            c.rationale.length > 0 ? c.rationale : 'Model-suggested sensor.',
+          source: 'llm' as const,
+        })),
+      );
+    } catch (e) {
+      llmWarning =
+        e instanceof Error ? e.message : `LLM sensor discovery failed: ${String(e)}`;
     }
   }
 
+  const candidates = mergeSensorCandidateLayers([llmLayer, heuristic, catalog]);
+
   return {
     computational,
-    candidates: mergeById(layers),
+    candidates,
+    ...(llmWarning !== undefined ? { llmWarning } : {}),
   };
 }

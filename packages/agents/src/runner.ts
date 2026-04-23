@@ -12,13 +12,14 @@ import type {
   AnyAgentDefinition,
 } from './definition.js';
 import {
-  generateText,
   NoObjectGeneratedError,
   Output,
   stepCountIs,
   TypeValidationError,
   type ToolSet,
 } from 'ai';
+
+import { generateTextWithRateLimitBackoff } from './generate-text-with-backoff.js';
 
 import {
   serializeGenerateTextForAudit,
@@ -30,7 +31,11 @@ import { createEvaluatorToolSet } from './evaluator-tools.js';
 import { createGeneratorToolSet } from './generator-tools.js';
 import { createMergerToolSet } from './merger-tools.js';
 import { createGardenerToolSet } from './gardener-tools.js';
-import { createArchitectToolSet, createPlannerToolSet } from './repo-tools.js';
+import {
+  createArchitectToolSet,
+  createPlannerToolSet,
+  createSensorSetupToolSet,
+} from './repo-tools.js';
 
 /** Structured `agent.delta` payloads are synthetic (one chunk); keep TUI/logs bounded. */
 const AGENT_DELTA_MAX_CHARS = 12_000;
@@ -257,7 +262,7 @@ async function generateToolAugmentedAgentText(options: {
   readonly outputSchema: AnyAgentDefinition['outputSchema'];
 }): Promise<{
   readonly structuredOutput: unknown;
-  readonly generateResult: Awaited<ReturnType<typeof generateText>>;
+  readonly generateResult: Awaited<ReturnType<typeof generateTextWithRateLimitBackoff>>;
   readonly toolLoopRecoveryAttempted: boolean;
 }> {
   const structuredOutputSpec = Output.object({
@@ -267,9 +272,9 @@ async function generateToolAugmentedAgentText(options: {
   });
 
   // `Output.object` consumes an extra step after tool calls; keep headroom so stopWhen does not cut early.
-  let gen: Awaited<ReturnType<typeof generateText>>;
+  let gen: Awaited<ReturnType<typeof generateTextWithRateLimitBackoff>>;
   try {
-    gen = await generateText({
+    gen = await generateTextWithRateLimitBackoff({
       model: options.model,
       system: options.system,
       prompt: options.prompt,
@@ -306,9 +311,9 @@ async function generateToolAugmentedAgentText(options: {
   let toolLoopRecoveryAttempted = false;
   if (structured === undefined) {
     toolLoopRecoveryAttempted = true;
-    let recovery: Awaited<ReturnType<typeof generateText>>;
+    let recovery: Awaited<ReturnType<typeof generateTextWithRateLimitBackoff>>;
     try {
-      recovery = await generateText({
+      recovery = await generateTextWithRateLimitBackoff({
         model: options.model,
         system: `${options.system}\n\n---\nFollow-up: do not use tools. Produce only the structured output required by the output schema.`,
         messages: [
@@ -391,7 +396,7 @@ export async function runAgent<TInput, TOutput>(
 
     let text = '';
     let outputCandidate: unknown;
-    let toolLoopGen: Awaited<ReturnType<typeof generateText>> | undefined;
+    let toolLoopGen: Awaited<ReturnType<typeof generateTextWithRateLimitBackoff>> | undefined;
     let toolLoopRecoveryAttempted = false;
 
     const meta = context.metadata;
@@ -479,6 +484,11 @@ export async function runAgent<TInput, TOutput>(
         }),
         maxSteps: 40,
       };
+    } else if (definition.id === 'sensor-setup') {
+      toolAugmented = {
+        tools: createSensorSetupToolSet(stateRepoRoot),
+        maxSteps: 24,
+      };
     }
 
     if (toolAugmented) {
@@ -503,9 +513,9 @@ export async function runAgent<TInput, TOutput>(
         name: definition.id,
         description: 'Maestro agent output (JSON object matching the output schema).',
       });
-      let gen: Awaited<ReturnType<typeof generateText>>;
+      let gen: Awaited<ReturnType<typeof generateTextWithRateLimitBackoff>>;
       try {
-        gen = await generateText({
+        gen = await generateTextWithRateLimitBackoff({
           model,
           system,
           prompt,

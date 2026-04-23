@@ -22,6 +22,7 @@ export { runComputationalDiscovery } from './computational.js';
 export {
   buildCatalogSensorCandidates,
   buildHeuristicSensorCandidates,
+  mergeSensorCandidateLayers,
   runSensorCandidateInference,
   type RunSensorCandidateInferenceOptions,
   type RunSensorCandidateInferenceResult,
