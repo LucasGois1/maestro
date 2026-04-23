@@ -50,6 +50,8 @@ export function deriveFooterState(
       return 'running';
     case 'paused':
       return 'paused';
+    case 'escalated':
+      return 'paused';
     case 'idle':
     case 'completed':
     case 'failed':

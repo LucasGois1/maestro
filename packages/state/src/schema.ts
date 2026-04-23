@@ -41,7 +41,64 @@ export type PipelineFailureAt = (typeof PIPELINE_FAILURE_AT)[number];
 
 export const pipelineFailureAtSchema = z.enum(PIPELINE_FAILURE_AT);
 
+/** Origem da escalação persistida em `RunState.escalation`. */
+export const ESCALATION_SOURCES = [
+  'architect',
+  'evaluator',
+  'planner',
+  'pipeline',
+] as const;
+
+export type EscalationSource = (typeof ESCALATION_SOURCES)[number];
+
+export const escalationSourceSchema = z.enum(ESCALATION_SOURCES);
+
+/** Alvo semântico para retomada após escalação humana. */
+export const RESUME_TARGETS = [
+  'ContinueGenerate',
+  'ReSeedContract',
+  'ReArchitectAndContract',
+  'ReplanOnly',
+] as const;
+
+export type ResumeTarget = (typeof RESUME_TARGETS)[number];
+
+export const resumeTargetSchema = z.enum(RESUME_TARGETS);
+
 const isoString = z.iso.datetime();
+
+export const escalationHumanFeedbackSchema = z
+  .object({
+    text: z.string().min(1),
+    submittedAt: isoString,
+  })
+  .strict();
+
+export type EscalationHumanFeedback = z.output<
+  typeof escalationHumanFeedbackSchema
+>;
+
+const escalationRawSchema = z
+  .object({
+    reason: z.string().min(1),
+    sprintIdx: z.number().int().nonnegative(),
+    source: escalationSourceSchema.optional(),
+    phaseAtEscalation: pipelineFailureAtSchema.optional(),
+    resumeTarget: resumeTargetSchema.optional(),
+    artifactHints: z.array(z.string().min(1)).optional(),
+    humanFeedback: escalationHumanFeedbackSchema.optional(),
+  })
+  .strict();
+
+/** Escalação normalizada (runs antigas recebem defaults tolerantes). */
+export const escalationSchema = escalationRawSchema.transform((v) => ({
+  ...v,
+  source: v.source ?? ('pipeline' as const),
+  phaseAtEscalation: v.phaseAtEscalation ?? ('evaluating' as const),
+  resumeTarget: v.resumeTarget ?? ('ContinueGenerate' as const),
+}));
+
+export type RunStateEscalation = z.output<typeof escalationSchema>;
 
 export const runFailureSchema = z
   .object({
@@ -69,13 +126,7 @@ export const runStateSchema = z
     completedAt: isoString.optional(),
     /** Presente quando `status === 'failed'`; `null` limpa após retomada ou conclusão. */
     failure: z.union([runFailureSchema, z.null()]).optional(),
-    escalation: z
-      .object({
-        reason: z.string().min(1),
-        sprintIdx: z.number().int().nonnegative(),
-      })
-      .strict()
-      .optional(),
+    escalation: escalationSchema.optional(),
     metadata: z
       .object({
         prompt: z.string().min(1),

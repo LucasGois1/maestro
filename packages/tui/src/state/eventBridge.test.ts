@@ -271,6 +271,60 @@ describe('bridgeBusToStore', () => {
       expect(store.getState().sprints[0]?.status).toBe('failed');
     });
 
+    it('sets escalated pipeline status on pipeline.escalation_pending', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({ type: 'pipeline.started', runId: 'r1' });
+      bus.emit({
+        type: 'pipeline.escalation_pending',
+        runId: 'r1',
+        sprintIdx: 0,
+        reason: 'blocked',
+        source: 'evaluator',
+        phaseAtEscalation: 'evaluating',
+        resumeTarget: 'ContinueGenerate',
+      });
+
+      const st = store.getState();
+      expect(st.pipeline.status).toBe('escalated');
+      expect(st.pipeline.escalationDetail).toMatchObject({
+        reason: 'blocked',
+        sprintIdx: 0,
+        source: 'evaluator',
+        phaseAtEscalation: 'evaluating',
+        resumeTarget: 'ContinueGenerate',
+      });
+    });
+
+    it('clears escalationDetail when resuming from escalated', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({ type: 'pipeline.started', runId: 'r1' });
+      bus.emit({
+        type: 'pipeline.escalation_pending',
+        runId: 'r1',
+        sprintIdx: 0,
+        reason: 'x',
+        source: 'evaluator',
+        phaseAtEscalation: 'evaluating',
+        resumeTarget: 'ContinueGenerate',
+      });
+      bus.emit({
+        type: 'pipeline.resumed',
+        runId: 'r1',
+        from: 'escalated',
+        phaseBeforeEscalation: 'evaluating',
+      });
+
+      expect(store.getState().pipeline.status).toBe('running');
+      expect(store.getState().pipeline.stage).toBe('evaluating');
+      expect(store.getState().pipeline.escalationDetail).toBeNull();
+    });
+
     it('reflects pause, resume, completion and failure', () => {
       const bus = createEventBus();
       const store = createTuiStore();

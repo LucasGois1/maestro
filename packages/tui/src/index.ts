@@ -36,6 +36,7 @@ export {
   type TuiHeaderState,
   type TuiMode,
   type TuiPanelId,
+  type TuiEscalationDetail,
   type TuiPipelineState,
   type TuiPipelineStatus,
   RECENT_RUNS_CAP,

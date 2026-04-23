@@ -148,6 +148,7 @@ function handlePipelineEvent(
           sprintIdx: null,
           retryCount: 0,
           history: [],
+          escalationDetail: null,
         },
         focus: {
           ...state.focus,
@@ -285,6 +286,34 @@ function handlePipelineEvent(
         }),
       }));
       return;
+    case 'pipeline.escalation_pending':
+      store.setState((state) => ({
+        ...state,
+        runId: event.runId,
+        mode: 'run',
+        pipeline: {
+          ...state.pipeline,
+          status: 'escalated',
+          stage: event.phaseAtEscalation,
+          sprintIdx: event.sprintIdx,
+          error: null,
+          escalationDetail: {
+            reason: event.reason,
+            sprintIdx: event.sprintIdx,
+            source: event.source,
+            phaseAtEscalation: event.phaseAtEscalation,
+            resumeTarget: event.resumeTarget,
+            ...(event.artifactHints !== undefined
+              ? { artifactHints: event.artifactHints }
+              : {}),
+          },
+        },
+        header: {
+          ...state.header,
+          sprintIdx: event.sprintIdx,
+        },
+      }));
+      return;
     case 'pipeline.paused':
       store.setState((state) => ({
         ...state,
@@ -292,6 +321,7 @@ function handlePipelineEvent(
           ...state.pipeline,
           status: 'paused',
           stage: event.at,
+          escalationDetail: null,
         },
       }));
       return;
@@ -301,7 +331,11 @@ function handlePipelineEvent(
         pipeline: {
           ...state.pipeline,
           status: 'running',
-          stage: event.from,
+          stage:
+            event.from === 'escalated'
+              ? (event.phaseBeforeEscalation ?? state.pipeline.stage)
+              : event.from,
+          escalationDetail: null,
         },
       }));
       return;
@@ -315,6 +349,7 @@ function handlePipelineEvent(
             ...state.pipeline,
             status: 'completed',
             history: closed,
+            escalationDetail: null,
           },
           sprints: state.sprints.map((sprint) =>
             sprint.status === 'running'
@@ -343,6 +378,7 @@ function handlePipelineEvent(
             stage: event.at,
             error: event.error,
             history: closed,
+            escalationDetail: null,
           },
           sprints:
             activeIdx === null

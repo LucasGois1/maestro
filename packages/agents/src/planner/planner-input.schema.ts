@@ -13,6 +13,8 @@ export const plannerReplanContextSchema = z.object({
   previousPlanSummary: z.string().min(1),
   boundaryNotes: z.string().optional(),
   escalationReason: z.string().optional(),
+  /** Notas do operador na TUI antes de retomar (resume com replan). */
+  humanGuidance: z.string().optional(),
 });
 
 export type PlannerReplanContext = z.infer<typeof plannerReplanContextSchema>;
@@ -20,6 +22,8 @@ export type PlannerReplanContext = z.infer<typeof plannerReplanContextSchema>;
 export const plannerInputSchema = z.object({
   prompt: z.string().min(1),
   replan: plannerReplanContextSchema.optional(),
+  /** Orientação humana na primeira planificação (opcional). */
+  humanGuidance: z.string().optional(),
 });
 
 export type PlannerInput = z.infer<typeof plannerInputSchema>;

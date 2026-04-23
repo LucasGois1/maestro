@@ -17,6 +17,7 @@ import { render, type Instance } from 'ink';
 import { createElement } from 'react';
 
 import { CLI_PACKAGE_VERSION } from '../cli-version.js';
+import { createPersistEscalationHumanFeedback } from '../persist-escalation-feedback.js';
 import { createTuiCommandExecutor } from '../tui-command-executor.js';
 import { createTuiStoreForWorkspace } from '../tui-workspace-store.js';
 import { ensureWorkspaceTrustInteractive } from '../workspace-trust.js';
@@ -72,14 +73,25 @@ async function loadConfigOrExit(
 function renderPipelineApp(options: {
   readonly store: TuiStore;
   readonly bus: EventBus;
+  readonly stateStore: StateStore;
   readonly commandExecutor?: Parameters<typeof App>[0]['commandExecutor'];
 }): Instance {
   let instance: Instance | undefined;
+  const persistEscalationHumanFeedback =
+    options.commandExecutor !== undefined
+      ? createPersistEscalationHumanFeedback({
+          stateStore: options.stateStore,
+          tuiStore: options.store,
+        })
+      : undefined;
   instance = render(
     createElement(App, {
       store: options.store,
       bus: options.bus,
       maestroVersion: CLI_PACKAGE_VERSION,
+      ...(persistEscalationHumanFeedback !== undefined
+        ? { persistEscalationHumanFeedback }
+        : {}),
       ...(options.commandExecutor
         ? {
             commandExecutor: options.commandExecutor,
@@ -133,7 +145,12 @@ export function createResumeCommand(
         store,
       });
       const instance = stdoutIsTTY
-        ? renderApp({ store: tuiStore, bus, commandExecutor })
+        ? renderApp({
+            store: tuiStore,
+            bus,
+            stateStore: store,
+            commandExecutor,
+          })
         : null;
 
       try {

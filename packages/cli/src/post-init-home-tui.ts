@@ -8,6 +8,7 @@ import { render, type Instance } from 'ink';
 import { createElement } from 'react';
 
 import { CLI_PACKAGE_VERSION } from './cli-version.js';
+import { createPersistEscalationHumanFeedback } from './persist-escalation-feedback.js';
 import { createTuiCommandExecutor } from './tui-command-executor.js';
 import { listMaestroFilesUnderRepo } from './tui-kb.js';
 import { createTuiStoreForWorkspace } from './tui-workspace-store.js';
@@ -54,6 +55,10 @@ export function mountPostInitHomeShell(options: {
           bus,
           colorMode,
           maestroVersion: CLI_PACKAGE_VERSION,
+          persistEscalationHumanFeedback: createPersistEscalationHumanFeedback({
+            stateStore,
+            tuiStore: store,
+          }),
           kbExplorer: {
             repoLabel: options.repoRoot,
             files: kbFiles,

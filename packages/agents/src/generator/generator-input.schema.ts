@@ -22,6 +22,8 @@ export const generatorInputSchema = z.object({
       decision: z.enum(['failed', 'escalated']).optional(),
     })
     .optional(),
+  /** Notas humanas (TUI) injectadas na retomada após escalação. */
+  humanGuidance: z.string().optional(),
 });
 
 export type GeneratorInput = z.infer<typeof generatorInputSchema>;

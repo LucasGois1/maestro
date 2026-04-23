@@ -8,8 +8,18 @@ import {
 import { ConfigValidationError } from '@maestro/config';
 import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import type { EventBus } from '@maestro/core';
-import { runPipeline, resumePipeline } from '@maestro/pipeline';
-import { createStateStore, type StateStore } from '@maestro/state';
+import {
+  PipelineEscalationError,
+  PipelinePauseError,
+  resumePipeline,
+  runPipeline,
+} from '@maestro/pipeline';
+import {
+  RESUME_TARGETS,
+  createStateStore,
+  type ResumeTarget,
+  type StateStore,
+} from '@maestro/state';
 import type {
   CommandCatalogEntry,
   TuiCommandExecutionResult,
@@ -102,6 +112,33 @@ function parseRunInput(tokens: readonly string[]): ParsedRunInput {
   };
 }
 
+const RESUME_TARGET_SET = new Set<string>(RESUME_TARGETS);
+
+function parseResumeCommandTokens(tokens: readonly string[]): {
+  readonly runId?: string;
+  readonly resumeTargetOverride?: ResumeTarget;
+} {
+  let runId: string | undefined;
+  let resumeTargetOverride: ResumeTarget | undefined;
+  for (let i = 1; i < tokens.length; i += 1) {
+    const t = tokens[i]?.trim();
+    if (t === undefined || t.length === 0) continue;
+    if (RESUME_TARGET_SET.has(t)) {
+      resumeTargetOverride = t as ResumeTarget;
+      continue;
+    }
+    runId = t;
+  }
+  const out: { runId?: string; resumeTargetOverride?: ResumeTarget } = {};
+  if (runId !== undefined) {
+    out.runId = runId;
+  }
+  if (resumeTargetOverride !== undefined) {
+    out.resumeTargetOverride = resumeTargetOverride;
+  }
+  return out;
+}
+
 function formatError(error: unknown): string {
   if (error instanceof ConfigValidationError) {
     return [
@@ -170,6 +207,12 @@ async function executeRun(options: {
       bus: options.bus,
       config: loaded.resolved,
     }).catch((error: unknown) => {
+      if (
+        error instanceof PipelineEscalationError ||
+        error instanceof PipelinePauseError
+      ) {
+        return;
+      }
       options.bus.emit({
         type: 'pipeline.failed',
         runId,
@@ -194,12 +237,10 @@ async function executeResume(options: {
 }): Promise<TuiCommandExecutionResult> {
   try {
     const loaded = await loadConfigWithAutoResolvedModels({ cwd: options.repoRoot });
-    const rawId = options.tokens[1]?.trim();
-    const explicitRunId =
-      rawId !== undefined && rawId.length > 0 ? rawId : undefined;
+    const parsed = parseResumeCommandTokens(options.tokens);
 
-    let runId: string | undefined = explicitRunId;
-    if (runId === undefined) {
+    let candidateRunId = parsed.runId;
+    if (candidateRunId === undefined) {
       const last = await options.store.latestResumable();
       if (!last) {
         return {
@@ -208,8 +249,9 @@ async function executeResume(options: {
             'No runs recorded. Start one with `/run <prompt>` then use `/resume`.',
         };
       }
-      runId = last.runId;
+      candidateRunId = last.runId;
     }
+    const runId: string = candidateRunId;
 
     void resumePipeline({
       runId,
@@ -217,7 +259,16 @@ async function executeResume(options: {
       store: options.store,
       bus: options.bus,
       config: loaded.resolved,
+      ...(parsed.resumeTargetOverride !== undefined
+        ? { resumeTargetOverride: parsed.resumeTargetOverride }
+        : {}),
     }).catch((error: unknown) => {
+      if (
+        error instanceof PipelineEscalationError ||
+        error instanceof PipelinePauseError
+      ) {
+        return;
+      }
       options.bus.emit({
         type: 'pipeline.failed',
         runId,

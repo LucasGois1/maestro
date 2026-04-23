@@ -141,6 +141,46 @@ describe('StateStore', () => {
     expect((await s.latestResumable())?.runId).toBe('boom');
   });
 
+  it('latestResumable() includes paused+escalated and ranks it above failed', async () => {
+    const s = createStateStore({
+      repoRoot,
+      now: () => new Date('2026-04-23T12:00:00.000Z'),
+    });
+    await s.create({
+      ...baseOpts,
+      runId: 'failed-run',
+      now: () => new Date('2026-04-23T11:00:00.000Z'),
+    });
+    await s.update('failed-run', {
+      status: 'failed',
+      phase: 'planning',
+      failure: {
+        message: 'err',
+        at: 'planning',
+        failedAt: '2026-04-23T11:30:00.000Z',
+      },
+    });
+    await s.create({
+      ...baseOpts,
+      runId: 'esc-run',
+      now: () => new Date('2026-04-23T10:00:00.000Z'),
+    });
+    await s.update('esc-run', {
+      status: 'paused',
+      phase: 'escalated',
+      escalation: {
+        sprintIdx: 0,
+        reason: 'Evaluator escalated',
+        source: 'evaluator',
+        phaseAtEscalation: 'evaluating',
+        resumeTarget: 'ReArchitectAndContract',
+      },
+      pausedAt: '2026-04-23T12:00:00.000Z',
+    });
+
+    expect((await s.latestResumable())?.runId).toBe('esc-run');
+  });
+
   it('delete() removes the run directory', async () => {
     const s = store();
     await s.create(baseOpts);

@@ -1,18 +1,28 @@
 export const STATE_PACKAGE_NAME = '@maestro/state';
 
 export {
+  ESCALATION_SOURCES,
+  RESUME_TARGETS,
+  escalationHumanFeedbackSchema,
+  escalationSchema,
+  escalationSourceSchema,
   PIPELINE_FAILURE_AT,
   PIPELINE_STAGES,
   RUN_STATUSES,
   pipelineFailureAtSchema,
+  resumeTargetSchema,
   runFailureSchema,
   runMetaSchema,
   runStateSchema,
+  type EscalationHumanFeedback,
+  type EscalationSource,
   type PipelineFailureAt,
   type PipelineStage,
+  type ResumeTarget,
   type RunFailure,
   type RunMeta,
   type RunState,
+  type RunStateEscalation,
   type RunStateInput,
   type RunStatus,
 } from './schema.js';
@@ -29,6 +39,7 @@ export {
   PLAN_FILE,
   PLAN_SNAPSHOT_FILE,
   PROJECT_LOG_FILE,
+  RUN_LOG_FILE,
   RUNS_DIR,
   STATE_FILE,
   execPlansActiveDir,
@@ -45,6 +56,7 @@ export {
   runMetaPath,
   runPlanPath,
   runPlanSnapshotPath,
+  runLogPath,
   sprintOutcomeCheckpointPath,
   runRoot,
   runStatePath,
@@ -82,6 +94,13 @@ export {
   type ProjectLogEntry,
   type ProjectLogLevel,
 } from './project-log.js';
+
+export {
+  appendRunLog,
+  type AppendRunLogOptions,
+  type RunLogEntry,
+  type RunLogLevel,
+} from './run-log.js';
 
 export {
   writeCompletedExecPlan,

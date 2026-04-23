@@ -15,6 +15,8 @@ export const PLAN_FILE = 'plan.md';
 /** Snapshot JSON do `PlannerOutput` normalizado (retomada sem re-planear). */
 export const PLAN_SNAPSHOT_FILE = 'plan.snapshot.json';
 export const PROJECT_LOG_FILE = 'log.md';
+/** Log append-only por run (fases, escalação, resume). */
+export const RUN_LOG_FILE = 'run.log.md';
 
 export type RunPathOptions = {
   readonly repoRoot: string;
@@ -40,6 +42,10 @@ export function runStatePath(opts: RunPathOptions): string {
 
 export function runMetaPath(opts: RunPathOptions): string {
   return join(runRoot(opts), META_FILE);
+}
+
+export function runLogPath(opts: RunPathOptions): string {
+  return join(runRoot(opts), RUN_LOG_FILE);
 }
 
 export function runPlanPath(opts: RunPathOptions): string {

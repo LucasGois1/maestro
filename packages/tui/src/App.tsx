@@ -38,6 +38,10 @@ import {
   createAgentLogOverlay,
 } from './panels/AgentLogOverlay.js';
 import { DiscoveryScreen } from './panels/DiscoveryScreen.js';
+import {
+  EscalationScreen,
+  type PersistEscalationFeedbackResult,
+} from './panels/EscalationScreen.js';
 import { MaestroHomeScreen } from './panels/MaestroHomeScreen.js';
 import { DiffPreviewPanel } from './panels/DiffPreviewPanel.js';
 import {
@@ -101,6 +105,12 @@ export interface AppProps {
   /** Shown on the home screen (e.g. CLI package version). */
   readonly maestroVersion?: string;
   /**
+   * Grava `humanFeedback` no `RunState` da run em escalação (CLI com StateStore).
+   */
+  readonly persistEscalationHumanFeedback?: (
+    text: string,
+  ) => Promise<PersistEscalationFeedbackResult>;
+  /**
    * Invoked after the second Control+C within 2s (see CommandInput). Required
    * for double Control-C exit when `commandExecutor` is set (CLI should unmount Ink).
    */
@@ -119,6 +129,7 @@ export function App({
   editPlan,
   commandExecutor,
   maestroVersion,
+  persistEscalationHumanFeedback,
   onForceExit,
 }: AppProps) {
   const activeStore = useMemo(
@@ -150,6 +161,9 @@ export function App({
         editPlan={editPlan}
         {...(commandExecutor !== undefined ? { commandExecutor } : {})}
         {...(maestroVersion !== undefined ? { maestroVersion } : {})}
+        {...(persistEscalationHumanFeedback !== undefined
+          ? { persistEscalationHumanFeedback }
+          : {})}
         {...(onForceExit !== undefined ? { onForceExit } : {})}
       />
     </OverlayHostProvider>
@@ -174,6 +188,7 @@ interface AppBodyProps {
   readonly editPlan?: AppProps['editPlan'];
   readonly commandExecutor?: TuiCommandExecutor;
   readonly maestroVersion?: string;
+  readonly persistEscalationHumanFeedback?: AppProps['persistEscalationHumanFeedback'];
   readonly onForceExit?: () => void;
 }
 
@@ -231,6 +246,7 @@ function AppBody({
   editPlan,
   commandExecutor,
   maestroVersion,
+  persistEscalationHumanFeedback,
   onForceExit,
 }: AppBodyProps) {
   const overlayHost = useOverlayHost();
@@ -256,6 +272,9 @@ function AppBody({
         editPlan={editPlan}
         {...(commandExecutor !== undefined ? { commandExecutor } : {})}
         {...(maestroVersion !== undefined ? { maestroVersion } : {})}
+        {...(persistEscalationHumanFeedback !== undefined
+          ? { persistEscalationHumanFeedback }
+          : {})}
         {...(onForceExit !== undefined ? { onForceExit } : {})}
       />
     </KeybindingShell>
@@ -269,6 +288,7 @@ function AppShell({
   editPlan,
   commandExecutor,
   maestroVersion,
+  persistEscalationHumanFeedback,
   onForceExit,
 }: {
   readonly store: TuiStore;
@@ -277,6 +297,7 @@ function AppShell({
   readonly editPlan?: AppProps['editPlan'];
   readonly commandExecutor?: TuiCommandExecutor;
   readonly maestroVersion?: string;
+  readonly persistEscalationHumanFeedback?: AppProps['persistEscalationHumanFeedback'];
   readonly onForceExit?: () => void;
 }) {
   const overlayHost = useOverlayHost();
@@ -307,7 +328,9 @@ function AppShell({
   }, [footerTransient]);
 
   const showDashboard =
-    pipeline.status === 'running' || pipeline.status === 'paused';
+    pipeline.status === 'running' ||
+    pipeline.status === 'paused' ||
+    pipeline.status === 'escalated';
 
   useKeybinding(
     { kind: 'global' },
@@ -318,7 +341,12 @@ function AppShell({
         focus: { ...state.focus, panelId: nextPanelId(state.focus.panelId) },
       }));
     },
-    { enabled: mode !== 'discovery' && showDashboard },
+    {
+      enabled:
+        mode !== 'discovery' &&
+        showDashboard &&
+        pipeline.status !== 'escalated',
+    },
   );
 
   useKeybinding(
@@ -333,7 +361,12 @@ function AppShell({
         },
       }));
     },
-    { enabled: mode !== 'discovery' && showDashboard },
+    {
+      enabled:
+        mode !== 'discovery' &&
+        showDashboard &&
+        pipeline.status !== 'escalated',
+    },
   );
 
   useKeybinding({ kind: 'overlay' }, { key: 'escape' }, () => {
@@ -575,52 +608,61 @@ function AppShell({
     <Box flexDirection="column" width={size.columns}>
       <Header mode={mode} header={header} colorMode={colorMode} />
       {showDashboard ? (
-        <LayoutGrid
-          focusedPanelId={focus.panelId}
-          slots={{
-            pipeline: (
-              <PipelinePanel
-                pipeline={pipeline}
-                sprints={sprints}
-                focused={focus.panelId === 'pipeline'}
-                colorMode={colorMode}
-              />
-            ),
-            activeAgent: (
-              <ActiveAgentPanel
-                agent={agent}
-                pipelineStage={pipeline.stage}
-                pipelineStatus={pipeline.status}
-                focused={focus.panelId === 'activeAgent'}
-                colorMode={colorMode}
-              />
-            ),
-            sprints: (
-              <SprintsPanel
-                sprints={sprints}
-                selectedSprintIdx={focus.selectedSprintIdx}
-                focused={focus.panelId === 'sprints'}
-                colorMode={colorMode}
-              />
-            ),
-            sensors: (
-              <SensorsPanel
-                sensors={sensors}
-                focusedSensorId={focus.focusedSensorId}
-                onFocusedSensorIdChange={setFocusedSensorId}
-                focused={focus.panelId === 'sensors'}
-                colorMode={colorMode}
-              />
-            ),
-            diff: (
-              <DiffPreviewPanel
-                diffPreview={diffPreview}
-                focused={focus.panelId === 'diff'}
-                colorMode={colorMode}
-              />
-            ),
-          }}
-        />
+        pipeline.status === 'escalated' ? (
+          <EscalationScreen
+            store={store}
+            {...(persistEscalationHumanFeedback !== undefined
+              ? { persistEscalationHumanFeedback }
+              : {})}
+          />
+        ) : (
+          <LayoutGrid
+            focusedPanelId={focus.panelId}
+            slots={{
+              pipeline: (
+                <PipelinePanel
+                  pipeline={pipeline}
+                  sprints={sprints}
+                  focused={focus.panelId === 'pipeline'}
+                  colorMode={colorMode}
+                />
+              ),
+              activeAgent: (
+                <ActiveAgentPanel
+                  agent={agent}
+                  pipelineStage={pipeline.stage}
+                  pipelineStatus={pipeline.status}
+                  focused={focus.panelId === 'activeAgent'}
+                  colorMode={colorMode}
+                />
+              ),
+              sprints: (
+                <SprintsPanel
+                  sprints={sprints}
+                  selectedSprintIdx={focus.selectedSprintIdx}
+                  focused={focus.panelId === 'sprints'}
+                  colorMode={colorMode}
+                />
+              ),
+              sensors: (
+                <SensorsPanel
+                  sensors={sensors}
+                  focusedSensorId={focus.focusedSensorId}
+                  onFocusedSensorIdChange={setFocusedSensorId}
+                  focused={focus.panelId === 'sensors'}
+                  colorMode={colorMode}
+                />
+              ),
+              diff: (
+                <DiffPreviewPanel
+                  diffPreview={diffPreview}
+                  focused={focus.panelId === 'diff'}
+                  colorMode={colorMode}
+                />
+              ),
+            }}
+          />
+        )
       ) : (
         <MaestroHomeScreen
           store={store}

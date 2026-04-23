@@ -1,4 +1,4 @@
-import type { StateStore } from '@maestro/state';
+import type { ResumeTarget, StateStore } from '@maestro/state';
 
 import {
   PipelineResumeNotAllowedError,
@@ -15,6 +15,8 @@ export type ResumePipelineOptions = Omit<
   'prompt' | 'branch' | 'worktreePath' | 'runId' | 'resume'
 > & {
   readonly runId?: string;
+  readonly humanFeedback?: string;
+  readonly resumeTargetOverride?: ResumeTarget;
 };
 
 export async function resumePipeline(
@@ -41,5 +43,11 @@ export async function resumePipeline(
     branch: target.branch,
     worktreePath: target.worktreePath,
     resume: true,
+    ...(options.humanFeedback !== undefined
+      ? { humanFeedback: options.humanFeedback }
+      : {}),
+    ...(options.resumeTargetOverride !== undefined
+      ? { resumeTargetOverride: options.resumeTargetOverride }
+      : {}),
   });
 }

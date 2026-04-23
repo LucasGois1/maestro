@@ -62,4 +62,41 @@ describe('runStateSchema', () => {
     expect(parsed.failure?.at).toBe('generating');
     expect(parsed.phase).toBe('generating');
   });
+
+  it('normalizes legacy escalation (only reason + sprintIdx)', () => {
+    const parsed = runStateSchema.parse({
+      ...valid,
+      status: 'paused',
+      phase: 'escalated',
+      escalation: {
+        sprintIdx: 0,
+        reason: 'Human review',
+      },
+    });
+    expect(parsed.escalation?.source).toBe('pipeline');
+    expect(parsed.escalation?.phaseAtEscalation).toBe('evaluating');
+    expect(parsed.escalation?.resumeTarget).toBe('ContinueGenerate');
+  });
+
+  it('accepts full escalation with humanFeedback', () => {
+    const parsed = runStateSchema.parse({
+      ...valid,
+      status: 'paused',
+      phase: 'escalated',
+      escalation: {
+        sprintIdx: 1,
+        reason: 'Architect: blocked',
+        source: 'architect',
+        phaseAtEscalation: 'architecting',
+        resumeTarget: 'ReplanOnly',
+        artifactHints: ['.maestro/runs/r1/contracts/sprint-2.md'],
+        humanFeedback: {
+          text: 'Try smaller scope',
+          submittedAt: '2026-04-20T00:10:00.000Z',
+        },
+      },
+    });
+    expect(parsed.escalation?.resumeTarget).toBe('ReplanOnly');
+    expect(parsed.escalation?.humanFeedback?.text).toBe('Try smaller scope');
+  });
 });

@@ -114,9 +114,14 @@ function formatDetail(state: RunState): string {
     parts.push(`retriesLeft:  ${state.retriesRemaining}`);
   }
   if (state.escalation) {
+    const e = state.escalation;
     parts.push(
-      `escalation:   sprint ${state.escalation.sprintIdx} — ${state.escalation.reason}`,
+      `escalation:   sprint ${e.sprintIdx} — ${e.reason}`,
+      `              source: ${e.source} · phaseAt: ${e.phaseAtEscalation} · resume: ${e.resumeTarget}`,
     );
+    if (e.artifactHints?.length) {
+      parts.push(`              hints: ${e.artifactHints.join(', ')}`);
+    }
   }
   parts.push('metadata:');
   parts.push(`  prompt:    ${state.metadata.prompt}`);

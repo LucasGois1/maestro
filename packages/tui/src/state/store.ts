@@ -1,4 +1,8 @@
-import type { PipelineStageName } from '@maestro/core';
+import type {
+  PipelineEscalationSource,
+  PipelineResumeTarget,
+  PipelineStageName,
+} from '@maestro/core';
 
 export type TuiMode = 'idle' | 'discovery' | 'run';
 
@@ -131,8 +135,19 @@ export type TuiPipelineStatus =
   | 'idle'
   | 'running'
   | 'paused'
+  | 'escalated'
   | 'completed'
   | 'failed';
+
+/** Contexto de escalação humana (espelha `pipeline.escalation_pending`). */
+export interface TuiEscalationDetail {
+  readonly reason: string;
+  readonly sprintIdx: number;
+  readonly source: PipelineEscalationSource;
+  readonly phaseAtEscalation: PipelineStageName;
+  readonly resumeTarget: PipelineResumeTarget;
+  readonly artifactHints?: readonly string[];
+}
 
 /** Finished pipeline runs for the home screen “Recent activity” list (newest first). */
 export interface TuiRecentRun {
@@ -195,6 +210,8 @@ export interface TuiPipelineState {
   readonly retryCount: number;
   readonly error: string | null;
   readonly history: readonly TuiStageRecord[];
+  /** Preenchido quando há escalação pendente (aguarda feedback / resume). */
+  readonly escalationDetail: TuiEscalationDetail | null;
 }
 
 export interface TuiSprintState {
@@ -379,6 +396,7 @@ export function createInitialTuiState(
       retryCount: 0,
       error: null,
       history: [],
+      escalationDetail: null,
     },
     sprints: [],
     agent: {
@@ -517,6 +535,8 @@ export function computeStageStatuses(
     );
     if (pipeline.status === 'failed') {
       statuses[pipeline.stage] = 'failed';
+    } else if (pipeline.status === 'escalated') {
+      statuses[pipeline.stage] = 'escalated';
     } else if (pipeline.status === 'paused') {
       statuses[pipeline.stage] = 'paused';
     } else if (hasEscalated && pipeline.status === 'running') {

@@ -1,5 +1,6 @@
 import { createEventBus } from '@maestro/core';
 import { editSprintContract, resolveContractPath } from '@maestro/contract';
+import { createStateStore, type StateStore } from '@maestro/state';
 import { App, playDemoEvents, resolveColorMode, type TuiState } from '@maestro/tui';
 import { existsSync } from 'node:fs';
 import { cwd } from 'node:process';
@@ -8,6 +9,7 @@ import { render, type Instance } from 'ink';
 import { createElement } from 'react';
 
 import { CLI_PACKAGE_VERSION } from '../cli-version.js';
+import { createPersistEscalationHumanFeedback } from '../persist-escalation-feedback.js';
 import { listMaestroFilesUnderRepo } from '../tui-kb.js';
 import { createTuiCommandExecutor } from '../tui-command-executor.js';
 import { createTuiStoreForWorkspace } from '../tui-workspace-store.js';
@@ -56,10 +58,12 @@ export function createTuiCommand(
 
         const bus = createEventBus();
         const store = await createTuiStoreForWorkspace({ repoRoot, colorMode });
+        const stateStore = createStateStore({ repoRoot });
         const kbFiles = listMaestroFilesUnderRepo(repoRoot);
         const commandExecutor = createTuiCommandExecutor({
           repoRoot,
           bus,
+          store: stateStore,
         });
 
         let inkInstance: Instance | undefined;
@@ -69,6 +73,7 @@ export function createTuiCommand(
             store,
             bus,
             colorMode,
+            stateStore,
             kbExplorer: {
               repoLabel: repoRoot,
               files: kbFiles,
@@ -118,6 +123,7 @@ export interface DefaultRenderAppArgs {
   readonly store: Awaited<ReturnType<typeof createTuiStoreForWorkspace>>;
   readonly bus: ReturnType<typeof createEventBus>;
   readonly colorMode: ReturnType<typeof resolveColorMode>;
+  readonly stateStore: StateStore;
   readonly kbExplorer?: {
     readonly repoLabel: string;
     readonly files: ReturnType<typeof listMaestroFilesUnderRepo>;
@@ -134,18 +140,24 @@ export function defaultRenderApp({
   store,
   bus,
   colorMode,
+  stateStore,
   kbExplorer,
   editPlan,
   commandExecutor,
   onForceExit,
 }: DefaultRenderAppArgs): Instance {
   const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  const persistEscalationHumanFeedback = createPersistEscalationHumanFeedback({
+    stateStore,
+    tuiStore: store,
+  });
   return render(
     createElement(App, {
       store,
       bus,
       colorMode,
       maestroVersion: CLI_PACKAGE_VERSION,
+      persistEscalationHumanFeedback,
       ...(kbExplorer ? { kbExplorer } : {}),
       ...(editPlan ? { editPlan } : {}),
       ...(commandExecutor ? { commandExecutor } : {}),

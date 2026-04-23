@@ -3,6 +3,7 @@ import { cwd } from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 import { createEventBus } from '@maestro/core';
+import { createStateStore } from '@maestro/state';
 import { App } from '@maestro/tui';
 import { Command } from 'commander';
 import { render, type Instance } from 'ink';
@@ -19,6 +20,7 @@ import { createRunCommand } from './commands/run.js';
 import { createRunsCommand } from './commands/runs.js';
 import { createTuiCommand } from './commands/tui.js';
 import { resolveCliMode } from './mode.js';
+import { createPersistEscalationHumanFeedback } from './persist-escalation-feedback.js';
 import { createTuiCommandExecutor } from './tui-command-executor.js';
 import { createTuiStoreForWorkspace } from './tui-workspace-store.js';
 import { ensureWorkspaceTrustInteractive } from './workspace-trust.js';
@@ -48,9 +50,11 @@ async function renderInkApp(_version: string, stdoutIsTTY: boolean) {
   const repoRoot = cwd();
   const bus = createEventBus();
   const store = await createTuiStoreForWorkspace({ repoRoot });
+  const stateStore = createStateStore({ repoRoot });
   const commandExecutor = createTuiCommandExecutor({
     repoRoot,
     bus,
+    store: stateStore,
   });
   let instance: Instance | undefined;
   instance = render(
@@ -59,6 +63,10 @@ async function renderInkApp(_version: string, stdoutIsTTY: boolean) {
       bus,
       commandExecutor,
       maestroVersion: packageJson.version,
+      persistEscalationHumanFeedback: createPersistEscalationHumanFeedback({
+        stateStore,
+        tuiStore: store,
+      }),
       onForceExit: () => {
         instance?.unmount();
         process.exit(0);

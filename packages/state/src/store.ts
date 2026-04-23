@@ -44,7 +44,10 @@ export interface StateStore {
   latest(): Promise<RunState | null>;
   /** Most recent run by `startedAt` (chronologically last started), for `/resume` without id. */
   latestStarted(): Promise<RunState | null>;
-  /** Última run `failed` ou `paused` (exclui `paused`+`escalated`), por `lastUpdatedAt`. */
+  /**
+   * Última run retomável: `failed`, ou `paused` (inclui `paused`+`escalated`).
+   * Prioridade: `paused`+`escalated` mais recente, depois `failed`, depois outras `paused`.
+   */
   latestResumable(): Promise<RunState | null>;
   delete(runId: string): Promise<void>;
 }
@@ -203,15 +206,21 @@ export function createStateStore(options: CreateStateStoreOptions): StateStore {
     async latestResumable() {
       const all = await this.list();
       const candidates = all.filter(
-        (s) =>
-          s.status === 'failed' ||
-          (s.status === 'paused' && s.phase !== 'escalated'),
+        (s) => s.status === 'failed' || s.status === 'paused',
       );
       if (candidates.length === 0) return null;
+      const rank = (s: RunState): number => {
+        if (s.status === 'paused' && s.phase === 'escalated') return 3;
+        if (s.status === 'failed') return 2;
+        if (s.status === 'paused') return 1;
+        return 0;
+      };
       return (
-        [...candidates].sort((a, b) =>
-          b.lastUpdatedAt.localeCompare(a.lastUpdatedAt),
-        )[0] ?? null
+        [...candidates].sort((a, b) => {
+          const r = rank(b) - rank(a);
+          if (r !== 0) return r;
+          return b.lastUpdatedAt.localeCompare(a.lastUpdatedAt);
+        })[0] ?? null
       );
     },
 

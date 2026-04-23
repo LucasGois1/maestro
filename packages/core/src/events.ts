@@ -53,6 +53,20 @@ export type PipelineStageName =
   | 'evaluating'
   | 'merging';
 
+/** Alinhado com `EscalationSource` em `@maestro/state` (eventos não dependem desse pacote). */
+export type PipelineEscalationSource =
+  | 'architect'
+  | 'evaluator'
+  | 'planner'
+  | 'pipeline';
+
+/** Alinhado com `ResumeTarget` em `@maestro/state`. */
+export type PipelineResumeTarget =
+  | 'ContinueGenerate'
+  | 'ReSeedContract'
+  | 'ReArchitectAndContract'
+  | 'ReplanOnly';
+
 export type PipelineEvent =
   | { readonly type: 'pipeline.started'; readonly runId: string }
   | {
@@ -78,6 +92,20 @@ export type PipelineEvent =
       readonly runId: string;
       readonly sprintIdx: number;
       readonly reason: string;
+      readonly source?: PipelineEscalationSource;
+      readonly phaseAtEscalation?: PipelineStageName;
+      readonly resumeTarget?: PipelineResumeTarget;
+      readonly artifactHints?: readonly string[];
+    }
+  | {
+      readonly type: 'pipeline.escalation_pending';
+      readonly runId: string;
+      readonly sprintIdx: number;
+      readonly reason: string;
+      readonly source: PipelineEscalationSource;
+      readonly phaseAtEscalation: PipelineStageName;
+      readonly resumeTarget: PipelineResumeTarget;
+      readonly artifactHints?: readonly string[];
     }
   | {
       readonly type: 'pipeline.plan_revised';
@@ -95,7 +123,10 @@ export type PipelineEvent =
   | {
       readonly type: 'pipeline.resumed';
       readonly runId: string;
-      readonly from: PipelineStageName;
+      /** Fase persistida; inclui `escalated` quando a run estava em escalação humana. */
+      readonly from: PipelineStageName | 'escalated';
+      /** Quando `from === 'escalated'`, fase operacional antes da pausa (ex.: `evaluating`). */
+      readonly phaseBeforeEscalation?: PipelineStageName;
     }
   | {
       readonly type: 'pipeline.completed';
