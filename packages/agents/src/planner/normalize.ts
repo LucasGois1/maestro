@@ -1,6 +1,7 @@
 import {
   isPlannerEscalation,
   type PlannerModelOutput,
+  type PlannerSuccessModelOutput,
   type UserStory,
 } from './plan-output.schema.js';
 
@@ -72,9 +73,11 @@ export function normalizePlannerModelOutput(
     throw new Error(`Planner escalation: ${raw.escalationReason}`);
   }
 
-  const storyById = new Map(raw.userStories.map((s) => [s.id, s] as const));
+  const plan = raw as PlannerSuccessModelOutput;
 
-  const sprints: PlannerPipelineSprint[] = raw.sprints.map((sp) => {
+  const storyById = new Map(plan.userStories.map((s) => [s.id, s] as const));
+
+  const sprints: PlannerPipelineSprint[] = plan.sprints.map((sp) => {
     const acceptance = formatAcceptance(
       sp.userStoryIds,
       storyById,
@@ -94,17 +97,17 @@ export function normalizePlannerModelOutput(
     };
   });
 
-  const overview = raw.overview.trim();
+  const overview = plan.overview.trim();
   const summary = overview.split('\n')[0]?.trim() ?? overview.slice(0, 200);
 
   return {
     runId: ctx.runId,
     prompt: ctx.prompt,
-    feature: raw.feature.trim(),
+    feature: plan.feature.trim(),
     overview,
     summary,
-    userStories: raw.userStories,
-    aiFeatures: raw.aiFeatures ?? [],
+    userStories: plan.userStories,
+    aiFeatures: plan.aiFeatures ?? [],
     sprints,
   };
 }
