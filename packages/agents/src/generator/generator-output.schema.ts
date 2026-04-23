@@ -6,7 +6,8 @@ const CONVENTIONAL_COMMIT_MESSAGE_RE =
 
 export const generatorModelOutputSchema = z
   .object({
-    sprintIdx: z.number().int().min(1),
+    /** Same 0-based cursor as INPUT.sprintIdx (pipeline loop index), not plan sprint.idx. */
+    sprintIdx: z.number().int().nonnegative(),
     filesChanged: z.array(
       z.object({
         path: z.string().min(1),

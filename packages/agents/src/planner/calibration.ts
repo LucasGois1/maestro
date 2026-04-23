@@ -4,6 +4,7 @@ import { PLANNER_SYSTEM_PROMPT } from './system-prompt.js';
 import {
   CONTRADICTION,
   IMPLICIT_SCOPE,
+  NARROW_DELIVERY,
   SIMPLE,
   VAGUE,
 } from './fixtures-data.js';
@@ -11,9 +12,14 @@ import {
 /** Few-shot pairs wired into `plannerAgent.calibration` (DSFT-90). */
 export const PLANNER_FEW_SHOT_EXAMPLES: readonly FewShotExample[] = [
   {
+    input: NARROW_DELIVERY.input,
+    output: NARROW_DELIVERY.output,
+    note: 'tarefa fechada → 1 sprint com entrega visível',
+  },
+  {
     input: SIMPLE.input,
     output: SIMPLE.output,
-    note: 'prompt simples → plano completo',
+    note: 'produto maior → vários sprints com dependência',
   },
   {
     input: IMPLICIT_SCOPE.input,

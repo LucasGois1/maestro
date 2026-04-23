@@ -27,7 +27,7 @@ Os eventos `agent.tool_call` e `agent.tool_result` são emitidos no bus para a T
 
 ## Calibração
 
-O `plannerAgent` inclui `calibration.fewShotExamples` (quatro cenários em `packages/agents/src/planner/fixtures-data.ts`): plano simples, escopo implícito, pedido vago → escalação, contradição → escalação. O texto resolvido do sistema (prompt + exemplos) está coberto por snapshot em `system-prompt.snapshot.test.ts`.
+O `plannerAgent` inclui `calibration.fewShotExamples` (cinco cenários em `packages/agents/src/planner/fixtures-data.ts`): tarefa fechada → um sprint, produto maior → vários sprints, escopo implícito, pedido vago → escalação, contradição → escalação. O texto resolvido do sistema (prompt + exemplos) está coberto por snapshot em `system-prompt.snapshot.test.ts`.
 
 ## Limitações
 

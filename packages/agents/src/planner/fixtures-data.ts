@@ -1,6 +1,43 @@
 import type { PlannerModelOutput } from './plan-output.schema.js';
 
-/** Simple prompt → full plan (≥2 sprints). */
+/** Narrow, user-visible scope → single sprint (proportional sizing). */
+export const NARROW_DELIVERY: {
+  readonly input: { readonly prompt: string };
+  readonly output: PlannerModelOutput;
+} = {
+  input: {
+    prompt:
+      'Replace Portuguese UI copy with English in the TUI help/footer and error strings; limit to packages/tui and related CLI copy.',
+  },
+  output: {
+    feature: 'EN copy for TUI',
+    overview:
+      'Users see consistent English strings in the terminal UI and related CLI messages.\nOne cohesive change set for the scoped surfaces.',
+    userStories: [
+      {
+        id: 1,
+        role: 'developer',
+        action: 'ship English UI strings in scope',
+        value: 'Portuguese literals removed from named packages',
+      },
+    ],
+    aiFeatures: [],
+    sprints: [
+      {
+        idx: 1,
+        name: 'Translate scoped copy',
+        objective:
+          'Update user-visible literals to English in the named packages; adjust tests if assertions pin old copy.',
+        userStoryIds: [1],
+        dependsOn: [],
+        complexity: 'low',
+        keyFeatures: ['TUI copy', 'CLI helper strings'],
+      },
+    ],
+  },
+};
+
+/** Product-sized prompt → multi-sprint plan with real dependency between sprints. */
 export const SIMPLE: {
   readonly input: { readonly prompt: string };
   readonly output: PlannerModelOutput;

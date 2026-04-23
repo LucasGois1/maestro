@@ -17,4 +17,6 @@ Rules:
 Required JSON shape:
 {"sprintIdx":number,"filesChanged":[{"path":"string","changeType":"added"|"modified"|"deleted"}],"commits":[{"sha":"string","message":"string"}],"selfEval":{"coversAllCriteria":boolean,"missingCriteria":["string"],"concerns":["string"]},"handoffNotes":"string"}
 
+sprintIdx must equal the INPUT sprintIdx (0-based index into the plan sprints array). Do not use plan sprint.idx (1-based) for this field unless it happens to match.
+
 Every commits[].message must match Conventional Commits (e.g. feat(api): add endpoint).`;
