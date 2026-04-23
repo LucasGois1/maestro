@@ -37,7 +37,7 @@ const plannerSuccessSchema = z
       for (const usId of sp.userStoryIds) {
         if (!storyIds.has(usId)) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             message: `Sprint "${sp.name}" references unknown user story id ${usId.toString()}`,
             path: ['sprints'],
           });
@@ -47,7 +47,7 @@ const plannerSuccessSchema = z
       for (const dep of sp.dependsOn) {
         if (!sprintIds.has(dep)) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             message: `Sprint idx ${sp.idx.toString()} depends on unknown sprint idx ${dep.toString()}`,
             path: ['sprints'],
           });
@@ -90,7 +90,7 @@ export const plannerModelOutputSchema = z
 
     if (hasEscalation && hasPlan) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message:
           'Provide either escalationReason (escalation) or a full plan, not both.',
         path: [],
@@ -99,7 +99,7 @@ export const plannerModelOutputSchema = z
     }
     if (!hasEscalation && !hasPlan) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message:
           'Provide escalationReason, or a full plan (feature, overview, userStories, sprints).',
         path: [],
@@ -120,7 +120,11 @@ export const plannerModelOutputSchema = z
     });
     if (!planParse.success) {
       for (const issue of planParse.error.issues) {
-        ctx.addIssue(issue);
+        ctx.addIssue({
+          code: 'custom',
+          message: issue.message,
+          path: issue.path,
+        });
       }
     }
   });

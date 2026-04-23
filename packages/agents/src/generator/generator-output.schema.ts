@@ -32,7 +32,7 @@ export const generatorModelOutputSchema = z
       const msg = val.commits[i]?.message ?? '';
       if (!CONVENTIONAL_COMMIT_MESSAGE_RE.test(msg.trim())) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           message: `commits[${i.toString()}].message must follow Conventional Commits (e.g. feat(scope): summary)`,
           path: ['commits', i, 'message'],
         });
