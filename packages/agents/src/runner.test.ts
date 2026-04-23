@@ -1,4 +1,5 @@
 import type {
+  LanguageModelV3GenerateResult,
   LanguageModelV3StreamPart,
   LanguageModelV3Usage,
 } from '@ai-sdk/provider';
@@ -8,12 +9,25 @@ import { z } from 'zod';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AgentContext, AgentDefinition } from './definition.js';
-import { AgentValidationError, runAgent } from './runner.js';
+import {
+  AgentOutputParseError,
+  AgentValidationError,
+  runAgent,
+} from './runner.js';
 
 const usage: LanguageModelV3Usage = {
   inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
   outputTokens: { total: 1, text: 1, reasoning: 0 },
 };
+
+function makeGenerateResult(text: string): LanguageModelV3GenerateResult {
+  return {
+    content: [{ type: 'text', text }],
+    finishReason: { unified: 'stop', raw: 'stop' },
+    usage,
+    warnings: [],
+  };
+}
 
 function makeStream(text: string): LanguageModelV3StreamPart[] {
   return [
@@ -28,12 +42,14 @@ function makeStream(text: string): LanguageModelV3StreamPart[] {
   ];
 }
 
-function mockModel(text: string) {
+/** `generateText` + `Output.object` uses `doGenerate` (not `doStream`). */
+function mockModel(jsonText: string) {
   return new MockLanguageModelV3({
     provider: 'mock',
     modelId: 'mock-1',
+    doGenerate: async () => makeGenerateResult(jsonText),
     doStream: async () => ({
-      stream: simulateReadableStream({ chunks: makeStream(text) }),
+      stream: simulateReadableStream({ chunks: makeStream(jsonText) }),
     }),
   });
 }
@@ -68,7 +84,7 @@ describe('runAgent', () => {
     ).rejects.toBeInstanceOf(AgentValidationError);
   });
 
-  it('streams deltas, validates output, and emits started + completed', async () => {
+  it('emits a single final delta, validates output, and emits started + completed', async () => {
     const bus = createEventBus();
     const events: AgentEvent[] = [];
     bus.on((e) => {
@@ -84,6 +100,7 @@ describe('runAgent', () => {
     });
 
     expect(result.output).toEqual({ echoed: 'hi' });
+    expect(result.text).toBe(JSON.stringify({ echoed: 'hi' }, null, 2));
     const types = events.map((e) => e.type);
     expect(types).toEqual(
       expect.arrayContaining([
@@ -92,30 +109,37 @@ describe('runAgent', () => {
         'agent.completed',
       ]),
     );
+    const deltas = events.filter((e) => e.type === 'agent.delta');
+    expect(deltas).toHaveLength(1);
+    expect(
+      deltas[0]?.type === 'agent.delta' && deltas[0].chunk,
+    ).toContain('"echoed"');
   });
 
-  it('parses fenced JSON in the model output', async () => {
+  it('rejects markdown-fenced JSON as structured output (no legacy fence stripping)', async () => {
     const bus = createEventBus();
-    const result = await runAgent({
-      definition: echoAgent,
-      input: { value: 'hi' },
-      context: ctx,
-      bus,
-      model: mockModel('```json\n{"echoed":"fenced"}\n```'),
-    });
-    expect(result.output.echoed).toBe('fenced');
+    await expect(
+      runAgent({
+        definition: echoAgent,
+        input: { value: 'hi' },
+        context: ctx,
+        bus,
+        model: mockModel('```json\n{"echoed":"fenced"}\n```'),
+      }),
+    ).rejects.toBeInstanceOf(AgentOutputParseError);
   });
 
-  it('repairs near-JSON from the model (e.g. trailing comma) before validating', async () => {
+  it('rejects invalid JSON text from the model (no jsonrepair path)', async () => {
     const bus = createEventBus();
-    const result = await runAgent({
-      definition: echoAgent,
-      input: { value: 'hi' },
-      context: ctx,
-      bus,
-      model: mockModel('{"echoed":"ok",}'),
-    });
-    expect(result.output.echoed).toBe('ok');
+    await expect(
+      runAgent({
+        definition: echoAgent,
+        input: { value: 'hi' },
+        context: ctx,
+        bus,
+        model: mockModel('{"echoed":"ok",}'),
+      }),
+    ).rejects.toBeInstanceOf(AgentOutputParseError);
   });
 
   it('emits agent.failed when output fails validation', async () => {

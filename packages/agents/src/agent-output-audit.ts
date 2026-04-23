@@ -18,6 +18,8 @@ function resolveMaestroDir(metadata: Readonly<Record<string, unknown>>): string 
 export type GenerateTextAuditModel = {
   readonly finishReason: string;
   readonly textLength: number;
+  readonly structuredOutputPresent: boolean;
+  readonly structuredOutputJsonPreview?: string;
   readonly steps: ReadonlyArray<{
     readonly stepNumber: number;
     readonly textLength: number;
@@ -42,6 +44,7 @@ export function buildGenerateTextAuditModel(gen: {
   return {
     finishReason: gen.finishReason,
     textLength: gen.text.length,
+    structuredOutputPresent: false,
     steps: gen.steps.map((s) => ({
       stepNumber: s.stepNumber,
       textLength: s.text.length,
@@ -55,23 +58,41 @@ export function buildGenerateTextAuditModel(gen: {
 
 /** Snapshot of a `generateText` tool loop for parse-failure audits. */
 export function serializeGenerateTextForAudit(
-  gen: GenerateTextResult<ToolSet, never>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches `generateText` with `Output.object` (second generic is an `Output` spec)
+  gen: GenerateTextResult<ToolSet, any>,
 ): GenerateTextAuditModel {
-  return buildGenerateTextAuditModel({
-    text: gen.text,
-    finishReason: String(gen.finishReason),
-    steps: gen.steps.map((s) => ({
-      stepNumber: s.stepNumber,
-      text: s.text,
-      finishReason: String(s.finishReason),
-      toolCalls: s.toolCalls.map((tc) => ({ toolName: tc.toolName })),
-    })),
-    response: {
-      messages: gen.response.messages.map((m) => ({
-        role: String(m.role),
+  const structured = gen.output as unknown;
+  const structuredPresent = structured !== undefined && structured !== null;
+  let structuredPreview: string | undefined;
+  if (structuredPresent) {
+    try {
+      const s = JSON.stringify(structured, null, 2);
+      structuredPreview = s.length > 4_000 ? `${s.slice(0, 4_000)}…` : s;
+    } catch {
+      structuredPreview = '[non-serializable structured output]';
+    }
+  }
+  return {
+    ...buildGenerateTextAuditModel({
+      text: gen.text,
+      finishReason: String(gen.finishReason),
+      steps: gen.steps.map((s) => ({
+        stepNumber: s.stepNumber,
+        text: s.text,
+        finishReason: String(s.finishReason),
+        toolCalls: s.toolCalls.map((tc) => ({ toolName: tc.toolName })),
       })),
-    },
-  });
+      response: {
+        messages: gen.response.messages.map((m) => ({
+          role: String(m.role),
+        })),
+      },
+    }),
+    structuredOutputPresent: structuredPresent,
+    ...(structuredPreview !== undefined
+      ? { structuredOutputJsonPreview: structuredPreview }
+      : {}),
+  };
 }
 
 export type WriteAgentParseAuditOptions = {

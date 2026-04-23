@@ -41,7 +41,7 @@ export async function createDiscoveryRunLog(
         await appendLine(error.rawModelOutput);
       }
       if (error instanceof AgentOutputParseError) {
-        await appendLine('--- full model output (JSON parse failed) ---');
+        await appendLine('--- full model output (structured output / parse failed) ---');
         await appendLine(error.rawText);
       }
     },

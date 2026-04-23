@@ -2,12 +2,17 @@
  * AI SDK `generateText`: `result.text` is only the **last** step's assistant text.
  * When the loop ends on tool calls, that field can be empty even if an earlier
  * step already emitted the JSON plan — we scan steps backwards for non-empty text.
+ *
+ * @deprecated `runAgent` now uses `generateText` + `Output.object` and reads
+ * `result.output` instead of scraping assistant text. Kept for unit tests and
+ * any legacy diagnostics.
  */
 export type ToolLoopTextSource = {
   readonly text: string;
   readonly steps: ReadonlyArray<{ readonly text: string }>;
 };
 
+/** @deprecated See {@link ToolLoopTextSource}. */
 export function collectAssistantTextFromToolLoopResult(
   gen: ToolLoopTextSource,
 ): string {

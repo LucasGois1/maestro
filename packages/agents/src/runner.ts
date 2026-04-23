@@ -1,9 +1,8 @@
 import type { MaestroConfig } from '@maestro/config';
 import { DEFAULT_CONFIG } from '@maestro/config';
 import type { EventBus } from '@maestro/core';
-import { getModel, streamText } from '@maestro/provider';
+import { getModel } from '@maestro/provider';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
-import { jsonrepair } from 'jsonrepair';
 
 import type { ZodIssue } from 'zod';
 
@@ -12,7 +11,14 @@ import type {
   AgentDefinition,
   AnyAgentDefinition,
 } from './definition.js';
-import { generateText, stepCountIs, type ToolSet } from 'ai';
+import {
+  generateText,
+  NoObjectGeneratedError,
+  Output,
+  stepCountIs,
+  TypeValidationError,
+  type ToolSet,
+} from 'ai';
 
 import {
   serializeGenerateTextForAudit,
@@ -25,7 +31,68 @@ import { createGeneratorToolSet } from './generator-tools.js';
 import { createMergerToolSet } from './merger-tools.js';
 import { createGardenerToolSet } from './gardener-tools.js';
 import { createArchitectToolSet, createPlannerToolSet } from './repo-tools.js';
-import { collectAssistantTextFromToolLoopResult } from './tool-loop-text.js';
+
+/** Structured `agent.delta` payloads are synthetic (one chunk); keep TUI/logs bounded. */
+const AGENT_DELTA_MAX_CHARS = 12_000;
+
+function truncateAgentDeltaPayload(text: string): string {
+  return text.length > AGENT_DELTA_MAX_CHARS
+    ? `${text.slice(0, AGENT_DELTA_MAX_CHARS)}…`
+    : text;
+}
+
+function rethrowStructuredGenerationError(
+  error: unknown,
+  opts: { readonly outputSchema: AnyAgentDefinition['outputSchema']; readonly agentId: string },
+): never {
+  if (NoObjectGeneratedError.isInstance(error)) {
+    const raw = error.text ?? '';
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const parsed: unknown = JSON.parse(trimmed);
+        const outputParse = opts.outputSchema.safeParse(parsed);
+        if (!outputParse.success) {
+          const issues = outputParse.error.issues;
+          const body = formatZodIssues(issues);
+          throw new AgentValidationError(
+            `Invalid output from agent "${opts.agentId}" (${issues.length} schema issue(s)):\n${body}`,
+            'output',
+            issues,
+            raw,
+          );
+        }
+      } catch (nested) {
+        if (nested instanceof AgentValidationError) {
+          throw nested;
+        }
+      }
+    }
+    throw new AgentOutputParseError(
+      `Structured output could not be generated: ${error.message}`,
+      raw,
+    );
+  }
+  if (TypeValidationError.isInstance(error)) {
+    let raw: string;
+    if (typeof error.value === 'string') {
+      raw = error.value;
+    } else {
+      try {
+        raw = JSON.stringify(error.value, null, 2);
+      } catch {
+        raw = String(error.value);
+      }
+    }
+    throw new AgentValidationError(
+      `Structured output failed type validation: ${error.message}`,
+      'output',
+      [error.cause ?? error.message],
+      raw,
+    );
+  }
+  throw error;
+}
 
 function formatZodIssues(issues: readonly ZodIssue[]): string {
   return issues
@@ -80,7 +147,7 @@ export function formatAgentErrorForDisplay(error: unknown): {
         ? `\n\nAudit log: ${auditPath}`
         : '';
     return {
-      summary: 'Model output was not valid JSON',
+      summary: 'Structured output could not be parsed from the model',
       detail: `${error.message}${audit}\n\n--- Raw output (truncated for screen) ---\n${head}`,
     };
   }
@@ -174,9 +241,9 @@ function stringifyInput(input: unknown): string {
   return JSON.stringify(input, null, 2);
 }
 
-/** When the tool loop hits maxSteps on tool-calls, the model may never emit a text turn. */
+/** When the tool loop hits maxSteps on tool-calls, the model may never emit structured output. */
 const TOOL_LOOP_JSON_RECOVERY_USER =
-  'The tool exploration phase finished without a final assistant text. Using the conversation and tool results above, output exactly one JSON object only: no markdown code fences, no commentary before or after. It must satisfy the output contract from the system message.';
+  'The tool exploration phase finished without structured output. Using the conversation and tool results above, produce the final structured output required by the system message. Do not use tools.';
 
 async function generateToolAugmentedAgentText(options: {
   readonly model: LanguageModelV3;
@@ -184,85 +251,113 @@ async function generateToolAugmentedAgentText(options: {
   readonly prompt: string;
   readonly bus: EventBus;
   readonly agentId: string;
-  readonly runId: string;
-  readonly workingDir: string;
+  readonly parseAuditContext: AgentContext;
   readonly tools: ToolSet;
   readonly maxSteps: number;
+  readonly outputSchema: AnyAgentDefinition['outputSchema'];
 }): Promise<{
-  readonly outputText: string;
+  readonly structuredOutput: unknown;
   readonly generateResult: Awaited<ReturnType<typeof generateText>>;
   readonly toolLoopRecoveryAttempted: boolean;
 }> {
-  const gen = await generateText({
-    model: options.model,
-    system: options.system,
-    prompt: options.prompt,
-    tools: options.tools,
-    stopWhen: stepCountIs(options.maxSteps),
-    experimental_onToolCallStart: ({ toolCall }) => {
-      options.bus.emit({
-        type: 'agent.tool_call',
-        agentId: options.agentId,
-        runId: options.runId,
-        tool: toolCall.toolName,
-        args: toolCall.input,
-      });
-    },
-    experimental_onToolCallFinish: (event) => {
-      options.bus.emit({
-        type: 'agent.tool_result',
-        agentId: options.agentId,
-        runId: options.runId,
-        tool: event.toolCall.toolName,
-        result: event.success ? event.output : event.error,
-      });
-    },
+  const structuredOutputSpec = Output.object({
+    schema: options.outputSchema,
+    name: options.agentId,
+    description: 'Final Maestro agent output (JSON object matching the output schema).',
   });
-  let outputText = collectAssistantTextFromToolLoopResult(gen);
-  let toolLoopRecoveryAttempted = false;
-  if (outputText.trim().length === 0) {
-    toolLoopRecoveryAttempted = true;
-    const recovery = await generateText({
+
+  // `Output.object` consumes an extra step after tool calls; keep headroom so stopWhen does not cut early.
+  let gen: Awaited<ReturnType<typeof generateText>>;
+  try {
+    gen = await generateText({
       model: options.model,
-      system: `${options.system}\n\n---\nFollow-up: do not use tools. Respond with the final JSON object only.`,
-      messages: [
-        ...gen.response.messages,
-        { role: 'user', content: TOOL_LOOP_JSON_RECOVERY_USER },
-      ],
-      stopWhen: stepCountIs(3),
+      system: options.system,
+      prompt: options.prompt,
+      tools: options.tools,
+      output: structuredOutputSpec,
+      stopWhen: stepCountIs(options.maxSteps + 2),
+      experimental_onToolCallStart: ({ toolCall }) => {
+        options.bus.emit({
+          type: 'agent.tool_call',
+          agentId: options.agentId,
+          runId: options.parseAuditContext.runId,
+          tool: toolCall.toolName,
+          args: toolCall.input,
+        });
+      },
+      experimental_onToolCallFinish: (event) => {
+        options.bus.emit({
+          type: 'agent.tool_result',
+          agentId: options.agentId,
+          runId: options.parseAuditContext.runId,
+          tool: event.toolCall.toolName,
+          result: event.success ? event.output : event.error,
+        });
+      },
     });
-    outputText = collectAssistantTextFromToolLoopResult(recovery);
+  } catch (error) {
+    rethrowStructuredGenerationError(error, {
+      outputSchema: options.outputSchema,
+      agentId: options.agentId,
+    });
   }
-  if (outputText.length > 0) {
+
+  let structured: unknown = gen.output;
+  let toolLoopRecoveryAttempted = false;
+  if (structured === undefined) {
+    toolLoopRecoveryAttempted = true;
+    let recovery: Awaited<ReturnType<typeof generateText>>;
+    try {
+      recovery = await generateText({
+        model: options.model,
+        system: `${options.system}\n\n---\nFollow-up: do not use tools. Produce only the structured output required by the output schema.`,
+        messages: [
+          ...gen.response.messages,
+          { role: 'user', content: TOOL_LOOP_JSON_RECOVERY_USER },
+        ],
+        output: structuredOutputSpec,
+        stopWhen: stepCountIs(5),
+      });
+    } catch (error) {
+      rethrowStructuredGenerationError(error, {
+        outputSchema: options.outputSchema,
+        agentId: options.agentId,
+      });
+    }
+    structured = recovery.output;
+    if (structured === undefined) {
+      const err = new AgentOutputParseError(
+        'After tool execution the model produced no structured output.',
+        recovery.text ?? '',
+      );
+      const auditPath = await writeAgentParseAuditLog({
+        context: options.parseAuditContext,
+        agentId: options.agentId,
+        candidateText: recovery.text ?? '',
+        parseMessage: err.message,
+        generateTextAudit: serializeGenerateTextForAudit(gen),
+        toolLoopRecoveryAttempted: true,
+      });
+      if (auditPath) {
+        err.auditLogPath = auditPath;
+        err.message = `${err.message}\nAudit: ${auditPath}`;
+      }
+      throw err;
+    }
+  }
+
+  const delta = truncateAgentDeltaPayload(
+    JSON.stringify(structured, null, 2),
+  );
+  if (delta.length > 0) {
     options.bus.emit({
       type: 'agent.delta',
       agentId: options.agentId,
-      runId: options.runId,
-      chunk: outputText,
+      runId: options.parseAuditContext.runId,
+      chunk: delta,
     });
   }
-  return { outputText, generateResult: gen, toolLoopRecoveryAttempted };
-}
-
-function extractJsonObject(text: string): unknown {
-  const trimmed = text.trim();
-  const fenceMatch = /```(?:json)?\s*([\s\S]*?)```/u.exec(trimmed);
-  const candidate = fenceMatch?.[1]?.trim() ?? trimmed;
-  try {
-    return JSON.parse(candidate);
-  } catch (first) {
-    /** LLMs often emit almost-JSON: newlines inside strings, stray commas, etc. */
-    try {
-      return JSON.parse(jsonrepair(candidate));
-    } catch (second) {
-      const a = first instanceof Error ? first.message : String(first);
-      const b = second instanceof Error ? second.message : String(second);
-      throw new AgentOutputParseError(
-        `Agent output was not valid JSON (parse: ${a}; after repair: ${b}).`,
-        text,
-      );
-    }
-  }
+  return { structuredOutput: structured, generateResult: gen, toolLoopRecoveryAttempted };
 }
 
 export async function runAgent<TInput, TOutput>(
@@ -295,6 +390,7 @@ export async function runAgent<TInput, TOutput>(
     const prompt = stringifyInput(inputParse.data);
 
     let text = '';
+    let outputCandidate: unknown;
     let toolLoopGen: Awaited<ReturnType<typeof generateText>> | undefined;
     let toolLoopRecoveryAttempted = false;
 
@@ -392,52 +488,51 @@ export async function runAgent<TInput, TOutput>(
         prompt,
         bus,
         agentId: definition.id,
-        runId: context.runId,
-        workingDir: context.workingDir,
+        parseAuditContext: context,
         tools: toolAugmented.tools,
         maxSteps: toolAugmented.maxSteps,
+        outputSchema: definition.outputSchema,
       });
-      text = loop.outputText;
+      outputCandidate = loop.structuredOutput;
       toolLoopGen = loop.generateResult;
       toolLoopRecoveryAttempted = loop.toolLoopRecoveryAttempted;
+      text = JSON.stringify(outputCandidate, null, 2);
     } else {
-      const result = streamText({
-        model,
-        system,
-        prompt,
+      const structuredOutputSpec = Output.object({
+        schema: definition.outputSchema,
+        name: definition.id,
+        description: 'Maestro agent output (JSON object matching the output schema).',
       });
-
-      for await (const chunk of result.textStream) {
-        text += chunk;
-        bus.emit({
-          type: 'agent.delta',
+      let gen: Awaited<ReturnType<typeof generateText>>;
+      try {
+        gen = await generateText({
+          model,
+          system,
+          prompt,
+          output: structuredOutputSpec,
+        });
+      } catch (error) {
+        rethrowStructuredGenerationError(error, {
+          outputSchema: definition.outputSchema,
           agentId: definition.id,
-          runId: context.runId,
-          chunk,
         });
       }
+      outputCandidate = gen.output;
+      if (outputCandidate === undefined) {
+        throw new AgentOutputParseError(
+          'Structured output missing from model response.',
+          gen.text ?? '',
+        );
+      }
+      text = JSON.stringify(outputCandidate, null, 2);
+      bus.emit({
+        type: 'agent.delta',
+        agentId: definition.id,
+        runId: context.runId,
+        chunk: truncateAgentDeltaPayload(text),
+      });
     }
 
-    let outputCandidate: unknown;
-    try {
-      outputCandidate = extractJsonObject(text);
-    } catch (err) {
-      if (err instanceof AgentOutputParseError && toolLoopGen !== undefined) {
-        const auditPath = await writeAgentParseAuditLog({
-          context,
-          agentId: definition.id,
-          candidateText: text,
-          parseMessage: err.message,
-          generateTextAudit: serializeGenerateTextForAudit(toolLoopGen),
-          toolLoopRecoveryAttempted,
-        });
-        if (auditPath) {
-          err.auditLogPath = auditPath;
-          err.message = `${err.message}\nAudit: ${auditPath}`;
-        }
-      }
-      throw err;
-    }
     const outputParse = definition.outputSchema.safeParse(outputCandidate);
     if (!outputParse.success) {
       const issues = outputParse.error.issues;
