@@ -55,6 +55,12 @@ describe('maestro init', () => {
     const log = await readFile(join(repoRoot, '.maestro', 'log.md'), 'utf8');
     expect(log).toContain('project.initialized');
 
+    const sensorsRaw = await readFile(
+      join(repoRoot, '.maestro', 'sensors.json'),
+      'utf8',
+    );
+    expect(sensorsRaw).toContain('"sensors": []');
+
     const report = await lintKnowledgeBase({ repoRoot });
     expect(report.ok).toBe(true);
     expect(report.issues).toHaveLength(0);

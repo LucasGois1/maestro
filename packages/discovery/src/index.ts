@@ -20,6 +20,15 @@ export { detectStack } from './stack-detector.js';
 export { analyzeStructure, pathIsDirectory } from './structural-analyzer.js';
 export { runComputationalDiscovery } from './computational.js';
 export {
+  buildCatalogSensorCandidates,
+  buildHeuristicSensorCandidates,
+  runSensorCandidateInference,
+  type RunSensorCandidateInferenceOptions,
+  type RunSensorCandidateInferenceResult,
+  type SensorInitCandidate,
+  type SensorInitCandidateSource,
+} from './sensor-candidates.js';
+export {
   runInferentialDiscovery,
   type InferentialDiscoveryProgressStep,
   type RunInferentialDiscoveryOptions,

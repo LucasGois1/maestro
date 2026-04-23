@@ -46,6 +46,14 @@ export {
   mergerAgent,
   plannerAgent,
 } from './built-in.js';
+export { sensorSetupAgent } from './sensor-setup/sensor-setup-agent.js';
+export {
+  sensorSetupAgentInputSchema,
+  sensorSetupAgentOutputSchema,
+  type SensorSetupAgentInput,
+  type SensorSetupAgentOutput,
+  type SensorSetupCandidate,
+} from './sensor-setup/sensor-setup-schemas.js';
 
 export {
   ARCHITECT_FEW_SHOT_EXAMPLES,

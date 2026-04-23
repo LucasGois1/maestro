@@ -23,6 +23,7 @@
     "@maestro/config": "workspace:^",
     "@maestro/core": "workspace:^",
     "@maestro/git": "workspace:^",
-    "@maestro/kb": "workspace:^"
+    "@maestro/kb": "workspace:^",
+    "@maestro/provider": "workspace:^"
   }
 }

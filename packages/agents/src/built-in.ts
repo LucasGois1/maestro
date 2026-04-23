@@ -28,6 +28,7 @@ import { DOC_GARDENER_FEW_SHOT_EXAMPLES } from './doc-gardener/calibration.js';
 import { gardenerInputSchema } from './doc-gardener/gardener-input.schema.js';
 import { gardenerOutputSchema } from './doc-gardener/gardener-output.schema.js';
 import { DOC_GARDENER_SYSTEM_PROMPT } from './doc-gardener/system-prompt.js';
+import { sensorSetupAgent } from './sensor-setup/sensor-setup-agent.js';
 
 const architectInputSchema = z.object({
   plan: z.unknown(),
@@ -292,6 +293,7 @@ export const BUILT_IN_AGENTS = [
   codeReviewerAgent,
   docGardenerAgent,
   discoveryAgent,
+  sensorSetupAgent,
 ] as const;
 
 /** Exposed for tests: validates + normalizes discovery agent JSON output. */

@@ -19,8 +19,9 @@ import {
   formatDiscoveryProviderSummary,
   runInitDiscoveryTui,
 } from '../init-discovery-tui.js';
-import { mountPostInitHomeShell } from '../post-init-home-tui.js';
+import { runSensorSetupAfterKbInit } from '../init-sensor-phase.js';
 import { runInitModelSetupInk } from '../init-model-setup.js';
+import { mountPostInitHomeShell } from '../post-init-home-tui.js';
 import {
   resolveDiscoveryConfigNonInteractive,
   runDiscoveryProviderSetupInk,
@@ -94,12 +95,17 @@ export function createInitCommand(options: InitCommandOptions = {}): Command {
       '--commit',
       'After KB files are written, switch to discovery.initBranch and commit .maestro/ (no-op if not a git repo)',
     )
+    .option(
+      '--skip-sensor-wizard',
+      'Skip interactive sensor setup (for CI; ensure .maestro/sensors.json is valid separately)',
+    )
     .action(
       async (flags: {
         template?: string;
         ai: boolean;
         apply?: boolean;
         commit?: boolean;
+        skipSensorWizard?: boolean;
       }) => {
         const repoRoot = cwd();
         const interactiveModelWizard =
@@ -123,6 +129,10 @@ export function createInitCommand(options: InitCommandOptions = {}): Command {
         const kb = createKBManager({ repoRoot });
         await kb.init();
 
+        const { resolved: config } = await loadConfigWithAutoResolvedModels({
+          cwd: repoRoot,
+        });
+
         if (flags.template !== undefined) {
           if (!isGreenfieldTemplateId(flags.template)) {
             io.stderr(
@@ -132,6 +142,20 @@ export function createInitCommand(options: InitCommandOptions = {}): Command {
             return;
           }
           await applyGreenfieldTemplate(repoRoot, flags.template);
+          const sensorsOk = await runSensorSetupAfterKbInit({
+            repoRoot,
+            kb,
+            config,
+            flags: {
+              ai: flags.ai,
+              skipSensorWizard: flags.skipSensorWizard === true,
+            },
+            io,
+          });
+          if (!sensorsOk) {
+            process.exitCode = 1;
+            return;
+          }
           await kb.appendLog({
             event: 'project.initialized',
             detail: `Greenfield template applied: ${flags.template}`,
@@ -142,9 +166,20 @@ export function createInitCommand(options: InitCommandOptions = {}): Command {
           return;
         }
 
-        const { resolved: config } = await loadConfigWithAutoResolvedModels({
-    cwd: repoRoot,
-  });
+        const sensorsOk = await runSensorSetupAfterKbInit({
+          repoRoot,
+          kb,
+          config,
+          flags: {
+            ai: flags.ai,
+            skipSensorWizard: flags.skipSensorWizard === true,
+          },
+          io,
+        });
+        if (!sensorsOk) {
+          process.exitCode = 1;
+          return;
+        }
 
         if (flags.ai === false) {
           const comp = await runComputationalDiscovery(repoRoot);

@@ -134,6 +134,9 @@ importers:
       '@maestro/provider':
         specifier: workspace:^
         version: link:../provider
+      '@maestro/sensors':
+        specifier: workspace:^
+        version: link:../sensors
       '@maestro/state':
         specifier: workspace:*
         version: link:../state
@@ -193,6 +196,9 @@ importers:
       '@maestro/kb':
         specifier: workspace:^
         version: link:../kb
+      '@maestro/provider':
+        specifier: workspace:^
+        version: link:../provider
 
   packages/git:
     dependencies:

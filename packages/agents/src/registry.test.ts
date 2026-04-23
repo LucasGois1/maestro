@@ -50,6 +50,7 @@ describe('AgentRegistry', () => {
     expect(r.background().map((d) => d.id)).toEqual([
       'doc-gardener',
       'discovery',
+      'sensor-setup',
     ]);
   });
 

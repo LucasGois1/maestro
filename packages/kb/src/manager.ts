@@ -97,16 +97,7 @@ Explain the main runtime or request flow through the system.
 const DEFAULT_SENSORS_JSON = `${JSON.stringify(
   {
     concurrency: 4,
-    sensors: [
-      {
-        id: 'code-review',
-        kind: 'inferential',
-        agent: 'code-reviewer',
-        onFail: 'warn',
-        appliesTo: ['**/*.{py,ts,tsx,js,jsx,go,rs,java}'],
-        criteria: [],
-      },
-    ],
+    sensors: [],
   },
   null,
   2,

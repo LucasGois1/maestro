@@ -22,6 +22,7 @@
     "@maestro/kb": "workspace:^",
     "@maestro/pipeline": "workspace:*",
     "@maestro/provider": "workspace:^",
+    "@maestro/sensors": "workspace:^",
     "@maestro/state": "workspace:*",
     "@maestro/tui": "workspace:*",
     "commander": "^14.0.1",
