@@ -5,7 +5,10 @@ export const generatorInputSchema = z.object({
   runId: z.string().min(1),
   /** Índice 0-based do sprint no array do plano. */
   sprintIdx: z.number().int().nonnegative(),
-  repoRoot: z.string().min(1),
+  /** Raiz onde editar código (worktree ou checkout único). */
+  implementationRoot: z.string().min(1),
+  /** Checkout principal: `.maestro/runs`, sensors, audit de shell. */
+  stateRepoRoot: z.string().min(1),
   sprint: z.unknown(),
   sprintContract: z.unknown(),
   planFull: z.unknown(),

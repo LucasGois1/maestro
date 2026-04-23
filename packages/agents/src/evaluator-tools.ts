@@ -182,6 +182,7 @@ export function createEvaluatorToolSet(
       executeRunSensorTool(
         {
           repoRoot: ctx.repoRoot,
+          executionRoot: ctx.worktreeRoot,
           runId: ctx.runId,
           bus: ctx.bus,
           ...(ctx.maestroDir !== undefined

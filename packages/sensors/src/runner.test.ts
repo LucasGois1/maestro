@@ -223,6 +223,49 @@ describe('runSensor', () => {
     );
   });
 
+  it('uses executionRoot as cwd base when distinct from repoRoot', async () => {
+    const shellRunner = vi.fn<ShellRunner>(
+      async ({ cwd, repoRoot }) =>
+        ({
+          exitCode: 0,
+          stdout: `${cwd}|${repoRoot}`,
+          stderr: '',
+          durationMs: 1,
+          decision: { kind: 'allow', reason: 'allowlist' },
+          approvedBy: 'allowlist',
+        }) satisfies RunCommandResult,
+    );
+
+    await runSensor(
+      {
+        id: 'root-only',
+        kind: 'computational',
+        command: 'pwd',
+        args: [],
+        parseOutput: 'generic',
+        expectExitCode: 0,
+        timeoutSec: 5,
+        onFail: 'block',
+        appliesTo: [],
+      },
+      {
+        runId: 'r-exec-root',
+        repoRoot: '/repo-main',
+        executionRoot: '/repo-wt',
+        bus: createEventBus(),
+        policy: composePolicy({ mode: 'allowlist' }),
+        shellRunner,
+      },
+    );
+
+    expect(shellRunner).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cwd: '/repo-wt',
+        repoRoot: '/repo-main',
+      }),
+    );
+  });
+
   it('marks inferential approve runs without findings as passed', async () => {
     const agentRunner = vi.fn(
       async (): Promise<{

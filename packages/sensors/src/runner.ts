@@ -43,7 +43,14 @@ export type AgentRunner = (options: {
 
 export type SensorRunContext = {
   readonly runId: string;
+  /**
+   * Checkout principal: sensors.json, KB, audit (`runShellCommand.repoRoot`).
+   */
   readonly repoRoot: string;
+  /**
+   * Raiz onde comandos computacionais correm (ex.: worktree). Omite-se = `repoRoot`.
+   */
+  readonly executionRoot?: string;
   readonly bus: EventBus;
   readonly maestroDir?: string;
   readonly diff?: string;
@@ -174,12 +181,16 @@ function splitCommandString(command: string): string[] {
 
 function resolveCwd(
   sensor: ComputationalSensorDefinition,
-  repoRoot: string,
+  baseRoot: string,
 ): string {
   if (!sensor.cwd) {
-    return repoRoot;
+    return baseRoot;
   }
-  return resolve(repoRoot, sensor.cwd);
+  return resolve(baseRoot, sensor.cwd);
+}
+
+function sensorShellBase(context: SensorRunContext): string {
+  return context.executionRoot ?? context.repoRoot;
 }
 
 function buildInferentialAgentInput(
@@ -290,7 +301,7 @@ async function runComputationalSensor(
     const execution = await shellRunner({
       cmd,
       args,
-      cwd: resolveCwd(sensor, context.repoRoot),
+      cwd: resolveCwd(sensor, sensorShellBase(context)),
       runId: context.runId,
       repoRoot: context.repoRoot,
       ...(context.maestroDir !== undefined
@@ -433,7 +444,7 @@ async function runInferentialSensor(
       context: {
         agentId: sensor.agent,
         runId: context.runId,
-        workingDir: context.repoRoot,
+        workingDir: sensorShellBase(context),
         metadata: {
           sensorId: sensor.id,
           criteria: sensor.criteria,

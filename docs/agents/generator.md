@@ -2,11 +2,15 @@
 
 O **Generator** implementa **um sprint de cada vez** no repositório de trabalho, usando ferramentas (ficheiros, shell com _permission model_, sensores, git) e devolve JSON validado por `generatorModelOutputSchema` em `@maestro/agents`. O pipeline grava `.maestro/runs/<runId>/checkpoints/sprint-<n>-self-eval.md` e atualiza o handoff com `handoffNotes` e lista de ficheiros alterados.
 
+Em `maestro run` com worktree Git, o **estado da run** (`.maestro/runs`, audit de shell, `sensors.json`) fica no checkout principal (`repoRoot` do processo), enquanto **ficheiros de código** são lidos e alterados no **worktree** (`worktreePath`). O input do generator expõe isso como `implementationRoot` e `stateRepoRoot`; o `AgentContext.workingDir` do runner aponta para o worktree.
+
 ## Entrada
 
 Corpo validado por `generatorInputSchema`:
 
-- `runId`, `repoRoot`, `sprintIdx` (0-based no array do plano).
+- `runId`, `sprintIdx` (0-based no array do plano).
+- `implementationRoot` — raiz onde aplicar alterações de código (worktree ou checkout único).
+- `stateRepoRoot` — checkout principal com `.maestro/runs`, `sensors.json` e audit de shell.
 - `sprint` — sprint normalizado do pipeline.
 - `sprintContract` — texto do ficheiro `contracts/sprint-<n>.md` (contrato com `status: agreed` no MVP atual).
 - `planFull` — `PlannerOutput` completo.
@@ -30,10 +34,10 @@ O runner usa `generateText` com limite de passos (tool loop), com `createGenerat
 
 | Ferramenta      | Função                                                                   |
 | --------------- | ------------------------------------------------------------------------ |
-| `readFile`      | Leitura sob a raiz do repo.                                              |
+| `readFile`      | Leitura sob a raiz de implementação (`implementationRoot`).              |
 | `writeFile`     | Cria/substitui ficheiro (caminho relativo seguro).                       |
 | `editFile`      | Substitui uma ocorrência única `oldStr` → `newStr`.                      |
-| `runShell`      | Comando na raiz via `@maestro/sandbox` / policy da config.               |
+| `runShell`      | `cwd` = implementação; audit em `stateRepoRoot` via `@maestro/sandbox`.  |
 | `runSensor`     | Executa sensor por id (`.maestro/sensors.json`).                         |
 | `gitCommit`     | `commitSprint` com `type` / `scope?` / `subject` (Conventional Commits). |
 | `listDirectory` | Igual ao Planner.                                                        |

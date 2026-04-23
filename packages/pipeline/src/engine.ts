@@ -130,14 +130,32 @@ function assertNotAborted(
 function contextFor(
   agentId: string,
   runId: string,
-  repoRoot: string,
+  workingDir: string,
   extra: Record<string, unknown> = {},
 ): AgentContext {
   return {
     agentId,
     runId,
-    workingDir: repoRoot,
+    workingDir,
     metadata: extra,
+  };
+}
+
+/** Raiz onde o código da run é editado (worktree ou igual a `repoRoot` sem worktree). */
+function implementationRoot(
+  options: Pick<PipelineRunOptions, 'worktreePath'>,
+): string {
+  return options.worktreePath;
+}
+
+function pipelineAgentMetadata(
+  options: PipelineRunOptions,
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    worktreeRoot: options.worktreePath,
+    stateRepoRoot: options.repoRoot,
+    ...extra,
   };
 }
 
@@ -365,7 +383,12 @@ async function runPlannerPhase(
       replan === undefined
         ? { prompt: options.prompt }
         : { prompt: options.prompt, replan },
-    context: contextFor('planner', options.runId, options.repoRoot),
+    context: contextFor(
+      'planner',
+      options.runId,
+      implementationRoot(options),
+      pipelineAgentMetadata(options),
+    ),
     bus: options.bus,
     config: options.config,
   });
@@ -420,7 +443,7 @@ export async function runPipeline(
     await writePlanFile(options.repoRoot, options.runId, plan, maestroDir);
 
     const architectureDoc = await loadArchitectureDocument(
-      options.repoRoot,
+      implementationRoot(options),
       options.architecture,
       maestroDir,
     );
@@ -450,7 +473,12 @@ export async function runPipeline(
           sprint,
           sprintIdx,
         },
-        context: contextFor('architect', options.runId, options.repoRoot),
+        context: contextFor(
+          'architect',
+          options.runId,
+          implementationRoot(options),
+          pipelineAgentMetadata(options),
+        ),
         bus: options.bus,
         config: options.config,
       });
@@ -609,7 +637,8 @@ export async function runPipeline(
           input: {
             runId: options.runId,
             sprintIdx,
-            repoRoot: options.repoRoot,
+            implementationRoot: implementationRoot(options),
+            stateRepoRoot: options.repoRoot,
             sprint,
             sprintContract: contractText,
             planFull: plan,
@@ -619,10 +648,14 @@ export async function runPipeline(
               ? { evaluatorFeedback: pendingEvaluatorFeedback }
               : {}),
           },
-          context: contextFor('generator', options.runId, options.repoRoot, {
-            worktreeRoot: options.worktreePath,
-            ...(maestroDir !== undefined ? { maestroDir } : {}),
-          }),
+          context: contextFor(
+            'generator',
+            options.runId,
+            implementationRoot(options),
+            pipelineAgentMetadata(options, {
+              ...(maestroDir !== undefined ? { maestroDir } : {}),
+            }),
+          ),
           bus: options.bus,
           config: options.config,
         });
@@ -648,10 +681,14 @@ export async function runPipeline(
             sprint,
             acceptance: [...sprint.acceptance],
           },
-          context: contextFor('evaluator', options.runId, options.repoRoot, {
-            worktreeRoot: options.worktreePath,
-            ...(maestroDir !== undefined ? { maestroDir } : {}),
-          }),
+          context: contextFor(
+            'evaluator',
+            options.runId,
+            implementationRoot(options),
+            pipelineAgentMetadata(options, {
+              ...(maestroDir !== undefined ? { maestroDir } : {}),
+            }),
+          ),
           bus: options.bus,
           config: options.config,
         })) as EvaluatorModelOutput;
@@ -841,10 +878,14 @@ export async function runPipeline(
     const rawMerger = await executor({
       definition: merger,
       input: mergerInput,
-      context: contextFor('merger', options.runId, options.repoRoot, {
-        worktreeRoot: options.worktreePath,
-        ...(maestroDir !== undefined ? { maestroDir } : {}),
-      }),
+      context: contextFor(
+        'merger',
+        options.runId,
+        implementationRoot(options),
+        pipelineAgentMetadata(options, {
+          ...(maestroDir !== undefined ? { maestroDir } : {}),
+        }),
+      ),
       bus: options.bus,
       config: options.config,
     });

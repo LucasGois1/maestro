@@ -8,6 +8,7 @@ import { createStateStore } from '@maestro/state';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
+  AgentContext,
   ArchitectModelOutput,
   EvaluatorModelOutput,
   GeneratorModelOutput,
@@ -510,6 +511,73 @@ describe('runPipeline (happy path)', () => {
         decision: 'failed',
       },
     });
+  });
+
+  it('binds agent workingDir to worktree and passes dual roots to generator input', async () => {
+    const env = makeEnv();
+    const wt = await mkdtemp(join(tmpdir(), 'maestro-pipeline-wt-'));
+    await mkdir(join(wt, '.maestro'), { recursive: true });
+    await writeFile(join(wt, '.maestro', 'ARCHITECTURE.md'), '# WT\n', 'utf8');
+
+    const contexts: AgentContext[] = [];
+    const generatorInputs: unknown[] = [];
+
+    const executor: AgentExecutor = async ({
+      definition,
+      input,
+      context,
+    }) => {
+      contexts.push(context);
+      if (definition.id === 'generator') {
+        generatorInputs.push(input);
+      }
+      const fn = (
+        {
+          planner: () => plannerModelOutputNarrow,
+          architect: (inp: unknown) => mockArchitectOk(inp),
+          generator: (inp: unknown) => mockGeneratorOk(inp),
+          evaluator: () => mockEvaluatorPassed(),
+          merger: () => mockMergerModelOutput('maestro/demo'),
+        } as const
+      )[definition.id as 'planner' | 'architect' | 'generator' | 'evaluator' | 'merger'];
+      if (!fn) throw new Error(`No stub for ${definition.id}`);
+      return fn(input as never) as never;
+    };
+
+    try {
+      await runPipeline({
+        runId: 'r-wt',
+        prompt: 'x',
+        branch: 'feat/wt',
+        worktreePath: wt,
+        repoRoot,
+        store: env.store,
+        bus: env.bus,
+        config: env.config,
+        executor,
+      });
+
+      const byAgent = new Map(contexts.map((c) => [c.agentId, c]));
+      for (const id of [
+        'planner',
+        'architect',
+        'generator',
+        'evaluator',
+        'merger',
+      ] as const) {
+        const c = byAgent.get(id);
+        expect(c?.workingDir).toBe(wt);
+        expect(c?.metadata.stateRepoRoot).toBe(repoRoot);
+        expect(c?.metadata.worktreeRoot).toBe(wt);
+      }
+
+      expect(generatorInputs[0]).toMatchObject({
+        implementationRoot: wt,
+        stateRepoRoot: repoRoot,
+      });
+    } finally {
+      await rm(wt, { recursive: true, force: true });
+    }
   });
 
   it('persists three new files from generator output in handoff', async () => {

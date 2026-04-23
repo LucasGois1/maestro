@@ -16,6 +16,8 @@ import type { SensorResult } from './types.js';
 export type DispatchSensorsOptions = {
   readonly runId: string;
   readonly repoRoot: string;
+  /** Base cwd para sensores computacionais (ex.: worktree). */
+  readonly executionRoot?: string;
   readonly bus: EventBus;
   readonly changedFiles?: readonly string[];
   readonly diff?: string;
@@ -82,6 +84,9 @@ export async function dispatchSensors(
     const task = runSensor(sensor, {
       runId: options.runId,
       repoRoot: options.repoRoot,
+      ...(options.executionRoot !== undefined
+        ? { executionRoot: options.executionRoot }
+        : {}),
       bus: options.bus,
       ...(options.maestroDir !== undefined
         ? { maestroDir: options.maestroDir }

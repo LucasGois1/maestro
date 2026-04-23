@@ -9,6 +9,8 @@ import { loadSensorsFile, runSensor } from '@maestro/sensors';
 
 export type RunSensorToolContext = {
   readonly repoRoot: string;
+  /** Worktree ou raiz onde sensores computacionais executam (default = repoRoot). */
+  readonly executionRoot?: string;
   readonly runId: string;
   readonly bus: EventBus;
   readonly maestroDir?: string;
@@ -69,6 +71,9 @@ export async function executeRunSensorTool(
     const result = await runSensor(sensor, {
       runId: ctx.runId,
       repoRoot: ctx.repoRoot,
+      ...(ctx.executionRoot !== undefined
+        ? { executionRoot: ctx.executionRoot }
+        : {}),
       bus: ctx.bus,
       ...(ctx.maestroDir !== undefined ? { maestroDir: ctx.maestroDir } : {}),
       policy: ctx.policy,

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -20,7 +20,6 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  const { rm } = await import('node:fs/promises');
   await rm(repoRoot, { recursive: true, force: true });
 });
 
@@ -29,7 +28,8 @@ describe('createGeneratorToolSet', () => {
     const bus = createEventBus();
     const config = configSchema.parse({ permissions: { mode: 'yolo' } });
     const tools = createGeneratorToolSet({
-      repoRoot,
+      workspaceRoot: repoRoot,
+      stateRepoRoot: repoRoot,
       config,
       runId: 'run1',
       bus,
@@ -70,12 +70,56 @@ describe('createGeneratorToolSet', () => {
     ).resolves.toBe('oldStr não encontrado no ficheiro.');
   });
 
+  it('writes under workspaceRoot when stateRepoRoot differs', async () => {
+    const stateRoot = await mkdtemp(join(tmpdir(), 'maestro-gen-state-'));
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'maestro-gen-ws-'));
+    try {
+      await mkdir(join(stateRoot, '.maestro'), { recursive: true });
+      await writeFile(
+        join(stateRoot, '.maestro', 'AGENTS.md'),
+        '# Agents\n',
+        'utf8',
+      );
+      await writeFile(
+        join(workspaceRoot, 'package.json'),
+        '{"name":"ws"}',
+        'utf8',
+      );
+
+      const bus = createEventBus();
+      const config = configSchema.parse({ permissions: { mode: 'yolo' } });
+      const tools = createGeneratorToolSet({
+        workspaceRoot,
+        stateRepoRoot: stateRoot,
+        config,
+        runId: 'run1',
+        bus,
+      });
+
+      const writeFileTool = toolExec<{ path: string; content: string }>(
+        tools.writeFile,
+      );
+      await expect(
+        writeFileTool({ path: 'lib/x.ts', content: 'export {}\n' }),
+      ).resolves.toBe('Escrito: lib/x.ts');
+
+      await expect(
+        readFile(join(workspaceRoot, 'lib', 'x.ts'), 'utf8'),
+      ).resolves.toBe('export {}\n');
+      await expect(readFile(join(stateRoot, 'lib', 'x.ts'), 'utf8')).rejects.toThrow();
+    } finally {
+      await rm(stateRoot, { recursive: true, force: true });
+      await rm(workspaceRoot, { recursive: true, force: true });
+    }
+  });
+
   it('rejects ambiguous edits and reports shell/git errors without throwing', async () => {
     const bus = createEventBus();
     const config = configSchema.parse({ permissions: { mode: 'yolo' } });
     await writeFile(join(repoRoot, 'dup.txt'), 'same same\n', 'utf8');
     const tools = createGeneratorToolSet({
-      repoRoot,
+      workspaceRoot: repoRoot,
+      stateRepoRoot: repoRoot,
       config,
       runId: 'run1',
       bus,
@@ -106,7 +150,8 @@ describe('createGeneratorToolSet', () => {
     let calls = 0;
     const tools = createGeneratorToolSet(
       {
-        repoRoot,
+        workspaceRoot: repoRoot,
+        stateRepoRoot: repoRoot,
         config,
         runId: 'run1',
         bus,

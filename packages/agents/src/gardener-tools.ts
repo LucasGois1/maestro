@@ -65,7 +65,7 @@ function policyFromConfig(config: MaestroConfig) {
  */
 export function createGardenerToolSet(ctx: GardenerToolContext): ToolSet {
   const policy = policyFromConfig(ctx.config);
-  const base = createArchitectToolSet(ctx.worktreeRoot);
+  const base = createArchitectToolSet(ctx.worktreeRoot, ctx.repoRoot);
 
   const writeFileTool = tool({
     description:
@@ -171,6 +171,7 @@ export function createGardenerToolSet(ctx: GardenerToolContext): ToolSet {
         return await executeRunSensorTool(
           {
             repoRoot: ctx.repoRoot,
+            executionRoot: ctx.worktreeRoot,
             runId: ctx.runId,
             bus: ctx.bus,
             policy,

@@ -299,6 +299,10 @@ export async function runAgent<TInput, TOutput>(
     let toolLoopRecoveryAttempted = false;
 
     const meta = context.metadata;
+    const stateRepoRoot =
+      typeof meta.stateRepoRoot === 'string' && meta.stateRepoRoot.length > 0
+        ? meta.stateRepoRoot
+        : context.workingDir;
     const worktreeRoot =
       typeof meta.worktreeRoot === 'string' && meta.worktreeRoot.length > 0
         ? meta.worktreeRoot
@@ -309,18 +313,19 @@ export async function runAgent<TInput, TOutput>(
     let toolAugmented: { tools: ToolSet; maxSteps: number } | null = null;
     if (definition.id === 'planner') {
       toolAugmented = {
-        tools: createPlannerToolSet(context.workingDir),
+        tools: createPlannerToolSet(context.workingDir, stateRepoRoot),
         maxSteps: 24,
       };
     } else if (definition.id === 'architect') {
       toolAugmented = {
-        tools: createArchitectToolSet(context.workingDir),
+        tools: createArchitectToolSet(context.workingDir, stateRepoRoot),
         maxSteps: 24,
       };
     } else if (definition.id === 'generator') {
       toolAugmented = {
         tools: createGeneratorToolSet({
-          repoRoot: context.workingDir,
+          workspaceRoot: context.workingDir,
+          stateRepoRoot,
           config,
           runId: context.runId,
           bus,
@@ -334,7 +339,7 @@ export async function runAgent<TInput, TOutput>(
       const evInput = inputParse.data as EvaluatorInput;
       toolAugmented = {
         tools: createEvaluatorToolSet({
-          repoRoot: context.workingDir,
+          repoRoot: stateRepoRoot,
           worktreeRoot,
           config,
           runId: context.runId,
@@ -350,7 +355,7 @@ export async function runAgent<TInput, TOutput>(
     } else if (definition.id === 'merger') {
       toolAugmented = {
         tools: createMergerToolSet({
-          repoRoot: context.workingDir,
+          repoRoot: stateRepoRoot,
           worktreeRoot,
           config,
           runId: context.runId,
@@ -364,7 +369,7 @@ export async function runAgent<TInput, TOutput>(
     } else if (definition.id === 'doc-gardener') {
       toolAugmented = {
         tools: createGardenerToolSet({
-          repoRoot: context.workingDir,
+          repoRoot: stateRepoRoot,
           worktreeRoot,
           config,
           runId: context.runId,

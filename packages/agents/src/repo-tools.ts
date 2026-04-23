@@ -211,9 +211,15 @@ export async function summarizeDependencies(repoRoot: string): Promise<string> {
 
 /**
  * Tools shared with the Planner: KB/docs read, directory listing, ripgrep search.
+ *
+ * @param workspaceRoot — Raiz para `docs/`, listagem e ripgrep (ex.: worktree).
+ * @param kbRepoRoot — Checkout onde vive `.maestro/` para a KB (default = workspaceRoot).
  */
-export function createPlannerToolSet(repoRoot: string): ToolSet {
-  const kb = createKBManager({ repoRoot });
+export function createPlannerToolSet(
+  workspaceRoot: string,
+  kbRepoRoot: string = workspaceRoot,
+): ToolSet {
+  const kb = createKBManager({ repoRoot: kbRepoRoot });
 
   const readKB = tool({
     description:
@@ -223,7 +229,10 @@ export function createPlannerToolSet(repoRoot: string): ToolSet {
       const norm = p.trim().replace(/^[/\\]+/u, '');
       try {
         if (norm.startsWith('docs/') || norm.startsWith('docs\\')) {
-          return await readRepoFileContent(repoRoot, norm.replace(/\\/gu, '/'));
+          return await readRepoFileContent(
+            workspaceRoot,
+            norm.replace(/\\/gu, '/'),
+          );
         }
         return await kb.read(norm.replace(/\\/gu, '/'));
       } catch (e) {
@@ -240,7 +249,7 @@ export function createPlannerToolSet(repoRoot: string): ToolSet {
       const relNorm = (rel ?? '').trim().replace(/^[/\\]+/u, '');
       const maxDepth = md ?? 3;
       try {
-        const base = resolvePathUnderRepo(repoRoot, relNorm);
+        const base = resolvePathUnderRepo(workspaceRoot, relNorm);
         const out: string[] = [];
         await listDirRecursive(base, relNorm, maxDepth, 0, out);
         out.sort((a, b) => a.localeCompare(b));
@@ -262,7 +271,7 @@ export function createPlannerToolSet(repoRoot: string): ToolSet {
     inputSchema: searchCodeInput,
     execute: async ({ query, maxLines: ml }) => {
       const maxLines = ml ?? 40;
-      return searchWithRipgrep(repoRoot, query, maxLines);
+      return searchWithRipgrep(workspaceRoot, query, maxLines);
     },
   });
 
@@ -271,9 +280,15 @@ export function createPlannerToolSet(repoRoot: string): ToolSet {
 
 /**
  * Planner tools plus readFile (repo-relative) and dependency summary.
+ *
+ * @param workspaceRoot — Código e manifests (ex.: worktree).
+ * @param kbRepoRoot — KB `.maestro/` (default = workspaceRoot).
  */
-export function createArchitectToolSet(repoRoot: string): ToolSet {
-  const base = createPlannerToolSet(repoRoot);
+export function createArchitectToolSet(
+  workspaceRoot: string,
+  kbRepoRoot: string = workspaceRoot,
+): ToolSet {
+  const base = createPlannerToolSet(workspaceRoot, kbRepoRoot);
 
   const readFile = tool({
     description:
@@ -282,7 +297,10 @@ export function createArchitectToolSet(repoRoot: string): ToolSet {
     execute: async ({ path: p }) => {
       const norm = p.trim().replace(/^[/\\]+/u, '');
       try {
-        return await readRepoFileContent(repoRoot, norm.replace(/\\/gu, '/'));
+        return await readRepoFileContent(
+          workspaceRoot,
+          norm.replace(/\\/gu, '/'),
+        );
       } catch (e) {
         return `Erro ao ler: ${e instanceof Error ? e.message : String(e)}`;
       }
@@ -293,7 +311,7 @@ export function createArchitectToolSet(repoRoot: string): ToolSet {
     description:
       'Resume dependências declaradas (package.json, go.mod, Cargo.toml, pyproject.toml).',
     inputSchema: z.object({}),
-    execute: async () => summarizeDependencies(repoRoot),
+    execute: async () => summarizeDependencies(workspaceRoot),
   });
 
   return { ...base, readFile, getDependencies } as ToolSet;

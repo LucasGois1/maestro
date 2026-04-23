@@ -17,7 +17,10 @@ import { executeRunSensorTool } from './run-sensor-tool.js';
 import { createPlannerToolSet, readRepoFileContent } from './repo-tools.js';
 
 const readFileInput = z.object({
-  path: z.string().min(1).describe('Caminho relativo à raiz do repositório.'),
+  path: z
+    .string()
+    .min(1)
+    .describe('Caminho relativo à raiz de implementação (worktree / branch).'),
 });
 
 const writeFileInput = z.object({
@@ -47,7 +50,10 @@ const gitCommitInput = z.object({
 });
 
 export type GeneratorToolContext = {
-  readonly repoRoot: string;
+  /** Raiz onde ler/escrever código e correr shell/git. */
+  readonly workspaceRoot: string;
+  /** Checkout com `.maestro/runs`, sensors e audit de comandos. */
+  readonly stateRepoRoot: string;
   readonly config: MaestroConfig;
   readonly runId: string;
   readonly bus: EventBus;
@@ -74,17 +80,21 @@ export function createGeneratorToolSet(
   ctx: GeneratorToolContext,
   hooks?: GeneratorToolHooks,
 ): ToolSet {
-  const { listDirectory, searchCode } = createPlannerToolSet(ctx.repoRoot);
+  const { listDirectory, searchCode } = createPlannerToolSet(
+    ctx.workspaceRoot,
+    ctx.stateRepoRoot,
+  );
   const policy = policyFromConfig(ctx.config);
 
   const readFileTool = tool({
-    description: 'Lê um ficheiro de texto sob a raiz do repositório.',
+    description:
+      'Lê um ficheiro de texto sob a raiz de implementação (caminho relativo).',
     inputSchema: readFileInput,
     execute: async ({ path: p }) => {
       const norm = p.trim().replace(/^[/\\]+/u, '');
       try {
         return await readRepoFileContent(
-          ctx.repoRoot,
+          ctx.workspaceRoot,
           norm.replace(/\\/gu, '/'),
         );
       } catch (e) {
@@ -95,12 +105,12 @@ export function createGeneratorToolSet(
 
   const writeFileTool = tool({
     description:
-      'Cria ou substitui um ficheiro sob a raiz do repositório (caminho relativo).',
+      'Cria ou substitui um ficheiro sob a raiz de implementação (caminho relativo).',
     inputSchema: writeFileInput,
     execute: async ({ path: p, content }) => {
       try {
         const abs = resolvePathUnderRepo(
-          ctx.repoRoot,
+          ctx.workspaceRoot,
           p
             .trim()
             .replace(/^[/\\]+/u, '')
@@ -122,7 +132,7 @@ export function createGeneratorToolSet(
     execute: async ({ path: p, oldStr, newStr }) => {
       try {
         const abs = resolvePathUnderRepo(
-          ctx.repoRoot,
+          ctx.workspaceRoot,
           p
             .trim()
             .replace(/^[/\\]+/u, '')
@@ -147,16 +157,16 @@ export function createGeneratorToolSet(
 
   const runShellTool = tool({
     description:
-      'Executa comando no shell na raiz do repo; sujeito ao permission model.',
+      'Executa comando no shell com cwd = raiz de implementação; sujeito ao permission model.',
     inputSchema: runShellInput,
     execute: async ({ cmd, args }) => {
       try {
         const result = await runShellCommand({
           cmd,
           args,
-          cwd: ctx.repoRoot,
+          cwd: ctx.workspaceRoot,
           runId: ctx.runId,
-          repoRoot: ctx.repoRoot,
+          repoRoot: ctx.stateRepoRoot,
           ...(ctx.maestroDir !== undefined
             ? { maestroDir: ctx.maestroDir }
             : {}),
@@ -183,7 +193,8 @@ export function createGeneratorToolSet(
     execute: async ({ id }) =>
       executeRunSensorTool(
         {
-          repoRoot: ctx.repoRoot,
+          repoRoot: ctx.stateRepoRoot,
+          executionRoot: ctx.workspaceRoot,
           runId: ctx.runId,
           bus: ctx.bus,
           ...(ctx.maestroDir !== undefined
@@ -204,7 +215,7 @@ export function createGeneratorToolSet(
     execute: async ({ type, scope, subject }) => {
       try {
         const sha = await commitSprint({
-          cwd: ctx.repoRoot,
+          cwd: ctx.workspaceRoot,
           type,
           ...(scope !== undefined ? { scope } : {}),
           subject,
