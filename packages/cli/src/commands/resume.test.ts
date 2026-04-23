@@ -48,6 +48,10 @@ function createCommand(overrides = {}) {
         commitCount: 1,
         execPlanPath: '.maestro/docs/exec-plans/completed/auth.md',
         cleanupDone: false,
+        prUrl: null,
+        prNumber: null,
+        summary: null,
+        prTitle: null,
       },
     })),
     renderApp: vi.fn(() => ({ unmount: vi.fn() })),
@@ -81,6 +85,10 @@ describe('maestro resume', () => {
         commitCount: 1,
         execPlanPath: '.maestro/docs/exec-plans/completed/auth.md',
         cleanupDone: false,
+        prUrl: null,
+        prNumber: null,
+        summary: null,
+        prTitle: null,
       },
     }));
 
@@ -118,6 +126,10 @@ describe('maestro resume', () => {
         commitCount: 1,
         execPlanPath: '.maestro/docs/exec-plans/completed/auth.md',
         cleanupDone: false,
+        prUrl: null,
+        prNumber: null,
+        summary: null,
+        prTitle: null,
       },
     }));
 

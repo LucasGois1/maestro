@@ -20,6 +20,8 @@ export const FITS_LAYERS: {
     patternsToFollow: ['Mantém handlers finos; lógica em serviços.'],
     libraries: [{ name: 'hono', reason: 'Já é dependência do pacote api.' }],
     boundaryCheck: 'ok',
+    boundaryNotes: null,
+    escalation: null,
   },
 };
 
@@ -40,6 +42,7 @@ export const VIOLATION_REFACTOR: {
     boundaryCheck: 'refactor_needed',
     boundaryNotes:
       'O sprint propõe SQL no handler; é necessário extrair repositório antes ou adicionar sprint prévio de infra.',
+    escalation: null,
   },
 };
 
@@ -63,6 +66,8 @@ export const NEW_LIB: {
       },
     ],
     boundaryCheck: 'ok',
+    boundaryNotes: null,
+    escalation: null,
   },
 };
 
@@ -83,5 +88,6 @@ export const LOW_LAYER_FIRST: {
     boundaryCheck: 'refactor_needed',
     boundaryNotes:
       'Depende de endpoints ainda não existentes; propor sprint anterior para OpenAPI + stubs.',
+    escalation: null,
   },
 };

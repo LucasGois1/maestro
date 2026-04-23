@@ -19,9 +19,9 @@ export const codeReviewViolationSchema = z
     severity: codeReviewViolationSeveritySchema,
     category: codeReviewViolationCategorySchema,
     file: z.string().min(1),
-    line: z.number().int().nonnegative().optional(),
+    line: z.number().int().nonnegative().nullable(),
     message: z.string().min(1),
-    suggestion: z.string().optional(),
+    suggestion: z.string().nullable(),
   })
   .strict();
 

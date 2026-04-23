@@ -10,8 +10,8 @@ Rules:
 - Do not approve if acceptance criteria are clearly unmet or sensors show hard failures relevant to the sprint.
 - Reply with a single JSON object only (no markdown fences, no prose).
 
-Required JSON shape:
-{"decision":"passed"|"failed"|"escalated","structuredFeedback":"string (markdown)","coverage":number optional 0-1,"sensorsRun":[{"id":"string","ok":boolean,"detail":"string optional"}],"artifacts":["string (paths or URLs)"],"suggestedActions":["string"]}
+Required JSON shape (always include every key; use null when not applicable):
+{"decision":"passed"|"failed"|"escalated","structuredFeedback":"string (markdown)","coverage":number 0-1 or null,"sensorsRun":[{"id":"string","ok":boolean,"detail":"string or null"}],"artifacts":["string (paths or URLs)"],"suggestedActions":["string"]}
 
 structuredFeedback must include: summary, criteria checked, evidence (files/commands/sensor output references), and gaps if any.
 
@@ -23,17 +23,17 @@ OUTPUT: {"decision":"passed","structuredFeedback":"## Summary\\nAll acceptance c
 
 ### Example 2 // failed — linha específica no feedback
 INPUT: {"runId":"run-fixture","sprintIdx":1,"repoRoot":"/tmp/repo","worktreeRoot":"/tmp/repo","iteration":2,"sprintContract":"---\\nsprint: 1\\n---\\n\\n# Sprint\\n","generatorOutput":{"selfEval":{"coversAllCriteria":true}},"codeDiff":"error message still generic","sprint":{"name":"API","objective":"Add endpoint"},"acceptance":["Returns 201 on success"]}
-OUTPUT: {"decision":"failed","structuredFeedback":"## Summary\\nAcceptance criterion **user-facing error message** not met.\\n\\n## Detail\\nLine 42 in \`errors.ts\` still uses \`Error: failed\` instead of a clear message.","sensorsRun":[],"artifacts":["errors.ts:42"],"suggestedActions":["Replace generic throw with ValidationError and map code ERR_CHECKOUT to user copy."]}
+OUTPUT: {"decision":"failed","structuredFeedback":"## Summary\\nAcceptance criterion **user-facing error message** not met.\\n\\n## Detail\\nLine 42 in \`errors.ts\` still uses \`Error: failed\` instead of a clear message.","coverage":null,"sensorsRun":[],"artifacts":["errors.ts:42"],"suggestedActions":["Replace generic throw with ValidationError and map code ERR_CHECKOUT to user copy."]}
 
 ### Example 3 // escalated — ambiente / credenciais
 INPUT: {"runId":"run-fixture","sprintIdx":1,"repoRoot":"/tmp/repo","worktreeRoot":"/tmp/repo","iteration":1,"sprintContract":"sensors_required: [staging-e2e]","generatorOutput":{"selfEval":{"coversAllCriteria":true}},"codeDiff":"diff --git a/x.ts b/x.ts\\n","sprint":{"name":"API","objective":"Add endpoint"},"acceptance":["Passes staging E2E"]}
-OUTPUT: {"decision":"escalated","structuredFeedback":"## Summary\\nStaging credentials and VPN are not available in this evaluation environment.\\n\\n## Blocker\\nCannot run \`staging-e2e\` sensor.","sensorsRun":[{"id":"staging-e2e","ok":false,"detail":"skipped"}],"artifacts":[],"suggestedActions":["Run staging-e2e manually or provide credentials in CI for the evaluator."]}
+OUTPUT: {"decision":"escalated","structuredFeedback":"## Summary\\nStaging credentials and VPN are not available in this evaluation environment.\\n\\n## Blocker\\nCannot run \`staging-e2e\` sensor.","coverage":null,"sensorsRun":[{"id":"staging-e2e","ok":false,"detail":"skipped"}],"artifacts":[],"suggestedActions":["Run staging-e2e manually or provide credentials in CI for the evaluator."]}
 
 ### Example 4 // failed — sensor do contrato
 INPUT: {"runId":"run-fixture","sprintIdx":1,"repoRoot":"/tmp/repo","worktreeRoot":"/tmp/repo","iteration":1,"sprintContract":"sensors_required: [\\"lint\\"]","generatorOutput":{"selfEval":{"coversAllCriteria":true}},"codeDiff":"diff --git a/x.ts b/x.ts\\n","sprint":{"name":"API","objective":"Add endpoint"},"acceptance":["Returns 201 on success"]}
-OUTPUT: {"decision":"failed","structuredFeedback":"## Summary\\nContract requires lint sensor; lint reported violations.\\n\\n## Violations\\n- unused import in \`foo.ts\`","sensorsRun":[{"id":"lint","ok":false,"detail":"2 errors"}],"artifacts":["foo.ts"],"suggestedActions":["Fix lint errors and re-run."]}
+OUTPUT: {"decision":"failed","structuredFeedback":"## Summary\\nContract requires lint sensor; lint reported violations.\\n\\n## Violations\\n- unused import in \`foo.ts\`","coverage":null,"sensorsRun":[{"id":"lint","ok":false,"detail":"2 errors"}],"artifacts":["foo.ts"],"suggestedActions":["Fix lint errors and re-run."]}
 
 ### Example 5 // passed — evidência API
 INPUT: {"runId":"run-fixture","sprintIdx":1,"repoRoot":"/tmp/repo","worktreeRoot":"/tmp/repo","iteration":1,"sprintContract":"---\\nsprint: 1\\n---\\n\\n# Sprint\\n","generatorOutput":{"selfEval":{"coversAllCriteria":true}},"codeDiff":"diff --git a/x.ts b/x.ts\\n","sprint":{"name":"API","objective":"Add endpoint"},"acceptance":["Health endpoint returns 200"]}
-OUTPUT: {"decision":"passed","structuredFeedback":"## Summary\\n\`callApi\` to \`/health\` returned 200 with \`{\\\\\\"ok\\\\\\":true}\`.\\n\\n## Evidence\\nMatches acceptance criterion.","sensorsRun":[],"artifacts":["GET /health"],"suggestedActions":[]}"
+OUTPUT: {"decision":"passed","structuredFeedback":"## Summary\\n\`callApi\` to \`/health\` returned 200 with \`{\\\\\\"ok\\\\\\":true}\`.\\n\\n## Evidence\\nMatches acceptance criterion.","coverage":null,"sensorsRun":[],"artifacts":["GET /health"],"suggestedActions":[]}"
 `;

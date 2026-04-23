@@ -358,12 +358,12 @@ function buildPlannerReplanContext(
     blockedSprintObjective: sprint.objective,
     boundaryCheck: architectResult.boundaryCheck,
     previousPlanSummary: summarizePlanForReplan(plan),
-    ...(architectResult.boundaryNotes !== undefined &&
-    architectResult.boundaryNotes.length > 0
+    ...(architectResult.boundaryNotes != null &&
+    architectResult.boundaryNotes.trim().length > 0
       ? { boundaryNotes: architectResult.boundaryNotes }
       : {}),
-    ...(architectResult.escalation?.reason !== undefined &&
-    architectResult.escalation.reason.length > 0
+    ...(architectResult.escalation != null &&
+    architectResult.escalation.reason.trim().length > 0
       ? { escalationReason: architectResult.escalation.reason }
       : {}),
   };
@@ -897,7 +897,8 @@ export async function runPipeline(
       branch: options.branch,
       plan,
       sprintOutcomes,
-      ...(parsedMerger.summary !== undefined
+      ...(parsedMerger.summary != null &&
+      parsedMerger.summary.trim().length > 0
         ? { mergerSummary: parsedMerger.summary }
         : {}),
     });

@@ -56,6 +56,10 @@ async function parseRun(args: string[], overrides = {}) {
         commitCount: 1,
         execPlanPath: '.maestro/docs/exec-plans/completed/auth.md',
         cleanupDone: false,
+        prUrl: null,
+        prNumber: null,
+        summary: null,
+        prTitle: null,
       },
     })),
     renderApp: vi.fn(() => ({ unmount: vi.fn() })),
@@ -89,6 +93,10 @@ describe('maestro run', () => {
         commitCount: 1,
         execPlanPath: '.maestro/docs/exec-plans/completed/auth.md',
         cleanupDone: false,
+        prUrl: null,
+        prNumber: null,
+        summary: null,
+        prTitle: null,
       },
     }));
 
@@ -131,6 +139,10 @@ describe('maestro run', () => {
         commitCount: 0,
         execPlanPath: '.maestro/docs/exec-plans/completed/auth.md',
         cleanupDone: false,
+        prUrl: null,
+        prNumber: null,
+        summary: null,
+        prTitle: null,
       },
     }));
 

@@ -16,6 +16,7 @@ import {
 } from './detect-package-health.js';
 import { detectStaleDocumentation } from './detect-stale-docs.js';
 import type {
+  GardenerBreakdown,
   GardenerOutput,
   GardenerPrOpened,
 } from './gardener-output.schema.js';
@@ -204,12 +205,12 @@ export async function executeBackgroundGardener(
   const llmIssues = parsedAgent?.issuesFound ?? 0;
   const issuesFound = Math.max(heuristicTotal, llmIssues);
 
-  const breakdown = {
+  const breakdown: GardenerBreakdown = {
     docHygiene: docFindings.length,
     codeDuplicate: duplicateFindings.length,
     knip: knipFindings.length,
     outdated: outdatedFindings.length,
-    ...(opts.skipLlm ? {} : { llmReported: llmIssues }),
+    llmReported: opts.skipLlm ? null : llmIssues,
   };
 
   const prDeps = mergeOpenPrDeps(opts.openPrDeps);

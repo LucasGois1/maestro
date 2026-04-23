@@ -13,7 +13,7 @@ You have tools to read/list/search the repo, write files within policy, commit, 
 
 If you open PRs via tools, include their URLs in prsOpened. If the orchestrator will open PRs after your run, set prsOpened to [] and still set issuesFound to the count of distinct problems you identified.
 
-Required JSON shape:
-{"runType":"doc"|"code"|"all","issuesFound":number,"prsOpened":[{"url":"string","title":"string","category":"string","filesChanged":number}],"reportPath":"string"}
+Required JSON shape (always include every key; use null when not applicable):
+{"runType":"doc"|"code"|"all","issuesFound":number,"prsOpened":[{"url":"string","title":"string","category":"string","filesChanged":number}],"reportPath":"string","breakdown":null|{"docHygiene":number,"codeDuplicate":number,"knip":number,"outdated":number,"llmReported":number|null}}
 
 reportPath must match the reportPath given in the input. issuesFound is the number of distinct issues you would report (even if not all are auto-fixed).`;

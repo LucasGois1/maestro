@@ -11,13 +11,24 @@ export const mergerModelOutputSchema = z
     commitCount: z.number().int().nonnegative(),
     execPlanPath: z.string().min(1),
     cleanupDone: z.boolean(),
-    prUrl: z.string().url().optional(),
-    prNumber: z.number().int().positive().optional(),
+    prUrl: z.union([z.string().url(), z.null()]),
+    prNumber: z.union([z.number().int().positive(), z.null()]),
     /** Resumo curto para log / UI */
-    summary: z.string().optional(),
+    summary: z.string().nullable(),
     /** Título do PR (estilo Conventional, ≤70 chars recomendado) */
-    prTitle: z.string().optional(),
+    prTitle: z.string().nullable(),
   })
-  .strict();
+  .strict()
+  .superRefine((val, ctx) => {
+    const urlMissing = val.prUrl === null;
+    const numMissing = val.prNumber === null;
+    if (urlMissing !== numMissing) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'prUrl and prNumber must both be a value or both null',
+        path: ['prUrl'],
+      });
+    }
+  });
 
 export type MergerModelOutput = z.infer<typeof mergerModelOutputSchema>;

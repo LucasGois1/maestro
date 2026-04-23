@@ -134,6 +134,8 @@ function mockArchitectOk(input: unknown): ArchitectModelOutput {
     patternsToFollow: ['Follow repo conventions.'],
     libraries: [],
     boundaryCheck: 'ok',
+    boundaryNotes: null,
+    escalation: null,
   };
 }
 
@@ -146,6 +148,7 @@ function mockArchitectRefactorNeeded(input: unknown): ArchitectModelOutput {
     libraries: [],
     boundaryCheck: 'refactor_needed',
     boundaryNotes: 'Narrow scope before implementation.',
+    escalation: null,
   };
 }
 
@@ -190,6 +193,7 @@ function mockEvaluatorPassed(): EvaluatorModelOutput {
   return {
     decision: 'passed',
     structuredFeedback: '## Summary\nStub evaluator OK.',
+    coverage: null,
     sensorsRun: [],
     artifacts: [],
     suggestedActions: [],
@@ -203,7 +207,10 @@ function mockMergerModelOutput(branch: string): MergerModelOutput {
     commitCount: 1,
     execPlanPath: '.maestro/docs/exec-plans/completed/placeholder.md',
     cleanupDone: false,
+    prUrl: null,
+    prNumber: null,
     summary: 'ok',
+    prTitle: null,
   };
 }
 

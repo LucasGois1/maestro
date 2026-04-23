@@ -11,25 +11,26 @@ Rules:
 - If golden principles or docs apply, cite them in patternsToFollow.
 - If the sprint would violate a boundary: set boundaryCheck to "violation" or "refactor_needed" and explain in boundaryNotes; use escalation only for contradictions that need a human decision.
 - sprintIdx must match the sprint you are reviewing (1-based, same as in the plan).
+- Always include keys boundaryNotes and escalation. Use JSON null when not used: boundaryNotes=null when boundaryCheck is "ok" (or use a short note if you still add context); escalation=null when there is no human escalation. For refactor_needed or violation, boundaryNotes must be a non-empty string.
 
-Required JSON shape:
-{"sprintIdx":number,"scopeTecnico":{"newFiles":[{"path":"string","layer":"string"}],"filesToTouch":["string"],"testFiles":["string"]},"patternsToFollow":["string"],"libraries":[{"name":"string","reason":"string"}],"boundaryCheck":"ok"|"refactor_needed"|"violation","boundaryNotes":"string","escalation":{"reason":"string"}?}
+Required JSON shape (all keys always present):
+{"sprintIdx":number,"scopeTecnico":{"newFiles":[{"path":"string","layer":"string"}],"filesToTouch":["string"],"testFiles":["string"]},"patternsToFollow":["string"],"libraries":[{"name":"string","reason":"string"}],"boundaryCheck":"ok"|"refactor_needed"|"violation","boundaryNotes":"string"|null,"escalation":{"reason":"string"}|null}
 
 ## Calibration examples
 
 ### Example 1 // encaixa nas camadas
 INPUT: {"sprintIdx":1,"sprintName":"API base"}
-OUTPUT: {"sprintIdx":1,"scopeTecnico":{"newFiles":[{"path":"packages/api/src/routes/health.ts","layer":"transport"}],"filesToTouch":["packages/api/src/app.ts"],"testFiles":["packages/api/test/health.test.ts"]},"patternsToFollow":["Mantém handlers finos; lógica em serviços."],"libraries":[{"name":"hono","reason":"Já é dependência do pacote api."}],"boundaryCheck":"ok"}
+OUTPUT: {"sprintIdx":1,"scopeTecnico":{"newFiles":[{"path":"packages/api/src/routes/health.ts","layer":"transport"}],"filesToTouch":["packages/api/src/app.ts"],"testFiles":["packages/api/test/health.test.ts"]},"patternsToFollow":["Mantém handlers finos; lógica em serviços."],"libraries":[{"name":"hono","reason":"Já é dependência do pacote api."}],"boundaryCheck":"ok","boundaryNotes":null,"escalation":null}
 
 ### Example 2 // violaria boundary → refactor_needed
 INPUT: {"sprintIdx":2,"sprintName":"DB direto no handler"}
-OUTPUT: {"sprintIdx":2,"scopeTecnico":{"newFiles":[],"filesToTouch":["packages/api/src/routes/users.ts"],"testFiles":[]},"patternsToFollow":["Acesso a dados só via repositório."],"libraries":[],"boundaryCheck":"refactor_needed","boundaryNotes":"O sprint propõe SQL no handler; é necessário extrair repositório antes ou adicionar sprint prévio de infra."}
+OUTPUT: {"sprintIdx":2,"scopeTecnico":{"newFiles":[],"filesToTouch":["packages/api/src/routes/users.ts"],"testFiles":[]},"patternsToFollow":["Acesso a dados só via repositório."],"libraries":[],"boundaryCheck":"refactor_needed","boundaryNotes":"O sprint propõe SQL no handler; é necessário extrair repositório antes ou adicionar sprint prévio de infra.","escalation":null}
 
 ### Example 3 // nova biblioteca com justificação
 INPUT: {"sprintIdx":1,"sprintName":"Parsing avançado"}
-OUTPUT: {"sprintIdx":1,"scopeTecnico":{"newFiles":[{"path":"packages/lib/src/parse.ts","layer":"domain"}],"filesToTouch":[],"testFiles":["packages/lib/test/parse.test.ts"]},"patternsToFollow":["Testes colocados junto do pacote."],"libraries":[{"name":"chevrotain","reason":"Parser CFG; não existe alternativa interna; MIT compatível."}],"boundaryCheck":"ok"}
+OUTPUT: {"sprintIdx":1,"scopeTecnico":{"newFiles":[{"path":"packages/lib/src/parse.ts","layer":"domain"}],"filesToTouch":[],"testFiles":["packages/lib/test/parse.test.ts"]},"patternsToFollow":["Testes colocados junto do pacote."],"libraries":[{"name":"chevrotain","reason":"Parser CFG; não existe alternativa interna; MIT compatível."}],"boundaryCheck":"ok","boundaryNotes":null,"escalation":null}
 
 ### Example 4 // dependência de camada baixa → sprint prévio
 INPUT: {"sprintIdx":3,"sprintName":"UI sem contrato de API"}
-OUTPUT: {"sprintIdx":3,"scopeTecnico":{"newFiles":[{"path":"apps/web/src/pages/Dash.tsx","layer":"ui"}],"filesToTouch":[],"testFiles":[]},"patternsToFollow":["Contratos OpenAPI antes de consumo no cliente."],"libraries":[],"boundaryCheck":"refactor_needed","boundaryNotes":"Depende de endpoints ainda não existentes; propor sprint anterior para OpenAPI + stubs."}"
+OUTPUT: {"sprintIdx":3,"scopeTecnico":{"newFiles":[{"path":"apps/web/src/pages/Dash.tsx","layer":"ui"}],"filesToTouch":[],"testFiles":[]},"patternsToFollow":["Contratos OpenAPI antes de consumo no cliente."],"libraries":[],"boundaryCheck":"refactor_needed","boundaryNotes":"Depende de endpoints ainda não existentes; propor sprint anterior para OpenAPI + stubs.","escalation":null}"
 `;

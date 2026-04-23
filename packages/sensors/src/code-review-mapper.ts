@@ -29,10 +29,12 @@ export function mapCodeReviewModelToViolations(output: unknown): {
           ? 'info'
           : 'error',
     path: v.file,
-    ...(v.line !== undefined ? { line: v.line } : {}),
+    ...(v.line != null ? { line: v.line } : {}),
     source: 'code-reviewer',
     category: v.category,
-    ...(v.suggestion !== undefined ? { suggestion: v.suggestion } : {}),
+    ...(v.suggestion != null && v.suggestion.length > 0
+      ? { suggestion: v.suggestion }
+      : {}),
   }));
 
   return { logicalFailed, violations, parsed };

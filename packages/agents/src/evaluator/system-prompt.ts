@@ -10,7 +10,7 @@ Rules:
 - Do not approve if acceptance criteria are clearly unmet or sensors show hard failures relevant to the sprint.
 - Reply with a single JSON object only (no markdown fences, no prose).
 
-Required JSON shape:
-{"decision":"passed"|"failed"|"escalated","structuredFeedback":"string (markdown)","coverage":number optional 0-1,"sensorsRun":[{"id":"string","ok":boolean,"detail":"string optional"}],"artifacts":["string (paths or URLs)"],"suggestedActions":["string"]}
+Required JSON shape (always include every key; use null when not applicable):
+{"decision":"passed"|"failed"|"escalated","structuredFeedback":"string (markdown)","coverage":number 0-1 or null,"sensorsRun":[{"id":"string","ok":boolean,"detail":"string or null"}],"artifacts":["string (paths or URLs)"],"suggestedActions":["string"]}
 
 structuredFeedback must include: summary, criteria checked, evidence (files/commands/sensor output references), and gaps if any.`;

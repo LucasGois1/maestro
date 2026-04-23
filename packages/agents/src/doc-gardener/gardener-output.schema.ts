@@ -18,7 +18,7 @@ export const gardenerBreakdownSchema = z
     codeDuplicate: z.number().int().nonnegative(),
     knip: z.number().int().nonnegative(),
     outdated: z.number().int().nonnegative(),
-    llmReported: z.number().int().nonnegative().optional(),
+    llmReported: z.number().int().nonnegative().nullable(),
   })
   .strict();
 
@@ -31,7 +31,7 @@ export const gardenerOutputSchema = z
     issuesFound: z.number().int().nonnegative(),
     prsOpened: z.array(gardenerPrOpenedSchema),
     reportPath: z.string().min(1),
-    breakdown: gardenerBreakdownSchema.optional(),
+    breakdown: gardenerBreakdownSchema.nullable(),
   })
   .strict();
 

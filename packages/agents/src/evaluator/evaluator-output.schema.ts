@@ -11,17 +11,17 @@ export type EvaluatorDecision = z.infer<typeof evaluatorDecisionSchema>;
 const sensorRunEntrySchema = z.object({
   id: z.string().min(1),
   ok: z.boolean(),
-  detail: z.string().optional(),
+  detail: z.string().nullable(),
 });
 
 export const evaluatorModelOutputSchema = z
   .object({
     decision: evaluatorDecisionSchema,
     structuredFeedback: z.string().min(1),
-    coverage: z.number().min(0).max(1).optional(),
-    sensorsRun: z.array(sensorRunEntrySchema).default([]),
-    artifacts: z.array(z.string()).default([]),
-    suggestedActions: z.array(z.string()).default([]),
+    coverage: z.number().min(0).max(1).nullable(),
+    sensorsRun: z.array(sensorRunEntrySchema),
+    artifacts: z.array(z.string()),
+    suggestedActions: z.array(z.string()),
   })
   .strict();
 

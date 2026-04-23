@@ -64,6 +64,8 @@ function architectOk(input: unknown) {
     patternsToFollow: ['Keep deterministic fixtures small.'],
     libraries: [],
     boundaryCheck: 'ok',
+    boundaryNotes: null,
+    escalation: null,
   };
 }
 
@@ -84,6 +86,7 @@ function evaluatorPassed(): EvaluatorModelOutput {
   return {
     decision: 'passed',
     structuredFeedback: '## Summary\nFixture accepted.',
+    coverage: null,
     sensorsRun: [],
     artifacts: [],
     suggestedActions: [],
@@ -97,7 +100,10 @@ function mergerOk(branch: string): MergerModelOutput {
     commitCount: 1,
     execPlanPath: '.maestro/docs/exec-plans/completed/placeholder.md',
     cleanupDone: false,
+    prUrl: null,
+    prNumber: null,
     summary: 'Fixture packaged.',
+    prTitle: null,
   };
 }
 

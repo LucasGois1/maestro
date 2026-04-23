@@ -30,6 +30,7 @@ export const FIXTURE_DOC_LINKS: {
       },
     ],
     reportPath: baseInput.reportPath,
+    breakdown: null,
   },
 };
 
@@ -53,5 +54,6 @@ export const FIXTURE_CODE_DRIFT: {
       },
     ],
     reportPath: baseInput.reportPath,
+    breakdown: null,
   },
 };

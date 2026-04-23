@@ -19,6 +19,8 @@ function output(
     patternsToFollow: [],
     libraries: [],
     boundaryCheck: 'ok',
+    boundaryNotes: null,
+    escalation: null,
     ...overrides,
   };
 }

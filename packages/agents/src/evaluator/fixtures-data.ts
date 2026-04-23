@@ -45,6 +45,7 @@ export const FIXTURE_FAILED_MESSAGE: {
     decision: 'failed',
     structuredFeedback:
       '## Summary\nAcceptance criterion **user-facing error message** not met.\n\n## Detail\nLine 42 in `errors.ts` still uses `Error: failed` instead of a clear message.',
+    coverage: null,
     sensorsRun: [],
     artifacts: ['errors.ts:42'],
     suggestedActions: [
@@ -67,6 +68,7 @@ export const FIXTURE_ESCALATED: {
     decision: 'escalated',
     structuredFeedback:
       '## Summary\nStaging credentials and VPN are not available in this evaluation environment.\n\n## Blocker\nCannot run `staging-e2e` sensor.',
+    coverage: null,
     sensorsRun: [{ id: 'staging-e2e', ok: false, detail: 'skipped' }],
     artifacts: [],
     suggestedActions: [
@@ -88,6 +90,7 @@ export const FIXTURE_SENSOR_FAILED: {
     decision: 'failed',
     structuredFeedback:
       '## Summary\nContract requires lint sensor; lint reported violations.\n\n## Violations\n- unused import in `foo.ts`',
+    coverage: null,
     sensorsRun: [{ id: 'lint', ok: false, detail: '2 errors' }],
     artifacts: ['foo.ts'],
     suggestedActions: ['Fix lint errors and re-run.'],
@@ -107,6 +110,7 @@ export const FIXTURE_API_CHECK: {
     decision: 'passed',
     structuredFeedback:
       '## Summary\n`callApi` to `/health` returned 200 with `{\\"ok\\":true}`.\n\n## Evidence\nMatches acceptance criterion.',
+    coverage: null,
     sensorsRun: [],
     artifacts: ['GET /health'],
     suggestedActions: [],
