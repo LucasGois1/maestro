@@ -95,7 +95,7 @@ export function createResumeCommand(
 
   return new Command('resume')
     .description('Resume a paused Maestro pipeline run')
-    .argument('[runId]', 'Run id; defaults to the latest run')
+    .argument('[runId]', 'Run id; defaults to the last-started run')
     .action(async (runId: string | undefined) => {
       const repoRoot = cwd();
       const loaded = await loadConfigOrExit(configLoader, repoRoot, io);

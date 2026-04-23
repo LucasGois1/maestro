@@ -35,6 +35,9 @@ export function createPackageVitestConfig(packageDirectory: string) {
   const packageName = path.basename(packageDirectory);
 
   return defineConfig({
+    resolve: {
+      alias: workspacePackageAliases,
+    },
     test: {
       environment: 'node',
       globals: true,

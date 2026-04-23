@@ -194,9 +194,25 @@ async function executeResume(options: {
 }): Promise<TuiCommandExecutionResult> {
   try {
     const loaded = await loadConfigWithAutoResolvedModels({ cwd: options.repoRoot });
-    const runId = options.tokens[1];
+    const rawId = options.tokens[1]?.trim();
+    const explicitRunId =
+      rawId !== undefined && rawId.length > 0 ? rawId : undefined;
+
+    let runId: string | undefined = explicitRunId;
+    if (runId === undefined) {
+      const last = await options.store.latestStarted();
+      if (!last) {
+        return {
+          level: 'error',
+          message:
+            'No runs recorded. Start one with `/run <prompt>` then use `/resume`.',
+        };
+      }
+      runId = last.runId;
+    }
+
     void resumePipeline({
-      ...(runId !== undefined ? { runId } : {}),
+      runId,
       repoRoot: options.repoRoot,
       store: options.store,
       bus: options.bus,
@@ -204,14 +220,14 @@ async function executeResume(options: {
     }).catch((error: unknown) => {
       options.bus.emit({
         type: 'pipeline.failed',
-        runId: runId ?? '(latest)',
+        runId,
         at: 'planning',
         error: formatError(error),
       });
     });
     return {
       level: 'info',
-      message: runId ? `Resume requested: ${runId}` : 'Resume requested',
+      message: `Resume requested: ${runId}`,
     };
   } catch (error) {
     return { level: 'error', message: formatError(error) };

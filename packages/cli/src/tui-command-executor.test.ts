@@ -238,9 +238,20 @@ describe('createTuiCommandExecutor', () => {
       level: 'info',
       message: 'Resume requested: run-42',
     });
+
+    await store.create({
+      runId: 'infer-me',
+      branch: 'maestro/infer',
+      worktreePath: repoRoot,
+      prompt: 'infer',
+      userAgent: 'test',
+      providerDefaults: {},
+      now: () => new Date('2026-05-01T12:00:00.000Z'),
+    });
+
     await expect(execute('resume')).resolves.toEqual({
       level: 'info',
-      message: 'Resume requested',
+      message: 'Resume requested: infer-me',
     });
 
     expect(mocks.resumePipeline).toHaveBeenNthCalledWith(
@@ -249,8 +260,17 @@ describe('createTuiCommandExecutor', () => {
     );
     expect(mocks.resumePipeline).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ repoRoot, store }),
+      expect.objectContaining({ runId: 'infer-me', repoRoot, store }),
     );
+  });
+
+  it('rejects resume when no runs exist', async () => {
+    await expect(execute('resume')).resolves.toEqual({
+      level: 'error',
+      message:
+        'No runs recorded. Start one with `/run <prompt>` then use `/resume`.',
+    });
+    expect(mocks.resumePipeline).not.toHaveBeenCalled();
   });
 
   it('routes administrative commands in-process and captures their output', async () => {

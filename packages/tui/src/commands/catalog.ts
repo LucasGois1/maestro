@@ -31,7 +31,8 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
   },
   {
     command: 'resume',
-    description: 'Resume a paused run, or the latest paused run',
+    description:
+      'Resume a run; without runId, uses the last-started run (by started time)',
     usage: 'resume [runId]',
     handlerId: 'resume',
   },

@@ -21,7 +21,7 @@ export async function resumePipeline(
   const target =
     options.runId !== undefined
       ? await store.load(options.runId)
-      : await store.latest();
+      : await store.latestStarted();
 
   if (!target) {
     throw new PipelineRunNotFoundError(options.runId ?? '(latest)');

@@ -830,7 +830,7 @@ describe('runPipeline (plan replan)', () => {
 });
 
 describe('resumePipeline', () => {
-  it('resumes the latest paused run and emits pipeline.resumed', async () => {
+  it('resumes the last-started run when no id is passed and emits pipeline.resumed', async () => {
     const env = makeEnv();
     const controller = new AbortController();
 

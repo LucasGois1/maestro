@@ -93,6 +93,24 @@ describe('StateStore', () => {
     expect(['run-1', 'run-2']).toContain(latest?.runId);
   });
 
+  it('latestStarted() returns the run with the newest startedAt, not lastUpdatedAt', async () => {
+    const s = createStateStore({ repoRoot });
+    await s.create({
+      ...baseOpts,
+      runId: 'older',
+      now: () => new Date('2026-04-20T00:00:00.000Z'),
+    });
+    await s.create({
+      ...baseOpts,
+      runId: 'newer',
+      now: () => new Date('2026-04-21T00:00:00.000Z'),
+    });
+    await s.update('older', { phase: 'planning' });
+
+    expect((await s.latest())?.runId).toBe('older');
+    expect((await s.latestStarted())?.runId).toBe('newer');
+  });
+
   it('delete() removes the run directory', async () => {
     const s = store();
     await s.create(baseOpts);

@@ -42,6 +42,8 @@ export interface StateStore {
   update(runId: string, patch: Partial<RunState>): Promise<RunState>;
   list(): Promise<RunState[]>;
   latest(): Promise<RunState | null>;
+  /** Most recent run by `startedAt` (chronologically last started), for `/resume` without id. */
+  latestStarted(): Promise<RunState | null>;
   delete(runId: string): Promise<void>;
 }
 
@@ -185,6 +187,15 @@ export function createStateStore(options: CreateStateStoreOptions): StateStore {
     async latest() {
       const all = await this.list();
       return all[0] ?? null;
+    },
+
+    async latestStarted() {
+      const all = await this.list();
+      if (all.length === 0) return null;
+      return (
+        [...all].sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0] ??
+        null
+      );
     },
 
     async delete(runId) {
