@@ -3,6 +3,7 @@ import { Text } from 'ink';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useSpinnerFrame } from './useSpinnerFrame.js';
+import React from 'react';
 
 function SpinnerProbe(props: { readonly enabled: boolean }) {
   const frame = useSpinnerFrame({ enabled: props.enabled, intervalMs: 50 });

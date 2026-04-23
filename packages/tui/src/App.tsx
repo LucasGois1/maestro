@@ -1,5 +1,11 @@
 import { Box } from 'ink';
-import { useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  type ReactNode,
+} from 'react';
 import type { EventBus } from '@maestro/core';
 
 import {
@@ -57,7 +63,9 @@ import { SprintsPanel } from './panels/SprintsPanel.js';
 import { bridgeBusToStore } from './state/eventBridge.js';
 import {
   createTuiStore,
+  PANEL_FOCUS_ORDER,
   type TuiColorMode,
+  type TuiPanelId,
   type TuiState,
   type TuiStore,
 } from './state/store.js';
@@ -72,7 +80,7 @@ export interface AppProps {
   readonly initialOverlay?: {
     readonly id: string;
     readonly title: string;
-    readonly render: () => React.ReactNode;
+    readonly render: () => ReactNode;
   };
   readonly discovery?: {
     readonly onChoice: (choice: 'accept' | 'cancel') => void;
@@ -121,17 +129,16 @@ export function App({
     return dispose;
   }, [activeStore, bus]);
 
-  const bodyProps = {
-    store: activeStore,
-    ...(keybindingRouter ? { keybindingRouter } : {}),
-    ...(discovery ? { discovery } : {}),
-    ...(kbExplorer ? { kbExplorer } : {}),
-    ...(editPlan ? { editPlan } : {}),
-    ...(commandExecutor ? { commandExecutor } : {}),
-  };
   const content = (
     <OverlayHostProvider initialStack={initialOverlay ? [initialOverlay] : []}>
-      <AppBody {...bodyProps} />
+      <AppBody
+        store={activeStore}
+        keybindingRouter={keybindingRouter}
+        discovery={discovery}
+        kbExplorer={kbExplorer}
+        editPlan={editPlan}
+        commandExecutor={commandExecutor}
+      />
     </OverlayHostProvider>
   );
 
@@ -147,11 +154,58 @@ export function App({
 
 interface AppBodyProps {
   readonly store: TuiStore;
-  readonly keybindingRouter?: KeybindingRouter;
+  /** Explicit `undefined` when absent (exactOptionalPropertyTypes-safe). */
+  readonly keybindingRouter: KeybindingRouter | undefined;
   readonly discovery?: AppProps['discovery'];
   readonly kbExplorer?: AppProps['kbExplorer'];
   readonly editPlan?: AppProps['editPlan'];
   readonly commandExecutor?: AppProps['commandExecutor'];
+}
+
+/** Runtime guard so panel focus never leaves the known `TuiPanelId` set (SAST / corrupted store). */
+function coerceTuiPanelId(value: string): TuiPanelId {
+  for (const id of PANEL_FOCUS_ORDER) {
+    if (id === value) {
+      return id;
+    }
+  }
+  return 'pipeline';
+}
+
+/**
+ * Wraps `KeybindingProvider` without `{...dynamic}` into the provider (SAST) and without
+ * passing optional props as explicit `undefined` (exactOptionalPropertyTypes).
+ */
+function KeybindingShell(props: {
+  readonly focusedPanelId: TuiPanelId;
+  readonly overlayOpen: boolean;
+  readonly enabled: boolean;
+  /** When `undefined`, the default in-tree router is used. */
+  readonly injectedRouter: KeybindingRouter | undefined;
+  readonly children: ReactNode;
+}) {
+  const focusedPanelId = coerceTuiPanelId(props.focusedPanelId);
+  if (props.injectedRouter !== undefined) {
+    return (
+      <KeybindingProvider
+        focusedPanelId={focusedPanelId}
+        overlayOpen={props.overlayOpen}
+        enabled={props.enabled}
+        router={props.injectedRouter}
+      >
+        {props.children}
+      </KeybindingProvider>
+    );
+  }
+  return (
+    <KeybindingProvider
+      focusedPanelId={focusedPanelId}
+      overlayOpen={props.overlayOpen}
+      enabled={props.enabled}
+    >
+      {props.children}
+    </KeybindingProvider>
+  );
 }
 
 function AppBody({
@@ -165,16 +219,19 @@ function AppBody({
   const overlayHost = useOverlayHost();
   const focus = useStoreSelector(store, (state) => state.focus);
   const mode = useStoreSelector(store, (state) => state.mode);
-  const providerProps = {
-    /** Discovery embeds diff without layout focus; treat diff as focused so panel shortcuts work. */
-    focusedPanelId: mode === 'discovery' ? 'diff' : focus.panelId,
-    overlayOpen: overlayHost.overlays.length > 0,
-    /** Keep router on during discovery; only the stdin command shell disables it. */
-    enabled: commandExecutor === undefined,
-    ...(keybindingRouter ? { router: keybindingRouter } : {}),
-  };
+  /** Discovery embeds diff without layout focus; treat diff as focused so panel shortcuts work. */
+  const focusedPanelId =
+    mode === 'discovery' ? 'diff' : coerceTuiPanelId(focus.panelId);
+  const overlayOpen = overlayHost.overlays.length > 0;
+  /** Keep router on during discovery; only the stdin command shell disables it. */
+  const keybindingsEnabled = commandExecutor === undefined;
   return (
-    <KeybindingProvider {...providerProps}>
+    <KeybindingShell
+      focusedPanelId={focusedPanelId}
+      overlayOpen={overlayOpen}
+      enabled={keybindingsEnabled}
+      injectedRouter={keybindingRouter}
+    >
       <AppShell
         store={store}
         discovery={discovery}
@@ -182,7 +239,7 @@ function AppBody({
         editPlan={editPlan}
         commandExecutor={commandExecutor}
       />
-    </KeybindingProvider>
+    </KeybindingShell>
   );
 }
 
