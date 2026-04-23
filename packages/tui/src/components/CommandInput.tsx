@@ -1,5 +1,5 @@
 import { Box, Text, useInput } from 'ink';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   commandEntryNeedsTrailingArgs,
@@ -23,10 +23,22 @@ export type TuiCommandExecutor = (options: {
   readonly command: CommandCatalogEntry;
 }) => Promise<TuiCommandExecutionResult> | TuiCommandExecutionResult;
 
+export type DoubleCtrlCExitHandlers = {
+  readonly onArm: () => void;
+  readonly onExit: () => void;
+};
+
 export type CommandInputProps = {
   readonly executor?: TuiCommandExecutor;
   readonly disabled?: boolean;
   readonly colorMode?: TuiColorMode;
+  /** Opens help (bound from App); plain `?` without Ctrl/Meta. */
+  readonly onRequestHelp?: () => void;
+  /**
+   * When set, the first Control+C arms exit (via `onArm`); a second Control+C
+   * within 2s calls `onExit`. Draft is cleared on each Control+C.
+   */
+  readonly doubleCtrlCExit?: DoubleCtrlCExitHandlers;
 };
 
 const INPUT_NAV_FOOTER =
@@ -49,6 +61,8 @@ export function CommandInput({
   executor,
   disabled = false,
   colorMode = 'color',
+  onRequestHelp,
+  doubleCtrlCExit,
 }: CommandInputProps) {
   const useColor = colorMode === 'color';
   const { columns } = useTerminalSize();
@@ -60,6 +74,16 @@ export function CommandInput({
   const [commandHistory, setCommandHistory] = useState<readonly string[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number | null>(null);
   const [submenu, setSubmenu] = useState<SubmenuState | null>(null);
+  const ctrlCArmAtRef = useRef<number | null>(null);
+  const ctrlCArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (ctrlCArmTimerRef.current !== null) {
+        clearTimeout(ctrlCArmTimerRef.current);
+      }
+    };
+  }, []);
 
   const input = draft.trimStart();
   const hasSlashPrefix = input.startsWith('/');
@@ -219,6 +243,50 @@ export function CommandInput({
           void confirmSubmenu();
           return;
         }
+        return;
+      }
+
+      if (
+        onRequestHelp !== undefined &&
+        ch === '?' &&
+        !key.ctrl &&
+        !key.meta
+      ) {
+        onRequestHelp();
+        return;
+      }
+
+      if (key.ctrl && ch === 'c' && doubleCtrlCExit !== undefined) {
+        const now = Date.now();
+        if (
+          ctrlCArmAtRef.current !== null &&
+          now - ctrlCArmAtRef.current <= 2000
+        ) {
+          if (ctrlCArmTimerRef.current !== null) {
+            clearTimeout(ctrlCArmTimerRef.current);
+            ctrlCArmTimerRef.current = null;
+          }
+          ctrlCArmAtRef.current = null;
+          setDraft('');
+          setMessage(null);
+          setSelectedSuggestion(0);
+          setHistoryIndex(null);
+          doubleCtrlCExit.onExit();
+          return;
+        }
+        ctrlCArmAtRef.current = now;
+        doubleCtrlCExit.onArm();
+        if (ctrlCArmTimerRef.current !== null) {
+          clearTimeout(ctrlCArmTimerRef.current);
+        }
+        ctrlCArmTimerRef.current = setTimeout(() => {
+          ctrlCArmAtRef.current = null;
+          ctrlCArmTimerRef.current = null;
+        }, 2000);
+        setDraft('');
+        setMessage(null);
+        setSelectedSuggestion(0);
+        setHistoryIndex(null);
         return;
       }
 

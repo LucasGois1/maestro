@@ -22,12 +22,20 @@ vi.mock('ink', () => ({
   render: inkRenderMock,
 }));
 
+vi.mock('../resolve-workspace-header.js', () => ({
+  resolveWorkspaceHeader: vi.fn(async () => ({
+    repoName: 'mock-repo',
+    branch: 'main',
+  })),
+}));
+
 import { createTuiCommand, defaultRenderApp } from './tui.js';
 
 let tempDir: string | undefined;
 
 describe('createTuiCommand', () => {
   beforeEach(async () => {
+    vi.stubEnv('MAESTRO_SKIP_WORKSPACE_TRUST', '1');
     tempDir = await mkdtemp(join(tmpdir(), 'maestro-cli-tui-'));
     inkRenderMock.mockClear();
     editSprintContractMock.mockClear();
@@ -35,13 +43,14 @@ describe('createTuiCommand', () => {
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     if (tempDir) {
       await rm(tempDir, { recursive: true, force: true });
       tempDir = undefined;
     }
   });
 
-  it('renders the App without demo events by default', () => {
+  it('renders the App without demo events by default', async () => {
     const renderApp = vi.fn(() => ({ unmount: vi.fn() }));
     const startDemo = vi.fn();
 
@@ -50,17 +59,19 @@ describe('createTuiCommand', () => {
       startDemo: startDemo as never,
       env: {},
     });
-    command.parse([], { from: 'user' });
+    await command.parseAsync([], { from: 'user' });
 
     expect(renderApp).toHaveBeenCalledOnce();
     expect(startDemo).not.toHaveBeenCalled();
     const args = renderApp.mock.calls[0]?.[0] as {
       colorMode: 'color' | 'no-color';
+      onForceExit?: () => void;
     };
     expect(args.colorMode).toBe('color');
+    expect(typeof args.onForceExit).toBe('function');
   });
 
-  it('starts the demo when --demo is provided', () => {
+  it('starts the demo when --demo is provided', async () => {
     const renderApp = vi.fn(() => ({ unmount: vi.fn() }));
     const startDemo = vi.fn();
 
@@ -69,19 +80,19 @@ describe('createTuiCommand', () => {
       startDemo: startDemo as never,
       env: {},
     });
-    command.parse(['--demo'], { from: 'user' });
+    await command.parseAsync(['--demo'], { from: 'user' });
 
     expect(startDemo).toHaveBeenCalledOnce();
   });
 
-  it('honors --no-color and NO_COLOR', () => {
+  it('honors --no-color and NO_COLOR', async () => {
     const renderApp = vi.fn(() => ({ unmount: vi.fn() }));
     const command = createTuiCommand({
       renderApp: renderApp as never,
       startDemo: vi.fn() as never,
       env: { NO_COLOR: '1' },
     });
-    command.parse([], { from: 'user' });
+    await command.parseAsync([], { from: 'user' });
 
     const args = renderApp.mock.calls[0]?.[0] as {
       colorMode: 'color' | 'no-color';
@@ -89,14 +100,14 @@ describe('createTuiCommand', () => {
     expect(args.colorMode).toBe('no-color');
   });
 
-  it('forces no-color when --no-color flag is used', () => {
+  it('forces no-color when --no-color flag is used', async () => {
     const renderApp = vi.fn(() => ({ unmount: vi.fn() }));
     const command = createTuiCommand({
       renderApp: renderApp as never,
       startDemo: vi.fn() as never,
       env: {},
     });
-    command.parse(['--no-color'], { from: 'user' });
+    await command.parseAsync(['--no-color'], { from: 'user' });
 
     const args = renderApp.mock.calls[0]?.[0] as {
       colorMode: 'color' | 'no-color';
@@ -104,7 +115,7 @@ describe('createTuiCommand', () => {
     expect(args.colorMode).toBe('no-color');
   });
 
-  it('passes a shared bus that demo events feed into', () => {
+  it('passes a shared bus that demo events feed into', async () => {
     const renderApp = vi.fn(
       (args: { bus: ReturnType<typeof createEventBus>; store: unknown }) => {
         const dispose = bridgeBusToStore(
@@ -127,7 +138,7 @@ describe('createTuiCommand', () => {
       env: {},
     });
 
-    command.parse(['--demo'], { from: 'user' });
+    await command.parseAsync(['--demo'], { from: 'user' });
 
     const args = renderApp.mock.calls[0]?.[0] as {
       store: { getState: () => { mode: string } };
@@ -153,7 +164,7 @@ describe('createTuiCommand', () => {
       startDemo: vi.fn() as never,
       env: {},
     });
-    command.parse([], { from: 'user' });
+    await command.parseAsync([], { from: 'user' });
 
     const args = renderApp.mock.calls[0]?.[0] as {
       editPlan: {

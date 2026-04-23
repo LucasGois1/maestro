@@ -12,7 +12,7 @@ export const GLOBAL_HOTKEYS: HotkeySection = {
   title: 'Global',
   lines: [
     { keys: '[tab] / [shift+tab]', description: 'Next / previous panel' },
-    { keys: '[?]', description: 'This help' },
+    { keys: '?', description: 'Help (in command line) or Shift+? here' },
     { keys: '[k]', description: 'KB explorer (.maestro files)' },
     { keys: '[e]', description: 'Edit sprint contract (when CLI wired)' },
     {
@@ -51,23 +51,7 @@ export const PIPELINE_FOOTER_HINTS: Readonly<
     readonly { key: string; label: string }[]
   >
 > = {
-  idle: [
-    { key: '[tab]', label: 'next panel' },
-    { key: '[?]', label: 'help' },
-    { key: '[q]', label: 'quit' },
-  ],
-  running: [
-    { key: '[tab]', label: 'next panel' },
-    { key: '[?]', label: 'help' },
-    { key: '[p]', label: 'pause' },
-    { key: '[c]', label: 'cancel' },
-    { key: '[q]', label: 'quit' },
-  ],
-  paused: [
-    { key: '[tab]', label: 'next panel' },
-    { key: '[?]', label: 'help' },
-    { key: '[space]', label: 'resume' },
-    { key: '[c]', label: 'cancel' },
-    { key: '[q]', label: 'quit' },
-  ],
+  idle: [],
+  running: [],
+  paused: [],
 };

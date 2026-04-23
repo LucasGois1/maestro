@@ -19,7 +19,9 @@ import {
 import { render, type Instance } from 'ink';
 import { createElement } from 'react';
 
+import { CLI_PACKAGE_VERSION } from './cli-version.js';
 import { createDiscoveryRunLog } from './discovery-debug-log.js';
+import { resolveWorkspaceHeader } from './resolve-workspace-header.js';
 
 function summarizeStructure(comp: ComputationalDiscoveryResult): string {
   const names = comp.structure.topLevelNames.slice(0, 10).join(', ');
@@ -103,12 +105,15 @@ export async function runInitDiscoveryTui(options: {
   } | null = null;
 
   const discoveryLog = await createDiscoveryRunLog(repoRoot);
+  const baseHeader = createInitialTuiState().header;
+  const workspaceHeader = await resolveWorkspaceHeader(repoRoot);
 
   return await new Promise<InitDiscoveryTuiResult>((resolve) => {
     const baseDiscovery = createInitialTuiState().discovery;
     const store = createTuiStore({
       mode: 'discovery',
       colorMode,
+      header: { ...baseHeader, ...workspaceHeader },
       discovery: {
         ...baseDiscovery,
         providerSummary: options.providerSummary ?? null,
@@ -125,6 +130,7 @@ export async function runInitDiscoveryTui(options: {
       createElement(App, {
         store,
         colorMode,
+        maestroVersion: CLI_PACKAGE_VERSION,
         discovery: {
           onChoice: (choice: 'accept' | 'cancel') => {
             if (pipelineFailed) {

@@ -19,6 +19,7 @@ import {
   formatDiscoveryProviderSummary,
   runInitDiscoveryTui,
 } from '../init-discovery-tui.js';
+import { ensureWorkspaceTrustInteractive } from '../workspace-trust.js';
 import { runSensorSetupAfterKbInit } from '../init-sensor-phase.js';
 import { runInitModelSetupInk } from '../init-model-setup.js';
 import { mountPostInitHomeShell } from '../post-init-home-tui.js';
@@ -108,6 +109,10 @@ export function createInitCommand(options: InitCommandOptions = {}): Command {
         skipSensorWizard?: boolean;
       }) => {
         const repoRoot = cwd();
+        if (!(await ensureWorkspaceTrustInteractive(repoRoot))) {
+          process.exit(0);
+          return;
+        }
         const interactiveModelWizard =
           flags.template === undefined &&
           flags.ai !== false &&

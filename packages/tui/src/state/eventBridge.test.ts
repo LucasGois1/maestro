@@ -2,7 +2,7 @@ import { createEventBus } from '@maestro/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { bridgeBusToStore } from './eventBridge.js';
-import { createTuiStore } from './store.js';
+import { createTuiStore, RECENT_RUNS_CAP } from './store.js';
 
 describe('bridgeBusToStore', () => {
   describe('pipeline events', () => {
@@ -193,6 +193,61 @@ describe('bridgeBusToStore', () => {
       bus.emit({ type: 'pipeline.completed', runId: 'r', durationMs: 5 });
 
       expect(store.getState().sprints[0]?.status).toBe('done');
+    });
+
+    it('records completed and failed runs in recentRuns (newest first)', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      let tick = 10_000;
+      bridgeBusToStore(bus, store, { clock: () => ++tick });
+
+      bus.emit({ type: 'pipeline.started', runId: 'r-done' });
+      bus.emit({ type: 'pipeline.completed', runId: 'r-done', durationMs: 9 });
+      expect(store.getState().recentRuns).toEqual([
+        {
+          runId: 'r-done',
+          status: 'completed',
+          at: 10_001,
+          durationMs: 9,
+        },
+      ]);
+
+      bus.emit({ type: 'pipeline.started', runId: 'r-bad' });
+      bus.emit({
+        type: 'pipeline.failed',
+        runId: 'r-bad',
+        error: 'x',
+        at: 'merging',
+      });
+      expect(store.getState().recentRuns).toEqual([
+        {
+          runId: 'r-bad',
+          status: 'failed',
+          at: 10_002,
+        },
+        {
+          runId: 'r-done',
+          status: 'completed',
+          at: 10_001,
+          durationMs: 9,
+        },
+      ]);
+    });
+
+    it('caps recentRuns at RECENT_RUNS_CAP', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      const unbridge = bridgeBusToStore(bus, store, { clock: () => 0 });
+      for (let i = 0; i < RECENT_RUNS_CAP + 2; i++) {
+        bus.emit({ type: 'pipeline.started', runId: `run-${i}` });
+        bus.emit({
+          type: 'pipeline.completed',
+          runId: `run-${i}`,
+          durationMs: 1,
+        });
+      }
+      expect(store.getState().recentRuns).toHaveLength(RECENT_RUNS_CAP);
+      unbridge();
     });
 
     it('marks the active sprint as failed on pipeline.failed', () => {

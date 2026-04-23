@@ -4,6 +4,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useState,
   type ReactNode,
 } from 'react';
 import type { EventBus } from '@maestro/core';
@@ -37,6 +38,7 @@ import {
   createAgentLogOverlay,
 } from './panels/AgentLogOverlay.js';
 import { DiscoveryScreen } from './panels/DiscoveryScreen.js';
+import { MaestroHomeScreen } from './panels/MaestroHomeScreen.js';
 import { DiffPreviewPanel } from './panels/DiffPreviewPanel.js';
 import {
   FEEDBACK_HISTORY_OVERLAY_ID,
@@ -96,6 +98,13 @@ export interface AppProps {
     readonly onEditPath: (path: string) => void | Promise<void>;
   };
   readonly commandExecutor?: TuiCommandExecutor;
+  /** Shown on the home screen (e.g. CLI package version). */
+  readonly maestroVersion?: string;
+  /**
+   * Invoked after the second Control+C within 2s (see CommandInput). Required
+   * for double Control-C exit when `commandExecutor` is set (CLI should unmount Ink).
+   */
+  readonly onForceExit?: () => void;
 }
 
 export function App({
@@ -109,6 +118,8 @@ export function App({
   kbExplorer,
   editPlan,
   commandExecutor,
+  maestroVersion,
+  onForceExit,
 }: AppProps) {
   const activeStore = useMemo(
     () => store ?? createTuiStore({ colorMode: colorMode ?? 'color' }),
@@ -137,7 +148,9 @@ export function App({
         discovery={discovery}
         kbExplorer={kbExplorer}
         editPlan={editPlan}
-        commandExecutor={commandExecutor}
+        {...(commandExecutor !== undefined ? { commandExecutor } : {})}
+        {...(maestroVersion !== undefined ? { maestroVersion } : {})}
+        {...(onForceExit !== undefined ? { onForceExit } : {})}
       />
     </OverlayHostProvider>
   );
@@ -159,7 +172,9 @@ interface AppBodyProps {
   readonly discovery?: AppProps['discovery'];
   readonly kbExplorer?: AppProps['kbExplorer'];
   readonly editPlan?: AppProps['editPlan'];
-  readonly commandExecutor?: AppProps['commandExecutor'];
+  readonly commandExecutor?: TuiCommandExecutor;
+  readonly maestroVersion?: string;
+  readonly onForceExit?: () => void;
 }
 
 /** Runtime guard so panel focus never leaves the known `TuiPanelId` set (SAST / corrupted store). */
@@ -215,6 +230,8 @@ function AppBody({
   kbExplorer,
   editPlan,
   commandExecutor,
+  maestroVersion,
+  onForceExit,
 }: AppBodyProps) {
   const overlayHost = useOverlayHost();
   const focus = useStoreSelector(store, (state) => state.focus);
@@ -237,7 +254,9 @@ function AppBody({
         discovery={discovery}
         kbExplorer={kbExplorer}
         editPlan={editPlan}
-        commandExecutor={commandExecutor}
+        {...(commandExecutor !== undefined ? { commandExecutor } : {})}
+        {...(maestroVersion !== undefined ? { maestroVersion } : {})}
+        {...(onForceExit !== undefined ? { onForceExit } : {})}
       />
     </KeybindingShell>
   );
@@ -249,14 +268,19 @@ function AppShell({
   kbExplorer,
   editPlan,
   commandExecutor,
+  maestroVersion,
+  onForceExit,
 }: {
   readonly store: TuiStore;
   readonly discovery?: AppProps['discovery'];
   readonly kbExplorer?: AppProps['kbExplorer'];
   readonly editPlan?: AppProps['editPlan'];
-  readonly commandExecutor?: AppProps['commandExecutor'];
+  readonly commandExecutor?: TuiCommandExecutor;
+  readonly maestroVersion?: string;
+  readonly onForceExit?: () => void;
 }) {
   const overlayHost = useOverlayHost();
+  const [footerTransient, setFooterTransient] = useState<string | null>(null);
   const mode = useStoreSelector(store, (state) => state.mode);
   const header = useStoreSelector(store, (state) => state.header);
   const pipeline = useStoreSelector(store, (state) => state.pipeline);
@@ -267,10 +291,23 @@ function AppShell({
   const focus = useStoreSelector(store, (state) => state.focus);
   const colorMode = useStoreSelector(store, (state) => state.colorMode);
   const size = useTerminalSize();
-  const footerState = deriveFooterState(
-    pipeline.status,
-    overlayHost.overlays.length > 0,
-  );
+  const overlayOpen = overlayHost.overlays.length > 0;
+  const footerState = deriveFooterState(pipeline.status, overlayOpen);
+
+  useEffect(() => {
+    if (footerTransient === null) {
+      return;
+    }
+    const id = setTimeout(() => {
+      setFooterTransient(null);
+    }, 2000);
+    return () => {
+      clearTimeout(id);
+    };
+  }, [footerTransient]);
+
+  const showDashboard =
+    pipeline.status === 'running' || pipeline.status === 'paused';
 
   useKeybinding(
     { kind: 'global' },
@@ -281,7 +318,7 @@ function AppShell({
         focus: { ...state.focus, panelId: nextPanelId(state.focus.panelId) },
       }));
     },
-    { enabled: mode !== 'discovery' },
+    { enabled: mode !== 'discovery' && showDashboard },
   );
 
   useKeybinding(
@@ -296,7 +333,7 @@ function AppShell({
         },
       }));
     },
-    { enabled: mode !== 'discovery' },
+    { enabled: mode !== 'discovery' && showDashboard },
   );
 
   useKeybinding({ kind: 'overlay' }, { key: 'escape' }, () => {
@@ -537,59 +574,81 @@ function AppShell({
   return (
     <Box flexDirection="column" width={size.columns}>
       <Header mode={mode} header={header} colorMode={colorMode} />
-      <LayoutGrid
-        focusedPanelId={focus.panelId}
-        slots={{
-          pipeline: (
-            <PipelinePanel
-              pipeline={pipeline}
-              sprints={sprints}
-              focused={focus.panelId === 'pipeline'}
-              colorMode={colorMode}
-            />
-          ),
-          activeAgent: (
-            <ActiveAgentPanel
-              agent={agent}
-              pipelineStage={pipeline.stage}
-              pipelineStatus={pipeline.status}
-              focused={focus.panelId === 'activeAgent'}
-              colorMode={colorMode}
-            />
-          ),
-          sprints: (
-            <SprintsPanel
-              sprints={sprints}
-              selectedSprintIdx={focus.selectedSprintIdx}
-              focused={focus.panelId === 'sprints'}
-              colorMode={colorMode}
-            />
-          ),
-          sensors: (
-            <SensorsPanel
-              sensors={sensors}
-              focusedSensorId={focus.focusedSensorId}
-              onFocusedSensorIdChange={setFocusedSensorId}
-              focused={focus.panelId === 'sensors'}
-              colorMode={colorMode}
-            />
-          ),
-          diff: (
-            <DiffPreviewPanel
-              diffPreview={diffPreview}
-              focused={focus.panelId === 'diff'}
-              colorMode={colorMode}
-            />
-          ),
-        }}
-      />
+      {showDashboard ? (
+        <LayoutGrid
+          focusedPanelId={focus.panelId}
+          slots={{
+            pipeline: (
+              <PipelinePanel
+                pipeline={pipeline}
+                sprints={sprints}
+                focused={focus.panelId === 'pipeline'}
+                colorMode={colorMode}
+              />
+            ),
+            activeAgent: (
+              <ActiveAgentPanel
+                agent={agent}
+                pipelineStage={pipeline.stage}
+                pipelineStatus={pipeline.status}
+                focused={focus.panelId === 'activeAgent'}
+                colorMode={colorMode}
+              />
+            ),
+            sprints: (
+              <SprintsPanel
+                sprints={sprints}
+                selectedSprintIdx={focus.selectedSprintIdx}
+                focused={focus.panelId === 'sprints'}
+                colorMode={colorMode}
+              />
+            ),
+            sensors: (
+              <SensorsPanel
+                sensors={sensors}
+                focusedSensorId={focus.focusedSensorId}
+                onFocusedSensorIdChange={setFocusedSensorId}
+                focused={focus.panelId === 'sensors'}
+                colorMode={colorMode}
+              />
+            ),
+            diff: (
+              <DiffPreviewPanel
+                diffPreview={diffPreview}
+                focused={focus.panelId === 'diff'}
+                colorMode={colorMode}
+              />
+            ),
+          }}
+        />
+      ) : (
+        <MaestroHomeScreen
+          store={store}
+          {...(maestroVersion !== undefined ? { maestroVersion } : {})}
+        />
+      )}
       <OverlayHost colorMode={colorMode} />
       <CommandInput
         {...(commandExecutor ? { executor: commandExecutor } : {})}
-        disabled={overlayHost.overlays.length > 0}
+        disabled={overlayOpen}
         colorMode={colorMode}
+        onRequestHelp={openHelp}
+        {...(commandExecutor !== undefined && onForceExit !== undefined
+          ? {
+              doubleCtrlCExit: {
+                onArm: () => {
+                  setFooterTransient('Press Control-C again to exit');
+                },
+                onExit: onForceExit,
+              },
+            }
+          : {})}
       />
-      <Footer state={footerState} colorMode={colorMode} />
+      <Footer
+        state={footerState}
+        colorMode={colorMode}
+        transientMessage={overlayOpen ? null : footerTransient}
+      />
     </Box>
   );
 }

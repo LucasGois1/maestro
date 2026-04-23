@@ -4,8 +4,10 @@ export { HelloWorld } from './components/HelloWorld.js';
 export { formatHelloMessage } from './message.js';
 
 export { App, type AppProps } from './App.js';
+export { MaestroHomeScreen } from './panels/MaestroHomeScreen.js';
 
 export {
+  appendRecentRun,
   computeStageDurations,
   computeStageStatuses,
   createInitialTuiState,
@@ -36,6 +38,8 @@ export {
   type TuiPanelId,
   type TuiPipelineState,
   type TuiPipelineStatus,
+  RECENT_RUNS_CAP,
+  type TuiRecentRun,
   type TuiSensorState,
   type TuiSensorStatus,
   type TuiSprintState,

@@ -1,20 +1,17 @@
 import { createEventBus } from '@maestro/core';
 import { editSprintContract, resolveContractPath } from '@maestro/contract';
-import {
-  App,
-  createTuiStore,
-  playDemoEvents,
-  resolveColorMode,
-  type TuiState,
-} from '@maestro/tui';
+import { App, playDemoEvents, resolveColorMode, type TuiState } from '@maestro/tui';
 import { existsSync } from 'node:fs';
 import { cwd } from 'node:process';
 import { Command } from 'commander';
 import { render, type Instance } from 'ink';
 import { createElement } from 'react';
 
+import { CLI_PACKAGE_VERSION } from '../cli-version.js';
 import { listMaestroFilesUnderRepo } from '../tui-kb.js';
 import { createTuiCommandExecutor } from '../tui-command-executor.js';
+import { createTuiStoreForWorkspace } from '../tui-workspace-store.js';
+import { ensureWorkspaceTrustInteractive } from '../workspace-trust.js';
 
 export interface CreateTuiCommandOptions {
   readonly renderApp?: typeof defaultRenderApp;
@@ -41,74 +38,84 @@ export function createTuiCommand(
       'Reserved: path to a JSON file describing a custom event fixture',
     )
     .action((flags: TuiCommandFlags) => {
-      const env = options.env ?? process.env;
-      const renderApp = options.renderApp ?? defaultRenderApp;
-      const startDemo = options.startDemo ?? playDemoEvents;
+      return (async () => {
+        const env = options.env ?? process.env;
+        const renderApp = options.renderApp ?? defaultRenderApp;
+        const startDemo = options.startDemo ?? playDemoEvents;
 
-      const colorMode = resolveColorMode({
-        args: flags.color === false ? ['--no-color'] : [],
-        env,
-      });
+        const repoRoot = cwd();
+        if (!(await ensureWorkspaceTrustInteractive(repoRoot))) {
+          process.exit(0);
+          return;
+        }
 
-      const bus = createEventBus();
-      const store = createTuiStore({ colorMode });
-
-      const repoRoot = cwd();
-      const kbFiles = listMaestroFilesUnderRepo(repoRoot);
-      const commandExecutor = createTuiCommandExecutor({
-        repoRoot,
-        bus,
-      });
-
-      let inkInstance: Instance | undefined;
-
-      const mount = () => {
-        inkInstance = renderApp({
-          store,
-          bus,
-          colorMode,
-          kbExplorer: {
-            repoLabel: repoRoot,
-            files: kbFiles,
-          },
-          editPlan: {
-            resolveContractPath: (state) => {
-              const runId = state.runId;
-              const spIdx = state.pipeline.sprintIdx;
-              if (!runId || spIdx === null) {
-                return null;
-              }
-              const path = resolveContractPath({
-                repoRoot,
-                runId,
-                sprint: spIdx + 1,
-              });
-              return existsSync(path) ? path : null;
-            },
-            onEditPath: async (filePath) => {
-              inkInstance?.unmount();
-              try {
-                await editSprintContract({ filePath });
-              } finally {
-                mount();
-              }
-            },
-          },
-          commandExecutor,
+        const colorMode = resolveColorMode({
+          args: flags.color === false ? ['--no-color'] : [],
+          env,
         });
-      };
 
-      mount();
+        const bus = createEventBus();
+        const store = await createTuiStoreForWorkspace({ repoRoot, colorMode });
+        const kbFiles = listMaestroFilesUnderRepo(repoRoot);
+        const commandExecutor = createTuiCommandExecutor({
+          repoRoot,
+          bus,
+        });
 
-      if (flags.demo) {
-        startDemo(bus);
-      }
+        let inkInstance: Instance | undefined;
+
+        const mount = () => {
+          inkInstance = renderApp({
+            store,
+            bus,
+            colorMode,
+            kbExplorer: {
+              repoLabel: repoRoot,
+              files: kbFiles,
+            },
+            editPlan: {
+              resolveContractPath: (state) => {
+                const runId = state.runId;
+                const spIdx = state.pipeline.sprintIdx;
+                if (!runId || spIdx === null) {
+                  return null;
+                }
+                const path = resolveContractPath({
+                  repoRoot,
+                  runId,
+                  sprint: spIdx + 1,
+                });
+                return existsSync(path) ? path : null;
+              },
+              onEditPath: async (filePath) => {
+                inkInstance?.unmount();
+                try {
+                  await editSprintContract({ filePath });
+                } finally {
+                  mount();
+                }
+              },
+            },
+            commandExecutor,
+            onForceExit: () => {
+              inkInstance?.unmount();
+              process.exit(0);
+            },
+          });
+        };
+
+        mount();
+
+        if (flags.demo) {
+          startDemo(bus);
+        }
+      })();
     });
   return command;
 }
 
 export interface DefaultRenderAppArgs {
-  readonly store: ReturnType<typeof createTuiStore>;
+  readonly store: Awaited<ReturnType<typeof createTuiStoreForWorkspace>>;
   readonly bus: ReturnType<typeof createEventBus>;
   readonly colorMode: ReturnType<typeof resolveColorMode>;
   readonly kbExplorer?: {
@@ -120,6 +127,7 @@ export interface DefaultRenderAppArgs {
     readonly onEditPath: (path: string) => void | Promise<void>;
   };
   readonly commandExecutor?: Parameters<typeof App>[0]['commandExecutor'];
+  readonly onForceExit?: Parameters<typeof App>[0]['onForceExit'];
 }
 
 export function defaultRenderApp({
@@ -129,18 +137,23 @@ export function defaultRenderApp({
   kbExplorer,
   editPlan,
   commandExecutor,
+  onForceExit,
 }: DefaultRenderAppArgs): Instance {
+  const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
   return render(
     createElement(App, {
       store,
       bus,
       colorMode,
+      maestroVersion: CLI_PACKAGE_VERSION,
       ...(kbExplorer ? { kbExplorer } : {}),
       ...(editPlan ? { editPlan } : {}),
       ...(commandExecutor ? { commandExecutor } : {}),
+      ...(onForceExit !== undefined ? { onForceExit } : {}),
     }),
     {
-      interactive: Boolean(process.stdin.isTTY && process.stdout.isTTY),
+      interactive,
+      ...(commandExecutor !== undefined ? { exitOnCtrlC: false } : {}),
     },
   );
 }

@@ -2,7 +2,14 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { Command } from 'commander';
 
 vi.mock(
@@ -25,11 +32,13 @@ const io = {
 };
 
 beforeEach(async () => {
+  vi.stubEnv('MAESTRO_SKIP_WORKSPACE_TRUST', '1');
   repoRoot = await mkdtemp(join(tmpdir(), 'maestro-cli-init-'));
   stdout = [];
 });
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await rm(repoRoot, { recursive: true, force: true });
 });
 

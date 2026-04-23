@@ -134,6 +134,16 @@ export type TuiPipelineStatus =
   | 'completed'
   | 'failed';
 
+/** Finished pipeline runs for the home screen “Recent activity” list (newest first). */
+export interface TuiRecentRun {
+  readonly runId: string;
+  readonly status: 'completed' | 'failed';
+  readonly at: number;
+  readonly durationMs?: number;
+}
+
+export const RECENT_RUNS_CAP = 8;
+
 export type TuiSensorStatus =
   | 'queued'
   | 'running'
@@ -280,6 +290,7 @@ export interface TuiState {
   readonly focus: TuiFocusState;
   readonly diffPreview: TuiDiffPreviewState;
   readonly colorMode: TuiColorMode;
+  readonly recentRuns: readonly TuiRecentRun[];
 }
 
 export type TuiStateUpdater = (previous: TuiState) => TuiState;
@@ -308,6 +319,15 @@ export const DEFAULT_AGENT_LOG_BUFFER = 120;
 export const DEFAULT_FEEDBACK_HISTORY_CAP = 24;
 export const DEFAULT_DIFF_VIEWPORT_LINES = 32;
 
+export function appendRecentRun(
+  prev: readonly TuiRecentRun[],
+  entry: TuiRecentRun,
+  cap: number = RECENT_RUNS_CAP,
+): readonly TuiRecentRun[] {
+  const next: TuiRecentRun[] = [entry, ...prev];
+  return next.slice(0, cap);
+}
+
 export const PIPELINE_STAGE_ORDER: readonly PipelineStageName[] = [
   'discovering',
   'planning',
@@ -321,7 +341,13 @@ export const PIPELINE_STAGE_ORDER: readonly PipelineStageName[] = [
 export function createInitialTuiState(
   overrides: Partial<TuiState> = {},
 ): TuiState {
-  return {
+  const {
+    header: headerOverride,
+    discovery: discoveryOverride,
+    ...restOverrides
+  } = overrides;
+
+  const base: TuiState = {
     mode: 'idle',
     runId: null,
     kbPathsRead: [],
@@ -380,7 +406,18 @@ export function createInitialTuiState(
       feedbackHistory: [],
     },
     colorMode: 'color',
-    ...overrides,
+    recentRuns: [],
+  };
+
+  return {
+    ...base,
+    ...restOverrides,
+    ...(headerOverride !== undefined
+      ? { header: { ...base.header, ...headerOverride } }
+      : {}),
+    ...(discoveryOverride !== undefined
+      ? { discovery: { ...base.discovery, ...discoveryOverride } }
+      : {}),
   };
 }
 

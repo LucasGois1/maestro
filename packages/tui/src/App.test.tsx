@@ -4,25 +4,51 @@ import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { App } from './App.js';
-import { createTuiStore } from './state/store.js';
+import { createInitialTuiState, createTuiStore } from './state/store.js';
 
 /** Wide enough for left column (3 panels + sensors) + dedicated diff column without title wrap. */
 const SIZE_WIDE = { columns: 160, rows: 40 } as const;
 const SIZE_NARROW = { columns: 60, rows: 24 } as const;
 
+function createRunningPipelineStore() {
+  const base = createInitialTuiState();
+  return createTuiStore({
+    mode: 'run',
+    pipeline: { ...base.pipeline, status: 'running' },
+  });
+}
+
 describe('App', () => {
-  it('renders header, all five panels, and footer in idle mode', () => {
-    const app = render(<App terminalSize={SIZE_WIDE} />);
+  it('renders header and home screen in idle mode (no pipeline footer bar)', () => {
+    const app = render(
+      <App terminalSize={SIZE_WIDE} maestroVersion="0.0.1-test" />,
+    );
 
     const frame = app.lastFrame() ?? '';
     expect(frame).toContain('maestro');
+    expect(frame).toContain('Tips for getting started');
+    expect(frame).toContain('No recent activity');
+    expect(frame).toContain('Maestro 0.0.1-test');
+    expect(frame).not.toContain('Pipeline');
+    expect(frame).not.toContain('Active Agent');
+    expect(frame).toContain('Type ? for help and shortcuts (command line)');
+    app.unmount();
+  });
+
+  it('renders dashboard panels when pipeline is running', () => {
+    const base = createInitialTuiState();
+    const store = createTuiStore({
+      mode: 'run',
+      pipeline: { ...base.pipeline, status: 'running' },
+    });
+    const app = render(<App store={store} terminalSize={SIZE_WIDE} />);
+
+    const frame = app.lastFrame() ?? '';
     expect(frame).toContain('Pipeline');
     expect(frame).toContain('Active Agent');
     expect(frame).toContain('Sprints');
     expect(frame).toContain('Sensors');
     expect(frame).toContain('Diff · Preview · Feedback');
-    expect(frame).toContain('[?]');
-    expect(frame).toContain('help');
     app.unmount();
   });
 
@@ -37,6 +63,7 @@ describe('App', () => {
         bus={bus}
         terminalSize={SIZE_WIDE}
         commandExecutor={commandExecutor}
+        onForceExit={vi.fn()}
       />,
     );
 
@@ -58,7 +85,11 @@ describe('App', () => {
   it('suggests known commands and rejects unknown free text', async () => {
     const commandExecutor = vi.fn();
     const app = render(
-      <App terminalSize={SIZE_WIDE} commandExecutor={commandExecutor} />,
+      <App
+        terminalSize={SIZE_WIDE}
+        commandExecutor={commandExecutor}
+        onForceExit={vi.fn()}
+      />,
     );
 
     app.stdin.write('ru');
@@ -90,7 +121,11 @@ describe('App', () => {
       message: `executed ${input}`,
     }));
     const app = render(
-      <App terminalSize={SIZE_WIDE} commandExecutor={commandExecutor} />,
+      <App
+        terminalSize={SIZE_WIDE}
+        commandExecutor={commandExecutor}
+        onForceExit={vi.fn()}
+      />,
     );
 
     app.stdin.write('/runs\r');
@@ -120,7 +155,11 @@ describe('App', () => {
       message: `executed ${input}`,
     }));
     const app = render(
-      <App terminalSize={SIZE_WIDE} commandExecutor={commandExecutor} />,
+      <App
+        terminalSize={SIZE_WIDE}
+        commandExecutor={commandExecutor}
+        onForceExit={vi.fn()}
+      />,
     );
 
     app.stdin.write('/run list\r');
@@ -140,7 +179,11 @@ describe('App', () => {
       message: `executed ${input}`,
     }));
     const app = render(
-      <App terminalSize={SIZE_WIDE} commandExecutor={commandExecutor} />,
+      <App
+        terminalSize={SIZE_WIDE}
+        commandExecutor={commandExecutor}
+        onForceExit={vi.fn()}
+      />,
     );
 
     app.stdin.write('/run ship auth\r');
@@ -161,6 +204,7 @@ describe('App', () => {
       <App
         terminalSize={SIZE_WIDE}
         commandExecutor={commandExecutor}
+        onForceExit={vi.fn()}
         initialOverlay={{
           id: 'help',
           title: 'Help',
@@ -204,12 +248,14 @@ describe('App', () => {
     expect(frame).toContain('run');
     expect(frame).toContain('sprint 2/4');
     expect(frame).toContain('⟳ Generating');
-    expect(frame).toContain('[p] pause');
     app.unmount();
   });
 
   it('degrades into a single-column layout below 80 columns', () => {
-    const app = render(<App terminalSize={SIZE_NARROW} />);
+    const store = createRunningPipelineStore();
+    const app = render(
+      <App store={store} terminalSize={SIZE_NARROW} />,
+    );
     const frame = app.lastFrame() ?? '';
 
     const order = [
@@ -259,7 +305,7 @@ describe('App', () => {
   });
 
   it('cycles focus through panels with Tab and Shift+Tab', async () => {
-    const store = createTuiStore();
+    const store = createRunningPipelineStore();
     const app = render(<App store={store} terminalSize={SIZE_WIDE} />);
 
     await new Promise((resolve) => setTimeout(resolve, 20));

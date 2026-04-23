@@ -3,9 +3,9 @@ import { cwd } from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 import { createEventBus } from '@maestro/core';
-import { App, createTuiStore } from '@maestro/tui';
+import { App } from '@maestro/tui';
 import { Command } from 'commander';
-import { render } from 'ink';
+import { render, type Instance } from 'ink';
 import { createElement } from 'react';
 
 import { createAbortCommand } from './commands/abort.js';
@@ -20,6 +20,8 @@ import { createRunsCommand } from './commands/runs.js';
 import { createTuiCommand } from './commands/tui.js';
 import { resolveCliMode } from './mode.js';
 import { createTuiCommandExecutor } from './tui-command-executor.js';
+import { createTuiStoreForWorkspace } from './tui-workspace-store.js';
+import { ensureWorkspaceTrustInteractive } from './workspace-trust.js';
 
 const CLI_PACKAGE_NAME = '@maestro/cli';
 const require = createRequire(import.meta.url);
@@ -29,7 +31,10 @@ type CliProgram = Pick<Command, 'parse'>;
 
 type RunCliOptions = {
   program?: CliProgram;
-  renderApp?: typeof renderInkApp;
+  renderApp?: (
+    version: string,
+    stdoutIsTTY: boolean,
+  ) => void | Promise<void>;
   stdoutIsTTY?: boolean;
   version?: string;
 };
@@ -39,20 +44,35 @@ type ExecuteCliFromProcessOptions = {
   run?: typeof runCli;
 };
 
-function renderInkApp(_version: string, stdoutIsTTY: boolean) {
+async function renderInkApp(_version: string, stdoutIsTTY: boolean) {
+  const repoRoot = cwd();
   const bus = createEventBus();
-  const store = createTuiStore();
+  const store = await createTuiStoreForWorkspace({ repoRoot });
   const commandExecutor = createTuiCommandExecutor({
-    repoRoot: cwd(),
+    repoRoot,
     bus,
   });
-  const instance = render(createElement(App, { store, bus, commandExecutor }), {
-    interactive: stdoutIsTTY && Boolean(process.stdin.isTTY),
-  });
+  let instance: Instance | undefined;
+  instance = render(
+    createElement(App, {
+      store,
+      bus,
+      commandExecutor,
+      maestroVersion: packageJson.version,
+      onForceExit: () => {
+        instance?.unmount();
+        process.exit(0);
+      },
+    }),
+    {
+      interactive: stdoutIsTTY && Boolean(process.stdin.isTTY),
+      exitOnCtrlC: false,
+    },
+  );
 
   if (!stdoutIsTTY) {
     setTimeout(() => {
-      instance.unmount();
+      instance?.unmount();
     }, 0);
   }
 }
@@ -91,7 +111,14 @@ export function runCli(args: string[], options: RunCliOptions = {}) {
   const stdoutIsTTY = options.stdoutIsTTY ?? process.stdout.isTTY;
   const renderApp = options.renderApp ?? renderInkApp;
 
-  renderApp(version, stdoutIsTTY);
+  void (async () => {
+    const repoRoot = cwd();
+    if (!(await ensureWorkspaceTrustInteractive(repoRoot))) {
+      process.exit(0);
+      return;
+    }
+    await renderApp(version, stdoutIsTTY);
+  })();
 }
 
 function isExecutedAsEntrypoint(

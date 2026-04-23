@@ -1,5 +1,6 @@
 import { Box, Text, useInput } from 'ink';
 
+import { useSpinnerFrame } from '../hooks/useSpinnerFrame.js';
 import { useTerminalSize } from '../layout/useTerminalSize.js';
 import type { TuiDiscoveryPhase, TuiStore } from '../state/store.js';
 import { useStoreSelector } from '../state/useStoreSelector.js';
@@ -47,6 +48,11 @@ export function DiscoveryScreen({ store, onChoice }: DiscoveryScreenProps) {
   );
 
   const useColor = colorMode === 'color';
+  const scanInFlight =
+    discovery.phase === 'detecting' ||
+    discovery.phase === 'structuring' ||
+    discovery.phase === 'inferring';
+  const spinner = useSpinnerFrame({ enabled: scanInFlight, intervalMs: 100 });
   const phaseLabel = formatPhase(discovery.phase);
   const streamReserve =
     discovery.phase === 'inferring'
@@ -62,7 +68,10 @@ export function DiscoveryScreen({ store, onChoice }: DiscoveryScreenProps) {
 
   return (
     <Box flexDirection="column" paddingX={1} width={size.columns}>
-      <Box marginBottom={1}>
+      <Box marginBottom={1} flexDirection="row">
+        {scanInFlight ? (
+          <Text {...(useColor ? { color: 'cyan' } : {})}>{spinner} </Text>
+        ) : null}
         <Text bold {...(useColor ? { color: 'cyan' } : {})}>
           {'Discovery · '}
         </Text>
@@ -83,7 +92,7 @@ export function DiscoveryScreen({ store, onChoice }: DiscoveryScreenProps) {
       {discovery.progressHint !== null && discovery.phase === 'inferring' ? (
         <Box marginBottom={1}>
           <Text dimColor={useColor} wrap="wrap">
-            {discovery.progressHint}
+            {spinner} {discovery.progressHint}
           </Text>
         </Box>
       ) : null}
@@ -118,7 +127,7 @@ export function DiscoveryScreen({ store, onChoice }: DiscoveryScreenProps) {
           width={size.columns - 4}
         >
           <Text bold dimColor={useColor}>
-            Live model output (latest)
+            {spinner} Live model output (latest)
           </Text>
           <Box flexDirection="column">
             <Text dimColor={useColor} wrap="wrap">
@@ -133,7 +142,7 @@ export function DiscoveryScreen({ store, onChoice }: DiscoveryScreenProps) {
       ) : discovery.phase === 'inferring' ? (
         <Box marginBottom={1}>
           <Text dimColor={useColor}>
-            Inferring AGENTS.md & ARCHITECTURE.md (streaming)…
+            {spinner} Inferring AGENTS.md & ARCHITECTURE.md (streaming)…
           </Text>
         </Box>
       ) : null}

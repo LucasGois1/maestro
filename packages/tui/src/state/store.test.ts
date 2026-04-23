@@ -37,6 +37,16 @@ describe('createTuiStore', () => {
     expect(state.colorMode).toBe('no-color');
   });
 
+  it('merges partial header overrides without dropping other header fields', () => {
+    const state = createInitialTuiState({
+      header: { repoName: 'acme', branch: 'develop' },
+    });
+    expect(state.header.repoName).toBe('acme');
+    expect(state.header.branch).toBe('develop');
+    expect(state.header.sprintIdx).toBeNull();
+    expect(state.header.updateAvailable).toBe(false);
+  });
+
   it('updates state immutably via setState', () => {
     const store = createTuiStore();
     const previous = store.getState();

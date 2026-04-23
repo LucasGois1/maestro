@@ -16,7 +16,10 @@ import type {
   TuiStageRecord,
   TuiStore,
 } from './store.js';
-import { DEFAULT_FEEDBACK_HISTORY_CAP } from './store.js';
+import {
+  appendRecentRun,
+  DEFAULT_FEEDBACK_HISTORY_CAP,
+} from './store.js';
 
 export interface BridgeBusOptions {
   readonly agentDeltaBufferChars?: number;
@@ -318,6 +321,12 @@ function handlePipelineEvent(
               ? { ...sprint, status: 'done' }
               : sprint,
           ),
+          recentRuns: appendRecentRun(state.recentRuns, {
+            runId: event.runId,
+            status: 'completed',
+            at: now,
+            durationMs: event.durationMs,
+          }),
         };
       });
       return;
@@ -343,6 +352,11 @@ function handlePipelineEvent(
                     ? { ...sprint, status: 'failed' }
                     : sprint,
                 ),
+          recentRuns: appendRecentRun(state.recentRuns, {
+            runId: event.runId,
+            status: 'failed',
+            at: now,
+          }),
         };
       });
   }

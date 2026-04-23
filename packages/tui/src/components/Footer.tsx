@@ -8,11 +8,24 @@ export type FooterState = 'idle' | 'running' | 'paused' | 'overlay';
 export interface FooterProps {
   readonly state: FooterState;
   readonly colorMode?: TuiColorMode;
+  /** Shown instead of empty pipeline hints (e.g. double Control-C exit prompt). */
+  readonly transientMessage?: string | null;
 }
 
-export function Footer({ state, colorMode = 'color' }: FooterProps) {
+export function Footer({
+  state,
+  colorMode = 'color',
+  transientMessage = null,
+}: FooterProps) {
   const useColor = colorMode === 'color';
   const hotkeys = HOTKEYS_BY_STATE[state];
+  const line =
+    transientMessage !== null && transientMessage.length > 0
+      ? transientMessage
+      : hotkeys.map(({ key, label }) => `${key} ${label}`).join('  ·  ');
+  if (line.length === 0) {
+    return null;
+  }
   return (
     <Box
       flexDirection="row"
@@ -20,9 +33,7 @@ export function Footer({ state, colorMode = 'color' }: FooterProps) {
       borderStyle="single"
       borderColor={useColor ? 'gray' : undefined}
     >
-      <Text dimColor={useColor}>
-        {hotkeys.map(({ key, label }) => `${key} ${label}`).join('  ·  ')}
-      </Text>
+      <Text dimColor={useColor}>{line}</Text>
     </Box>
   );
 }

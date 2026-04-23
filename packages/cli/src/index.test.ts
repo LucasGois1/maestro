@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { renderMock } = vi.hoisted(() => ({
   renderMock: vi.fn(() => ({
@@ -29,10 +29,31 @@ vi.mock('@maestro/core', () => ({
   })),
 }));
 
+vi.mock('./tui-workspace-store.js', () => ({
+  createTuiStoreForWorkspace: vi.fn(async () => ({
+    getState: vi.fn(() => ({ mode: 'idle' })),
+    setState: vi.fn(),
+    subscribe: vi.fn(() => vi.fn()),
+    select: vi.fn(() => vi.fn()),
+  })),
+}));
+
+vi.mock('./workspace-trust.js', () => ({
+  ensureWorkspaceTrustInteractive: vi.fn(async () => true),
+}));
+
 import { createProgram, runCli } from './index.ts';
 import { executeCliFromProcess } from './index.ts';
 
 describe('@maestro/cli index', () => {
+  beforeEach(() => {
+    vi.stubEnv('MAESTRO_SKIP_WORKSPACE_TRUST', '1');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('configures the commander program metadata', () => {
     const program = createProgram('0.0.1');
 
@@ -56,10 +77,12 @@ describe('@maestro/cli index', () => {
     expect(program.parse).toHaveBeenCalledWith(['node', 'maestro', '--help']);
   });
 
-  it('renders the ink app when no CLI flags are provided', () => {
+  it('renders the ink app when no CLI flags are provided', async () => {
     runCli([], { stdoutIsTTY: true, version: '0.0.1' });
 
-    expect(renderMock).toHaveBeenCalledOnce();
+    await vi.waitFor(() => {
+      expect(renderMock).toHaveBeenCalledOnce();
+    });
   });
 
   it('routes maestro tui to the command path', () => {
@@ -83,18 +106,20 @@ describe('@maestro/cli index', () => {
     ]);
   });
 
-  it('unmounts the ink app in non-interactive mode', () => {
-    vi.useFakeTimers();
-
+  it('unmounts the ink app in non-interactive mode', async () => {
     const unmount = vi.fn();
     renderMock.mockReturnValueOnce({ unmount });
 
     runCli([], { stdoutIsTTY: false, version: '0.0.1' });
-    vi.runAllTimers();
-
-    expect(unmount).toHaveBeenCalledOnce();
-
-    vi.useRealTimers();
+    await vi.waitFor(() => {
+      expect(renderMock).toHaveBeenCalledOnce();
+    });
+    await vi.waitFor(
+      () => {
+        expect(unmount).toHaveBeenCalledOnce();
+      },
+      { timeout: 3000 },
+    );
   });
 
   it('does not execute from process args when no entrypoint is present', () => {

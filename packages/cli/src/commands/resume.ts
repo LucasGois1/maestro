@@ -11,12 +11,15 @@ import {
   type ResumePipelineOptions,
 } from '@maestro/pipeline';
 import { createStateStore, type StateStore } from '@maestro/state';
-import { App, createTuiStore } from '@maestro/tui';
+import { App, type TuiStore } from '@maestro/tui';
 import { Command } from 'commander';
 import { render, type Instance } from 'ink';
 import { createElement } from 'react';
 
+import { CLI_PACKAGE_VERSION } from '../cli-version.js';
 import { createTuiCommandExecutor } from '../tui-command-executor.js';
+import { createTuiStoreForWorkspace } from '../tui-workspace-store.js';
+import { ensureWorkspaceTrustInteractive } from '../workspace-trust.js';
 
 type Io = {
   stdout: (line: string) => void;
@@ -67,22 +70,34 @@ async function loadConfigOrExit(
 }
 
 function renderPipelineApp(options: {
-  readonly store: ReturnType<typeof createTuiStore>;
+  readonly store: TuiStore;
   readonly bus: EventBus;
   readonly commandExecutor?: Parameters<typeof App>[0]['commandExecutor'];
 }): Instance {
-  return render(
+  let instance: Instance | undefined;
+  instance = render(
     createElement(App, {
       store: options.store,
       bus: options.bus,
+      maestroVersion: CLI_PACKAGE_VERSION,
       ...(options.commandExecutor
-        ? { commandExecutor: options.commandExecutor }
+        ? {
+            commandExecutor: options.commandExecutor,
+            onForceExit: () => {
+              instance?.unmount();
+              process.exit(0);
+            },
+          }
         : {}),
     }),
     {
       interactive: Boolean(process.stdin.isTTY && process.stdout.isTTY),
+      ...(options.commandExecutor !== undefined
+        ? { exitOnCtrlC: false }
+        : {}),
     },
   );
+  return instance;
 }
 
 export function createResumeCommand(
@@ -99,6 +114,10 @@ export function createResumeCommand(
     .argument('[runId]', 'Run id; defaults to the last-started run')
     .action(async (runId: string | undefined) => {
       const repoRoot = cwd();
+      if (!(await ensureWorkspaceTrustInteractive(repoRoot))) {
+        process.exit(0);
+        return;
+      }
       const loaded = await loadConfigOrExit(configLoader, repoRoot, io);
       if (!loaded) {
         process.exitCode = 1;
@@ -106,7 +125,7 @@ export function createResumeCommand(
       }
       const store = options.store ?? createStateStore({ repoRoot });
       const bus = createEventBus();
-      const tuiStore = createTuiStore();
+      const tuiStore = await createTuiStoreForWorkspace({ repoRoot });
       const stdoutIsTTY = options.stdoutIsTTY ?? process.stdout.isTTY;
       const commandExecutor = createTuiCommandExecutor({
         repoRoot,

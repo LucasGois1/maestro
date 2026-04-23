@@ -4,28 +4,32 @@ import { describe, expect, it } from 'vitest';
 import { Footer, deriveFooterState } from './Footer.js';
 
 describe('Footer', () => {
-  it('renders idle hotkeys by default', () => {
+  it('renders nothing for idle pipeline footer (hints moved elsewhere)', () => {
     const app = render(<Footer state="idle" />);
-    const frame = app.lastFrame() ?? '';
-    expect(frame).toContain('[tab] next panel');
-    expect(frame).toContain('[?] help');
-    expect(frame).toContain('[q] quit');
+    expect(app.lastFrame() ?? '').toBe('');
     app.unmount();
   });
 
-  it('renders running hotkeys with pause', () => {
+  it('renders nothing for running pipeline footer', () => {
     const app = render(<Footer state="running" />);
-    const frame = app.lastFrame() ?? '';
-    expect(frame).toContain('[p] pause');
-    expect(frame).toContain('[c] cancel');
-    expect(frame).toContain('[?] help');
+    expect(app.lastFrame() ?? '').toBe('');
     app.unmount();
   });
 
-  it('renders paused hotkeys with resume', () => {
+  it('renders nothing for paused pipeline footer', () => {
     const app = render(<Footer state="paused" />);
-    const frame = app.lastFrame() ?? '';
-    expect(frame).toContain('[space] resume');
+    expect(app.lastFrame() ?? '').toBe('');
+    app.unmount();
+  });
+
+  it('renders transient message when provided', () => {
+    const app = render(
+      <Footer
+        state="idle"
+        transientMessage="Press Control-C again to exit"
+      />,
+    );
+    expect(app.lastFrame()).toContain('Press Control-C again to exit');
     app.unmount();
   });
 
