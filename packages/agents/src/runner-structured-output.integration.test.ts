@@ -82,7 +82,14 @@ describe('AI SDK structured output (Output.object)', () => {
   });
 
   it('accepts planner escalation union via the same Zod schema used in production', async () => {
-    const payload = { escalationReason: 'blocked' };
+    const payload = {
+      escalationReason: 'blocked',
+      feature: null,
+      overview: null,
+      userStories: null,
+      aiFeatures: null,
+      sprints: null,
+    };
     const model = new MockLanguageModelV3({
       provider: 'mock',
       modelId: 'mock-1',
@@ -104,6 +111,7 @@ describe('AI SDK structured output (Output.object)', () => {
 
   it('rejects planner success payloads that fail superRefine (sprint references unknown story id)', async () => {
     const invalidPlan = {
+      escalationReason: null,
       feature: 'f',
       overview: 'o',
       userStories: [
@@ -120,6 +128,7 @@ describe('AI SDK structured output (Output.object)', () => {
           keyFeatures: [],
         },
       ],
+      aiFeatures: [],
     };
     const model = new MockLanguageModelV3({
       provider: 'mock',

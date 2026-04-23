@@ -56,37 +56,58 @@ const plannerSuccessSchema = z
     }
   });
 
-const plannerEscalationSchema = z.object({
-  escalationReason: z.string().min(1),
-});
-
 export type PlannerSuccessModelOutput = z.infer<typeof plannerSuccessSchema>;
-export type PlannerEscalationModelOutput = z.infer<typeof plannerEscalationSchema>;
+
+/**
+ * Ramo de escalação após validação: mesmas chaves que {@link PlannerModelOutput},
+ * com motivo preenchido e campos de plano anulados.
+ */
+export type PlannerEscalationModelOutput = {
+  escalationReason: string;
+  feature: null;
+  overview: null;
+  userStories: null;
+  aiFeatures: null;
+  sprints: null;
+};
 
 /**
  * JSON object the Planner model must emit: either a full plan or an escalation.
  *
- * Implemented as a **single root object** (all keys optional at the Zod layer) so
- * `Output.object` / provider `response_format` get `type: "object"` in JSON Schema.
- * `z.union` at the root produced `anyOf` branches that OpenAI rejected (`type: "None"`).
+ * Single root `type: "object"` (no `z.union` at root — OpenAI rejected that JSON Schema).
+ *
+ * All keys use **`.nullable()`** (not `.optional()`): strict `response_format` requires
+ * `required` to list every property key; optional keys omit `escalationReason` from
+ * `required` and the API errors with "Missing 'escalationReason'".
  */
 export const plannerModelOutputSchema = z
   .object({
-    escalationReason: z.string().optional(),
-    feature: z.string().optional(),
-    overview: z.string().optional(),
-    userStories: z.array(userStorySchema).optional(),
-    aiFeatures: z.array(z.string()).optional(),
-    sprints: z.array(plannerSprintRawSchema).optional(),
+    escalationReason: z.string().nullable(),
+    feature: z.string().nullable(),
+    overview: z.string().nullable(),
+    userStories: z.array(userStorySchema).nullable(),
+    aiFeatures: z.array(z.string()).nullable(),
+    sprints: z.array(plannerSprintRawSchema).nullable(),
   })
   .superRefine((val, ctx) => {
-    const esc = val.escalationReason?.trim() ?? '';
+    const esc =
+      val.escalationReason === null || val.escalationReason === undefined
+        ? ''
+        : val.escalationReason.trim();
     const hasEscalation = esc.length > 0;
     const hasPlan =
-      (val.feature?.trim().length ?? 0) > 0 &&
-      (val.overview?.trim().length ?? 0) > 0 &&
-      (val.userStories?.length ?? 0) >= 1 &&
-      (val.sprints?.length ?? 0) >= 1;
+      val.feature !== null &&
+      val.feature !== undefined &&
+      val.feature.trim().length > 0 &&
+      val.overview !== null &&
+      val.overview !== undefined &&
+      val.overview.trim().length > 0 &&
+      val.userStories !== null &&
+      val.userStories !== undefined &&
+      val.userStories.length >= 1 &&
+      val.sprints !== null &&
+      val.sprints !== undefined &&
+      val.sprints.length >= 1;
 
     if (hasEscalation && hasPlan) {
       ctx.addIssue({
@@ -108,6 +129,33 @@ export const plannerModelOutputSchema = z
     }
 
     if (hasEscalation) {
+      const planFieldsPresent =
+        (val.feature !== null &&
+          val.feature !== undefined &&
+          val.feature.trim().length > 0) ||
+        (val.overview !== null &&
+          val.overview !== undefined &&
+          val.overview.trim().length > 0) ||
+        (val.userStories !== null && val.userStories !== undefined) ||
+        (val.sprints !== null && val.sprints !== undefined) ||
+        (val.aiFeatures !== null && val.aiFeatures !== undefined);
+      if (planFieldsPresent) {
+        ctx.addIssue({
+          code: 'custom',
+          message:
+            'Escalation must set feature, overview, userStories, and sprints to null.',
+          path: [],
+        });
+      }
+      return;
+    }
+
+    if (val.escalationReason !== null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'A full plan must set escalationReason to null.',
+        path: ['escalationReason'],
+      });
       return;
     }
 
@@ -115,7 +163,7 @@ export const plannerModelOutputSchema = z
       feature: val.feature,
       overview: val.overview,
       userStories: val.userStories,
-      aiFeatures: val.aiFeatures,
+      aiFeatures: val.aiFeatures ?? undefined,
       sprints: val.sprints,
     });
     if (!planParse.success) {
@@ -134,5 +182,9 @@ export type PlannerModelOutput = z.infer<typeof plannerModelOutputSchema>;
 export function isPlannerEscalation(
   o: PlannerModelOutput,
 ): o is PlannerEscalationModelOutput {
-  return typeof o.escalationReason === 'string' && o.escalationReason.trim().length > 0;
+  return (
+    o.escalationReason !== null &&
+    typeof o.escalationReason === 'string' &&
+    o.escalationReason.trim().length > 0
+  );
 }

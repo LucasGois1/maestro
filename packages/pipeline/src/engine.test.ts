@@ -29,6 +29,7 @@ let repoRoot: string;
 
 /** Raw model JSON consumed by `normalizePlannerModelOutput` inside `runPipeline`. */
 const plannerModelOutput: PlannerModelOutput = {
+  escalationReason: null,
   feature: 'Auth',
   overview: 'Ship authentication end-to-end.\nCoverage for sessions.',
   userStories: [
@@ -70,6 +71,7 @@ const plannerModelOutput: PlannerModelOutput = {
 
 /** Three sprints for architect integration coverage. */
 const plannerModelOutputThreeSprints: PlannerModelOutput = {
+  escalationReason: null,
   feature: 'Payments',
   overview: 'End-to-end payments.',
   userStories: [
@@ -149,6 +151,7 @@ function mockArchitectRefactorNeeded(input: unknown): ArchitectModelOutput {
 
 /** Single-sprint plan after a simulated Architect-driven replan. */
 const plannerModelOutputNarrow: PlannerModelOutput = {
+  escalationReason: null,
   feature: 'Narrow slice',
   overview: 'One sprint only.',
   userStories: [
@@ -456,7 +459,11 @@ describe('runPipeline (happy path)', () => {
     const env = makeEnv();
     const generatorInputs: unknown[] = [];
     let evalCalls = 0;
-    const firstSprint = plannerModelOutput.sprints[0];
+    const fixtureSprints = plannerModelOutput.sprints;
+    if (fixtureSprints === null || fixtureSprints.length === 0) {
+      throw new Error('planner fixture must contain at least one sprint');
+    }
+    const firstSprint = fixtureSprints[0];
     if (!firstSprint) {
       throw new Error('planner fixture must contain at least one sprint');
     }

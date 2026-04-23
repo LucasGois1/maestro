@@ -17,10 +17,13 @@ Guidelines:
 - complexity is low | medium | high per sprint.
 - keyFeatures: short bullets of what the sprint delivers (product language).
 - aiFeatures: optional list of AI-powered product capabilities (agents, semantic search, generation) where they add user value.
-- If the user prompt is fundamentally contradictory, respond with {"escalationReason":"..."} only.
+- Structured output always includes these keys: escalationReason, feature, overview, userStories, aiFeatures, sprints. Use JSON null for every field that does not apply:
+  - Normal plan: escalationReason=null; fill feature, overview, userStories, sprints; aiFeatures is [] or a string list.
+  - Escalation (contradictory/unknowable prompt): escalationReason is a non-empty string; set feature, overview, userStories, aiFeatures, and sprints to null.
+- If the user prompt is fundamentally contradictory, use the escalation branch (non-null escalationReason, all plan fields null).
 
 Required JSON shape for a normal plan:
-{"feature":"string","overview":"string","userStories":[{"id":number,"role":"string","action":"string","value":"string"}],"aiFeatures":["string"],"sprints":[{"idx":number,"name":"string","objective":"string","userStoryIds":[number],"dependsOn":[number],"complexity":"low"|"medium"|"high","keyFeatures":["string"]}]}
+{"escalationReason":null,"feature":"string","overview":"string","userStories":[{"id":number,"role":"string","action":"string","value":"string"}],"aiFeatures":["string"],"sprints":[{"idx":number,"name":"string","objective":"string","userStoryIds":[number],"dependsOn":[number],"complexity":"low"|"medium"|"high","keyFeatures":["string"]}]}
 
 overview: 2–3 short paragraphs of product vision (plain text, use \\n between paragraphs in the JSON string).
 
@@ -34,21 +37,21 @@ Replan mode (when the JSON input includes a top-level "replan" object):
 
 ### Example 1 // tarefa fechada → 1 sprint com entrega visível
 INPUT: {"prompt":"Replace Portuguese UI copy with English in the TUI help/footer and error strings; limit to packages/tui and related CLI copy."}
-OUTPUT: {"feature":"EN copy for TUI","overview":"Users see consistent English strings in the terminal UI and related CLI messages.\\nOne cohesive change set for the scoped surfaces.","userStories":[{"id":1,"role":"developer","action":"ship English UI strings in scope","value":"Portuguese literals removed from named packages"}],"aiFeatures":[],"sprints":[{"idx":1,"name":"Translate scoped copy","objective":"Update user-visible literals to English in the named packages; adjust tests if assertions pin old copy.","userStoryIds":[1],"dependsOn":[],"complexity":"low","keyFeatures":["TUI copy","CLI helper strings"]}]}
+OUTPUT: {"escalationReason":null,"feature":"EN copy for TUI","overview":"Users see consistent English strings in the terminal UI and related CLI messages.\\nOne cohesive change set for the scoped surfaces.","userStories":[{"id":1,"role":"developer","action":"ship English UI strings in scope","value":"Portuguese literals removed from named packages"}],"aiFeatures":[],"sprints":[{"idx":1,"name":"Translate scoped copy","objective":"Update user-visible literals to English in the named packages; adjust tests if assertions pin old copy.","userStoryIds":[1],"dependsOn":[],"complexity":"low","keyFeatures":["TUI copy","CLI helper strings"]}]}
 
 ### Example 2 // produto maior → vários sprints com dependência
 INPUT: {"prompt":"Ship authentication for our SaaS"}
-OUTPUT: {"feature":"Auth SaaS","overview":"Users sign in securely; admins manage sessions.\\nSecond paragraph for vision.","userStories":[{"id":1,"role":"utilizador","action":"iniciar sessão com email","value":"aceder à conta"},{"id":2,"role":"admin","action":"revogar sessões","value":"segurança da equipa"}],"aiFeatures":["Deteção de login suspeito"],"sprints":[{"idx":1,"name":"Sessões e cookies","objective":"Estabelecer sessão segura e renovação.","userStoryIds":[1],"dependsOn":[],"complexity":"medium","keyFeatures":["Cookie httpOnly","CSRF"]},{"idx":2,"name":"Gestão admin","objective":"Revogar sessões e auditoria.","userStoryIds":[2],"dependsOn":[1],"complexity":"high","keyFeatures":["Lista de sessões","Revogação"]}]}
+OUTPUT: {"escalationReason":null,"feature":"Auth SaaS","overview":"Users sign in securely; admins manage sessions.\\nSecond paragraph for vision.","userStories":[{"id":1,"role":"utilizador","action":"iniciar sessão com email","value":"aceder à conta"},{"id":2,"role":"admin","action":"revogar sessões","value":"segurança da equipa"}],"aiFeatures":["Deteção de login suspeito"],"sprints":[{"idx":1,"name":"Sessões e cookies","objective":"Estabelecer sessão segura e renovação.","userStoryIds":[1],"dependsOn":[],"complexity":"medium","keyFeatures":["Cookie httpOnly","CSRF"]},{"idx":2,"name":"Gestão admin","objective":"Revogar sessões e auditoria.","userStoryIds":[2],"dependsOn":[1],"complexity":"high","keyFeatures":["Lista de sessões","Revogação"]}]}
 
 ### Example 3 // escopo implícito
 INPUT: {"prompt":"Quero que as pessoas partilhem ficheiros grandes sem email"}
-OUTPUT: {"feature":"Partilha de ficheiros","overview":"Partilha simples de links com expiração.\\nFoco em UX mínima.","userStories":[{"id":1,"role":"remetente","action":"gerar link de upload","value":"enviar sem anexos"},{"id":2,"role":"destinatário","action":"descarregar com um clique","value":"receber ficheiros rapidamente"}],"aiFeatures":[],"sprints":[{"idx":1,"name":"Upload e link","objective":"Fluxo de upload e geração de URL.","userStoryIds":[1],"dependsOn":[],"complexity":"low","keyFeatures":["Drag-drop","Link único"]},{"idx":2,"name":"Download e expiração","objective":"Download seguro e TTL.","userStoryIds":[2],"dependsOn":[1],"complexity":"medium","keyFeatures":["Expiração configurável"]}]}
+OUTPUT: {"escalationReason":null,"feature":"Partilha de ficheiros","overview":"Partilha simples de links com expiração.\\nFoco em UX mínima.","userStories":[{"id":1,"role":"remetente","action":"gerar link de upload","value":"enviar sem anexos"},{"id":2,"role":"destinatário","action":"descarregar com um clique","value":"receber ficheiros rapidamente"}],"aiFeatures":[],"sprints":[{"idx":1,"name":"Upload e link","objective":"Fluxo de upload e geração de URL.","userStoryIds":[1],"dependsOn":[],"complexity":"low","keyFeatures":["Drag-drop","Link único"]},{"idx":2,"name":"Download e expiração","objective":"Download seguro e TTL.","userStoryIds":[2],"dependsOn":[1],"complexity":"medium","keyFeatures":["Expiração configurável"]}]}
 
 ### Example 4 // vago → escalation
 INPUT: {"prompt":"Melhora isto"}
-OUTPUT: {"escalationReason":"O pedido não identifica produto, utilizadores nem resultado mensurável; é necessário contexto antes de planear sprints."}
+OUTPUT: {"escalationReason":"O pedido não identifica produto, utilizadores nem resultado mensurável; é necessário contexto antes de planear sprints.","feature":null,"overview":null,"userStories":null,"aiFeatures":null,"sprints":null}
 
 ### Example 5 // contraditório → escalation
 INPUT: {"prompt":"Quero um produto sem login mas cada utilizador só vê os seus dados privados."}
-OUTPUT: {"escalationReason":"Sem identidade de utilizador não é possível garantir dados privados por pessoa; requisitos incompatíveis."}"
+OUTPUT: {"escalationReason":"Sem identidade de utilizador não é possível garantir dados privados por pessoa; requisitos incompatíveis.","feature":null,"overview":null,"userStories":null,"aiFeatures":null,"sprints":null}"
 `;

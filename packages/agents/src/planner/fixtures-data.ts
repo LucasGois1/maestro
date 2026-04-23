@@ -10,6 +10,7 @@ export const NARROW_DELIVERY: {
       'Replace Portuguese UI copy with English in the TUI help/footer and error strings; limit to packages/tui and related CLI copy.',
   },
   output: {
+    escalationReason: null,
     feature: 'EN copy for TUI',
     overview:
       'Users see consistent English strings in the terminal UI and related CLI messages.\nOne cohesive change set for the scoped surfaces.',
@@ -44,6 +45,7 @@ export const SIMPLE: {
 } = {
   input: { prompt: 'Ship authentication for our SaaS' },
   output: {
+    escalationReason: null,
     feature: 'Auth SaaS',
     overview:
       'Users sign in securely; admins manage sessions.\nSecond paragraph for vision.',
@@ -94,6 +96,7 @@ export const IMPLICIT_SCOPE: {
     prompt: 'Quero que as pessoas partilhem ficheiros grandes sem email',
   },
   output: {
+    escalationReason: null,
     feature: 'Partilha de ficheiros',
     overview: 'Partilha simples de links com expiração.\nFoco em UX mínima.',
     userStories: [
@@ -143,6 +146,11 @@ export const VAGUE: {
   output: {
     escalationReason:
       'O pedido não identifica produto, utilizadores nem resultado mensurável; é necessário contexto antes de planear sprints.',
+    feature: null,
+    overview: null,
+    userStories: null,
+    aiFeatures: null,
+    sprints: null,
   },
 };
 
@@ -158,5 +166,10 @@ export const CONTRADICTION: {
   output: {
     escalationReason:
       'Sem identidade de utilizador não é possível garantir dados privados por pessoa; requisitos incompatíveis.',
+    feature: null,
+    overview: null,
+    userStories: null,
+    aiFeatures: null,
+    sprints: null,
   },
 };

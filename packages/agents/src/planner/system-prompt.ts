@@ -18,10 +18,13 @@ Guidelines:
 - complexity is low | medium | high per sprint.
 - keyFeatures: short bullets of what the sprint delivers (product language).
 - aiFeatures: optional list of AI-powered product capabilities (agents, semantic search, generation) where they add user value.
-- If the user prompt is fundamentally contradictory, respond with {"escalationReason":"..."} only.
+- Structured output always includes these keys: escalationReason, feature, overview, userStories, aiFeatures, sprints. Use JSON null for every field that does not apply:
+  - Normal plan: escalationReason=null; fill feature, overview, userStories, sprints; aiFeatures is [] or a string list.
+  - Escalation (contradictory/unknowable prompt): escalationReason is a non-empty string; set feature, overview, userStories, aiFeatures, and sprints to null.
+- If the user prompt is fundamentally contradictory, use the escalation branch (non-null escalationReason, all plan fields null).
 
 Required JSON shape for a normal plan:
-{"feature":"string","overview":"string","userStories":[{"id":number,"role":"string","action":"string","value":"string"}],"aiFeatures":["string"],"sprints":[{"idx":number,"name":"string","objective":"string","userStoryIds":[number],"dependsOn":[number],"complexity":"low"|"medium"|"high","keyFeatures":["string"]}]}
+{"escalationReason":null,"feature":"string","overview":"string","userStories":[{"id":number,"role":"string","action":"string","value":"string"}],"aiFeatures":["string"],"sprints":[{"idx":number,"name":"string","objective":"string","userStoryIds":[number],"dependsOn":[number],"complexity":"low"|"medium"|"high","keyFeatures":["string"]}]}
 
 overview: 2–3 short paragraphs of product vision (plain text, use \\n between paragraphs in the JSON string).
 
