@@ -3,6 +3,7 @@ import { cwd } from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 import { createEventBus } from '@maestro/core';
+import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import { createStateStore } from '@maestro/state';
 import { App } from '@maestro/tui';
 import { Command } from 'commander';
@@ -66,6 +67,11 @@ async function renderInkApp(_version: string, stdoutIsTTY: boolean) {
       persistEscalationHumanFeedback: createPersistEscalationHumanFeedback({
         stateStore,
         tuiStore: store,
+        resumeAfterPersist: {
+          repoRoot,
+          bus,
+          loadConfig: loadConfigWithAutoResolvedModels,
+        },
       }),
       onForceExit: () => {
         instance?.unmount();

@@ -1,9 +1,9 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { ConfigValidationError, configSchema } from '@maestro/config';
-import { createStateStore, type StateStore } from '@maestro/state';
+import { createStateStore, runPipelineProcessPath, type StateStore } from '@maestro/state';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createRunCommand } from './run.js';
@@ -166,6 +166,12 @@ describe('maestro run', () => {
       userAgent: 'test',
       providerDefaults: {},
     });
+    const marker = runPipelineProcessPath({ repoRoot, runId: 'active' });
+    await mkdir(dirname(marker), { recursive: true });
+    await writeFile(
+      marker,
+      `${JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() })}\n`,
+    );
     const runPipeline = vi.fn();
 
     await parseRun(['ship', 'auth'], { runPipeline });
@@ -174,6 +180,43 @@ describe('maestro run', () => {
     expect(stderr.join('\n')).toContain('A Maestro pipeline run is active');
     expect(process.exitCode).toBe(2);
     process.exitCode = undefined;
+  });
+
+  it('reconciles an orphaned running run so a new run can start', async () => {
+    await store.create({
+      runId: 'ghost',
+      branch: 'maestro/ghost',
+      worktreePath: repoRoot,
+      prompt: 'ghost',
+      userAgent: 'test',
+      providerDefaults: {},
+    });
+    const runPipeline = vi.fn(async (options) => ({
+      state: await options.store.create({
+        runId: options.runId,
+        branch: options.branch,
+        worktreePath: options.worktreePath,
+        prompt: options.prompt,
+        userAgent: 'test',
+        providerDefaults: {},
+      }),
+      plan: { feature: 'Auth', summary: 'Ship auth', sprints: [] },
+      sprintOutcomes: [],
+      merger: {
+        runStatus: 'completed',
+        branch: options.branch,
+        commitCount: 0,
+        execPlanPath: '.maestro/docs/exec-plans/completed/auth.md',
+        cleanupDone: false,
+        prUrl: null,
+        prNumber: null,
+        summary: null,
+        prTitle: null,
+      },
+    }));
+    await parseRun(['ship', 'auth'], { runPipeline });
+    expect(runPipeline).toHaveBeenCalledOnce();
+    expect((await store.load('ghost'))?.status).toBe('paused');
   });
 
   it('renders the TUI instead of textual progress in TTY mode', async () => {
@@ -190,6 +233,8 @@ describe('maestro run', () => {
         bus: expect.any(Object),
         commandExecutor: expect.any(Function),
         store: expect.any(Object),
+        repoRoot: expect.any(String),
+        loadConfig: expect.any(Function),
       }),
     );
     expect(stdout.join('\n')).not.toContain('Run started');

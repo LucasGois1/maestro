@@ -38,6 +38,7 @@ export {
   META_FILE,
   PLAN_FILE,
   PLAN_SNAPSHOT_FILE,
+  PIPELINE_PROCESS_FILE,
   PROJECT_LOG_FILE,
   RUN_LOG_FILE,
   RUNS_DIR,
@@ -57,12 +58,20 @@ export {
   runPlanPath,
   runPlanSnapshotPath,
   runLogPath,
+  runPipelineProcessPath,
   sprintOutcomeCheckpointPath,
   runRoot,
   runStatePath,
   runsRoot,
   type RunPathOptions,
 } from './paths.js';
+
+export {
+  isProcessAlive,
+  isStaleRunningRun,
+  readPipelineProcessPid,
+  removePipelineProcessMarker,
+} from './reconcile-stale-running.js';
 
 export { writeAtomic, writeAtomicJson } from './atomic.js';
 

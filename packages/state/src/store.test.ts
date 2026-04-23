@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { runsRoot } from './paths.js';
+import { runPipelineProcessPath, runsRoot } from './paths.js';
 import {
   createStateStore,
   StateStoreError,
@@ -203,5 +203,36 @@ describe('StateStore', () => {
     });
     const meta = await s.loadMeta('run-1');
     expect(meta?.completedAt).toBe('2026-04-20T00:01:00.000Z');
+  });
+
+  it('reconcileStaleRunningRuns pauses running runs without a process marker', async () => {
+    const s = store();
+    await s.create(baseOpts);
+    expect(await s.reconcileStaleRunningRuns()).toBe(1);
+    expect((await s.load('run-1'))?.status).toBe('paused');
+  });
+
+  it('reconcileStaleRunningRuns keeps running when marker pid is alive', async () => {
+    const s = store();
+    await s.create(baseOpts);
+    const markerPath = runPipelineProcessPath({ repoRoot, runId: 'run-1' });
+    await writeFile(
+      markerPath,
+      `${JSON.stringify({ pid: process.pid, startedAt: '2026-04-20T00:00:00.000Z' })}\n`,
+    );
+    expect(await s.reconcileStaleRunningRuns()).toBe(0);
+    expect((await s.load('run-1'))?.status).toBe('running');
+  });
+
+  it('reconcileStaleRunningRuns pauses running when marker pid is not alive', async () => {
+    const s = store();
+    await s.create(baseOpts);
+    const markerPath = runPipelineProcessPath({ repoRoot, runId: 'run-1' });
+    await writeFile(
+      markerPath,
+      `${JSON.stringify({ pid: 9_999_999_999, startedAt: '2026-04-20T00:00:00.000Z' })}\n`,
+    );
+    expect(await s.reconcileStaleRunningRuns()).toBe(1);
+    expect((await s.load('run-1'))?.status).toBe('paused');
   });
 });

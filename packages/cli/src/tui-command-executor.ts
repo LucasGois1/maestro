@@ -1,11 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import {
-  BranchNameError,
-  computeBranchName,
-  createWorktree,
-} from '@maestro/git';
-import { ConfigValidationError } from '@maestro/config';
+import { computeBranchName, createWorktree } from '@maestro/git';
 import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import type { EventBus } from '@maestro/core';
 import {
@@ -32,6 +27,7 @@ import { createConfigCommand } from './commands/config.js';
 import { createGitCommand } from './commands/git.js';
 import { createKBCommand } from './commands/kb.js';
 import { createRunsCommand } from './commands/runs.js';
+import { formatCliError } from './format-cli-error.js';
 
 export type CreateTuiCommandExecutorOptions = {
   readonly repoRoot: string;
@@ -139,21 +135,6 @@ function parseResumeCommandTokens(tokens: readonly string[]): {
   return out;
 }
 
-function formatError(error: unknown): string {
-  if (error instanceof ConfigValidationError) {
-    return [
-      'Configuration is invalid:',
-      ...error.issues.map(
-        (issue) => `  - ${issue.path.join('.') || '(root)'}: ${issue.message}`,
-      ),
-    ].join('\n');
-  }
-  if (error instanceof BranchNameError) {
-    return error.message;
-  }
-  return error instanceof Error ? error.message : String(error);
-}
-
 async function executeRun(options: {
   readonly tokens: readonly string[];
   readonly repoRoot: string;
@@ -165,6 +146,7 @@ async function executeRun(options: {
   if (parsed.prompt.length === 0) {
     return { level: 'error', message: 'Usage: run <prompt>' };
   }
+  await options.store.reconcileStaleRunningRuns();
   const latest = await options.store.latest();
   if (latest?.status === 'running') {
     return {
@@ -217,7 +199,7 @@ async function executeRun(options: {
         type: 'pipeline.failed',
         runId,
         at: 'planning',
-        error: formatError(error),
+        error: formatCliError(error),
       });
     });
     return {
@@ -225,7 +207,7 @@ async function executeRun(options: {
       message: `Run started: ${runId}`,
     };
   } catch (error) {
-    return { level: 'error', message: formatError(error) };
+    return { level: 'error', message: formatCliError(error) };
   }
 }
 
@@ -273,7 +255,7 @@ async function executeResume(options: {
         type: 'pipeline.failed',
         runId,
         at: 'planning',
-        error: formatError(error),
+        error: formatCliError(error),
       });
     });
     return {
@@ -281,7 +263,7 @@ async function executeResume(options: {
       message: `Resume requested: ${runId}`,
     };
   } catch (error) {
-    return { level: 'error', message: formatError(error) };
+    return { level: 'error', message: formatCliError(error) };
   }
 }
 

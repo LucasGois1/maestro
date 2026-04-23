@@ -116,7 +116,9 @@ export function MaestroHomeScreen({
         • Use /run followed by your task to start a pipeline
       </Text>
       <Text dimColor={useColor} wrap="wrap">
-        • Use /resume when a run is available to continue
+        • When a run needs your input (escalation), type feedback on that screen
+        and press Enter to continue; /resume is still available from the command
+        line
       </Text>
       <Text dimColor={useColor} wrap="wrap">
         • Run maestro init to configure AGENTS, architecture, and sensors

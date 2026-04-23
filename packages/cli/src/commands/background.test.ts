@@ -1,9 +1,13 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import type { ExecuteBackgroundResult } from '@maestro/agents';
-import { createStateStore, type StateStore } from '@maestro/state';
+import {
+  createStateStore,
+  runPipelineProcessPath,
+  type StateStore,
+} from '@maestro/state';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createBackgroundCommand } from './background.js';
@@ -72,6 +76,12 @@ describe('maestro background', () => {
       userAgent: 'maestro/0.1.0',
       providerDefaults: {},
     });
+    const marker = runPipelineProcessPath({ repoRoot, runId: 'r1' });
+    await mkdir(dirname(marker), { recursive: true });
+    await writeFile(
+      marker,
+      `${JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() })}\n`,
+    );
     await run(['run']);
     expect(process.exitCode).toBe(2);
     expect(stderr.join('\n')).toMatch(/pipeline run is active/);

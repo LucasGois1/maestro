@@ -1,5 +1,5 @@
 import { Box, Text, useInput } from 'ink';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useTerminalSize } from '../layout/useTerminalSize.js';
 import type { TuiStore } from '../state/store.js';
@@ -30,8 +30,13 @@ export function EscalationScreen({
   const useColor = colorMode === 'color';
   const [draft, setDraft] = useState('');
   const [statusLine, setStatusLine] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const busyRef = useRef(false);
 
   const submit = useCallback(async () => {
+    if (busyRef.current) {
+      return;
+    }
     const text = draft.trim();
     if (text.length === 0) {
       setStatusLine('Escreve feedback antes de submeter.');
@@ -39,20 +44,30 @@ export function EscalationScreen({
     }
     if (persistEscalationHumanFeedback === undefined) {
       setStatusLine(
-        'Persistência não disponível neste modo; usa `/resume` na mesma.',
+        'Persistência não disponível neste modo; configura o StateStore na CLI.',
       );
       return;
     }
-    const r = await persistEscalationHumanFeedback(text);
-    setStatusLine(r.message);
-    if (r.ok) {
-      setDraft('');
+    busyRef.current = true;
+    setIsSubmitting(true);
+    try {
+      const r = await persistEscalationHumanFeedback(text);
+      setStatusLine(r.message);
+      if (r.ok) {
+        setDraft('');
+      }
+    } finally {
+      busyRef.current = false;
+      setIsSubmitting(false);
     }
   }, [draft, persistEscalationHumanFeedback]);
 
   useInput(
     (input, key) => {
       if (key.return) {
+        if (busyRef.current) {
+          return;
+        }
         void submit();
         return;
       }
@@ -87,11 +102,15 @@ export function EscalationScreen({
       </Text>
       <Text dimColor={useColor}>
         Origem: {escalation.source} · fase: {escalation.phaseAtEscalation} ·
-        resume sugerido: {escalation.resumeTarget}
+        alvo de retomada: {escalation.resumeTarget}
+      </Text>
+      <Text dimColor={useColor}>
+        O pipeline continuará com o alvo indicado acima após submeteres o
+        feedback.
       </Text>
       {escalation.artifactHints !== undefined &&
       escalation.artifactHints.length > 0 ? (
-        <Box flexDirection="column">
+        <Box flexDirection="column" marginTop={1}>
           <Text bold>Artefactos</Text>
           {escalation.artifactHints.map((p) => (
             <Text key={p} dimColor={useColor}>
@@ -105,12 +124,14 @@ export function EscalationScreen({
         <Text wrap="wrap">{reasonPreview}</Text>
       </Box>
       <Box flexDirection="column" marginTop={1}>
-        <Text bold>Feedback humano (Enter para gravar)</Text>
+        <Text bold>
+          O teu feedback (Enter para submeter e continuar o pipeline)
+        </Text>
         <Text dimColor={useColor}>{draft.length > 0 ? draft : '…'}</Text>
       </Box>
-      <Text dimColor={useColor}>
-        Depois: /resume opcionalmente com runId e alvo (ex.: ReSeedContract).
-      </Text>
+      {isSubmitting ? (
+        <Text dimColor={useColor}>A submeter…</Text>
+      ) : null}
       {statusLine !== null && statusLine.length > 0 ? (
         <Text {...(useColor ? { color: 'cyan' } : {})}>{statusLine}</Text>
       ) : null}

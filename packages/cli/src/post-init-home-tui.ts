@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 
 import { createEventBus } from '@maestro/core';
 import { editSprintContract, resolveContractPath } from '@maestro/contract';
+import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import { createStateStore } from '@maestro/state';
 import { App, resolveColorMode, type TuiState } from '@maestro/tui';
 import { render, type Instance } from 'ink';
@@ -58,6 +59,11 @@ export function mountPostInitHomeShell(options: {
           persistEscalationHumanFeedback: createPersistEscalationHumanFeedback({
             stateStore,
             tuiStore: store,
+            resumeAfterPersist: {
+              repoRoot: options.repoRoot,
+              bus,
+              loadConfig: loadConfigWithAutoResolvedModels,
+            },
           }),
           kbExplorer: {
             repoLabel: options.repoRoot,

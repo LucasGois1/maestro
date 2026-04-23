@@ -89,6 +89,8 @@ function renderPipelineApp(options: {
   readonly store: TuiStore;
   readonly bus: EventBus;
   readonly stateStore: StateStore;
+  readonly repoRoot: string;
+  readonly loadConfig: typeof loadConfigWithAutoResolvedModels;
   readonly commandExecutor?: Parameters<typeof App>[0]['commandExecutor'];
 }): Instance {
   let instance: Instance | undefined;
@@ -97,6 +99,11 @@ function renderPipelineApp(options: {
       ? createPersistEscalationHumanFeedback({
           stateStore: options.stateStore,
           tuiStore: options.store,
+          resumeAfterPersist: {
+            repoRoot: options.repoRoot,
+            bus: options.bus,
+            loadConfig: options.loadConfig,
+          },
         })
       : undefined;
   instance = render(
@@ -184,6 +191,7 @@ export function createRunCommand(options: RunCommandOptions = {}): Command {
       }
 
       const store = options.store ?? createStateStore({ repoRoot });
+      await store.reconcileStaleRunningRuns();
       const latest = await store.latest();
       if (latest?.status === 'running') {
         io.stderr(
@@ -233,6 +241,8 @@ export function createRunCommand(options: RunCommandOptions = {}): Command {
             store: tuiStore,
             bus,
             stateStore: store,
+            repoRoot,
+            loadConfig: configLoader,
             commandExecutor,
           })
         : null;

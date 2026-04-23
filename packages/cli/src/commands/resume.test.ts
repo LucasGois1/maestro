@@ -164,6 +164,8 @@ describe('maestro resume', () => {
         bus: expect.any(Object),
         commandExecutor: expect.any(Function),
         store: expect.any(Object),
+        repoRoot: expect.any(String),
+        loadConfig: expect.any(Function),
       }),
     );
     expect(stdout.join('\n')).not.toContain('Run completed');

@@ -4,11 +4,16 @@ import { readFile, readdir, rm } from 'node:fs/promises';
 import { writeAtomicJson } from './atomic.js';
 import {
   runMetaPath,
+  runPipelineProcessPath,
   runRoot,
   runStatePath,
   runsRoot,
   type RunPathOptions,
 } from './paths.js';
+import {
+  isStaleRunningRun,
+  removePipelineProcessMarker,
+} from './reconcile-stale-running.js';
 import {
   runMetaSchema,
   runStateSchema,
@@ -49,6 +54,11 @@ export interface StateStore {
    * Prioridade: `paused`+`escalated` mais recente, depois `failed`, depois outras `paused`.
    */
   latestResumable(): Promise<RunState | null>;
+  /**
+   * Runs com `status: running` sem processo vivo (ou sem ficheiro de marcador)
+   * passam a `paused` — p.ex. após fechar o terminal sem o pipeline terminar.
+   */
+  reconcileStaleRunningRuns(): Promise<number>;
   delete(runId: string): Promise<void>;
 }
 
@@ -222,6 +232,33 @@ export function createStateStore(options: CreateStateStoreOptions): StateStore {
           return b.lastUpdatedAt.localeCompare(a.lastUpdatedAt);
         })[0] ?? null
       );
+    },
+
+    async reconcileStaleRunningRuns() {
+      const all = await this.list();
+      let reconciled = 0;
+      for (const s of all) {
+        if (s.status !== 'running') {
+          continue;
+        }
+        const stale = await isStaleRunningRun({
+          repoRoot,
+          runId: s.runId,
+          ...(maestroDir !== undefined ? { maestroDir } : {}),
+        });
+        if (!stale) {
+          continue;
+        }
+        const path = runPipelineProcessPath(runPathOpts(s.runId));
+        await this.update(s.runId, {
+          status: 'paused',
+          pausedAt: clock().toISOString(),
+          failure: null,
+        });
+        await removePipelineProcessMarker(path);
+        reconciled += 1;
+      }
+      return reconciled;
     },
 
     async delete(runId) {

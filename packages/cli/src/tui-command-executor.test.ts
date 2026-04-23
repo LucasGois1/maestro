@@ -1,10 +1,14 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { configSchema } from '@maestro/config';
 import { createEventBus } from '@maestro/core';
-import { createStateStore, type StateStore } from '@maestro/state';
+import {
+  createStateStore,
+  runPipelineProcessPath,
+  type StateStore,
+} from '@maestro/state';
 import { findCommandEntry } from '@maestro/tui';
 import type * as AgentsModule from '@maestro/agents';
 import type * as ConfigModule from '@maestro/config';
@@ -160,6 +164,14 @@ async function seedRun(
     status,
     phase: status === 'completed' ? 'completed' : 'generating',
   });
+  if (status === 'running') {
+    const marker = runPipelineProcessPath({ repoRoot, runId });
+    await mkdir(dirname(marker), { recursive: true });
+    await writeFile(
+      marker,
+      `${JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() })}\n`,
+    );
+  }
 }
 
 describe('createTuiCommandExecutor', () => {

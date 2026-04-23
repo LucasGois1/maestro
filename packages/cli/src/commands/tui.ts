@@ -1,5 +1,6 @@
 import { createEventBus } from '@maestro/core';
 import { editSprintContract, resolveContractPath } from '@maestro/contract';
+import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import { createStateStore, type StateStore } from '@maestro/state';
 import { App, playDemoEvents, resolveColorMode, type TuiState } from '@maestro/tui';
 import { existsSync } from 'node:fs';
@@ -73,6 +74,7 @@ export function createTuiCommand(
             store,
             bus,
             colorMode,
+            repoRoot,
             stateStore,
             kbExplorer: {
               repoLabel: repoRoot,
@@ -123,6 +125,7 @@ export interface DefaultRenderAppArgs {
   readonly store: Awaited<ReturnType<typeof createTuiStoreForWorkspace>>;
   readonly bus: ReturnType<typeof createEventBus>;
   readonly colorMode: ReturnType<typeof resolveColorMode>;
+  readonly repoRoot: string;
   readonly stateStore: StateStore;
   readonly kbExplorer?: {
     readonly repoLabel: string;
@@ -140,6 +143,7 @@ export function defaultRenderApp({
   store,
   bus,
   colorMode,
+  repoRoot,
   stateStore,
   kbExplorer,
   editPlan,
@@ -150,6 +154,11 @@ export function defaultRenderApp({
   const persistEscalationHumanFeedback = createPersistEscalationHumanFeedback({
     stateStore,
     tuiStore: store,
+    resumeAfterPersist: {
+      repoRoot,
+      bus,
+      loadConfig: loadConfigWithAutoResolvedModels,
+    },
   });
   return render(
     createElement(App, {

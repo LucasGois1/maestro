@@ -97,6 +97,7 @@ export function createBackgroundCommand(
         }
 
         const store = resolveStore();
+        await store.reconcileStaleRunningRuns();
         const latest = await store.latest();
         if (latest?.status === 'running') {
           io.stderr(

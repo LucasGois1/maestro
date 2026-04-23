@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createEventBus, type MaestroEvent } from '@maestro/core';
+import { createStateStore } from '@maestro/state';
 import { bridgeBusToStore, createTuiStore } from '@maestro/tui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -198,7 +199,15 @@ describe('createTuiCommand', () => {
   it('defaultRenderApp renders an Ink instance and can unmount', () => {
     const bus = createEventBus();
     const store = createTuiStore({ colorMode: 'no-color' });
-    const instance = defaultRenderApp({ store, bus, colorMode: 'no-color' });
+    const repoRoot = tempDir ?? process.cwd();
+    const stateStore = createStateStore({ repoRoot });
+    const instance = defaultRenderApp({
+      store,
+      bus,
+      colorMode: 'no-color',
+      repoRoot,
+      stateStore,
+    });
     expect(typeof instance.unmount).toBe('function');
     expect(inkRenderMock).toHaveBeenCalledOnce();
     instance.unmount();

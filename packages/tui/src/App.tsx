@@ -13,6 +13,7 @@ import {
   CommandInput,
   type TuiCommandExecutor,
 } from './components/CommandInput.js';
+import { StdinExitCapture } from './components/StdinExitCapture.js';
 import { Footer, deriveFooterState } from './components/Footer.js';
 import { Header } from './components/Header.js';
 import {
@@ -313,6 +314,8 @@ function AppShell({
   const colorMode = useStoreSelector(store, (state) => state.colorMode);
   const size = useTerminalSize();
   const overlayOpen = overlayHost.overlays.length > 0;
+  const lockStdin =
+    pipeline.status === 'escalated' && !overlayOpen && mode !== 'discovery';
   const footerState = deriveFooterState(pipeline.status, overlayOpen);
 
   useEffect(() => {
@@ -670,9 +673,21 @@ function AppShell({
         />
       )}
       <OverlayHost colorMode={colorMode} />
+      {lockStdin && commandExecutor !== undefined && onForceExit !== undefined ? (
+        <StdinExitCapture
+          active
+          doubleCtrlCExit={{
+            onArm: () => {
+              setFooterTransient('Press Control-C again to exit');
+            },
+            onExit: onForceExit,
+          }}
+        />
+      ) : null}
       <CommandInput
         {...(commandExecutor ? { executor: commandExecutor } : {})}
         disabled={overlayOpen}
+        lockStdin={lockStdin}
         colorMode={colorMode}
         onRequestHelp={openHelp}
         {...(commandExecutor !== undefined && onForceExit !== undefined

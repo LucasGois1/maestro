@@ -41,6 +41,8 @@ import {
   feedbackPath,
   handoffPath,
   maestroRoot,
+  removePipelineProcessMarker,
+  runPipelineProcessPath,
   runPlanPath,
   runPlanSnapshotPath,
   sprintOutcomeCheckpointPath,
@@ -818,6 +820,21 @@ export async function runPipeline(
     generator: unknown;
     evaluator: EvaluatorModelOutput;
   }> = [];
+
+  const pipelineProcessPath = runPipelineProcessPath({
+    repoRoot: options.repoRoot,
+    runId: options.runId,
+    ...(maestroDir !== undefined ? { maestroDir } : {}),
+  });
+  await mkdir(dirname(pipelineProcessPath), { recursive: true });
+  await writeFile(
+    pipelineProcessPath,
+    `${JSON.stringify({
+      pid: process.pid,
+      startedAt: new Date().toISOString(),
+    })}\n`,
+    'utf8',
+  );
 
   try {
     if (!existing) {
@@ -1609,6 +1626,8 @@ export async function runPipeline(
       at: eventAt,
     });
     throw error;
+  } finally {
+    await removePipelineProcessMarker(pipelineProcessPath);
   }
 }
 

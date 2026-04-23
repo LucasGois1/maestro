@@ -1,5 +1,5 @@
 import { Box, Text, useInput } from 'ink';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import {
   commandEntryNeedsTrailingArgs,
@@ -10,8 +10,14 @@ import {
   suggestCommands,
   type CommandCatalogEntry,
 } from '../commands/catalog.js';
+import {
+  useDoubleCtrlCExit,
+  type DoubleCtrlCExitHandlers,
+} from '../hooks/useDoubleCtrlCExit.js';
 import { useTerminalSize } from '../layout/useTerminalSize.js';
 import type { TuiColorMode } from '../state/store.js';
+
+export type { DoubleCtrlCExitHandlers } from '../hooks/useDoubleCtrlCExit.js';
 
 export type TuiCommandExecutionResult = {
   readonly level: 'info' | 'warn' | 'error';
@@ -23,14 +29,14 @@ export type TuiCommandExecutor = (options: {
   readonly command: CommandCatalogEntry;
 }) => Promise<TuiCommandExecutionResult> | TuiCommandExecutionResult;
 
-export type DoubleCtrlCExitHandlers = {
-  readonly onArm: () => void;
-  readonly onExit: () => void;
-};
-
 export type CommandInputProps = {
   readonly executor?: TuiCommandExecutor;
   readonly disabled?: boolean;
+  /**
+   * When true, stdin is owned elsewhere (e.g. escalation draft); command bar
+   * does not read keys (double Control+C exit still uses StdinExitCapture).
+   */
+  readonly lockStdin?: boolean;
   readonly colorMode?: TuiColorMode;
   /** Opens help (bound from App); plain `?` without Ctrl/Meta. */
   readonly onRequestHelp?: () => void;
@@ -60,6 +66,7 @@ const ROOT_SUBMENU_BLURB: Partial<Record<string, string>> = {
 export function CommandInput({
   executor,
   disabled = false,
+  lockStdin = false,
   colorMode = 'color',
   onRequestHelp,
   doubleCtrlCExit,
@@ -74,16 +81,7 @@ export function CommandInput({
   const [commandHistory, setCommandHistory] = useState<readonly string[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number | null>(null);
   const [submenu, setSubmenu] = useState<SubmenuState | null>(null);
-  const ctrlCArmAtRef = useRef<number | null>(null);
-  const ctrlCArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (ctrlCArmTimerRef.current !== null) {
-        clearTimeout(ctrlCArmTimerRef.current);
-      }
-    };
-  }, []);
+  const { tryHandleCtrlC } = useDoubleCtrlCExit(doubleCtrlCExit);
 
   const input = draft.trimStart();
   const hasSlashPrefix = input.startsWith('/');
@@ -246,6 +244,14 @@ export function CommandInput({
         return;
       }
 
+      if (tryHandleCtrlC(ch, key)) {
+        setDraft('');
+        setMessage(null);
+        setSelectedSuggestion(0);
+        setHistoryIndex(null);
+        return;
+      }
+
       if (
         onRequestHelp !== undefined &&
         ch === '?' &&
@@ -253,40 +259,6 @@ export function CommandInput({
         !key.meta
       ) {
         onRequestHelp();
-        return;
-      }
-
-      if (key.ctrl && ch === 'c' && doubleCtrlCExit !== undefined) {
-        const now = Date.now();
-        if (
-          ctrlCArmAtRef.current !== null &&
-          now - ctrlCArmAtRef.current <= 2000
-        ) {
-          if (ctrlCArmTimerRef.current !== null) {
-            clearTimeout(ctrlCArmTimerRef.current);
-            ctrlCArmTimerRef.current = null;
-          }
-          ctrlCArmAtRef.current = null;
-          setDraft('');
-          setMessage(null);
-          setSelectedSuggestion(0);
-          setHistoryIndex(null);
-          doubleCtrlCExit.onExit();
-          return;
-        }
-        ctrlCArmAtRef.current = now;
-        doubleCtrlCExit.onArm();
-        if (ctrlCArmTimerRef.current !== null) {
-          clearTimeout(ctrlCArmTimerRef.current);
-        }
-        ctrlCArmTimerRef.current = setTimeout(() => {
-          ctrlCArmAtRef.current = null;
-          ctrlCArmTimerRef.current = null;
-        }, 2000);
-        setDraft('');
-        setMessage(null);
-        setSelectedSuggestion(0);
-        setHistoryIndex(null);
         return;
       }
 
@@ -380,7 +352,7 @@ export function CommandInput({
         setHistoryIndex(null);
       }
     },
-    { isActive: !disabled },
+    { isActive: !disabled && !lockStdin },
   );
 
   const messageColor =

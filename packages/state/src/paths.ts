@@ -17,6 +17,8 @@ export const PLAN_SNAPSHOT_FILE = 'plan.snapshot.json';
 export const PROJECT_LOG_FILE = 'log.md';
 /** Log append-only por run (fases, escalação, resume). */
 export const RUN_LOG_FILE = 'run.log.md';
+/** PID do processo Node que está a executar `runPipeline` (limpeza de `running` órfão). */
+export const PIPELINE_PROCESS_FILE = 'pipeline.process.json';
 
 export type RunPathOptions = {
   readonly repoRoot: string;
@@ -46,6 +48,10 @@ export function runMetaPath(opts: RunPathOptions): string {
 
 export function runLogPath(opts: RunPathOptions): string {
   return join(runRoot(opts), RUN_LOG_FILE);
+}
+
+export function runPipelineProcessPath(opts: RunPathOptions): string {
+  return join(runRoot(opts), PIPELINE_PROCESS_FILE);
 }
 
 export function runPlanPath(opts: RunPathOptions): string {
