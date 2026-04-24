@@ -39,6 +39,7 @@ export {
   type ApprovalRequest,
   type RunCommandOptions,
   type RunCommandResult,
+  type ShellApprovalDenyReason,
 } from './runner.js';
 
 export { parseCommandString } from 'execa';

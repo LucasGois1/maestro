@@ -11,6 +11,7 @@ import {
 import { ConfigValidationError, type LoadedConfig } from '@maestro/config';
 import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import { createEventBus, type EventBus } from '@maestro/core';
+import { createBusShellApprovalPrompter } from '@maestro/agents';
 import {
   runPipeline,
   type PipelineRunOptions,
@@ -251,6 +252,11 @@ export function createRunCommand(options: RunCommandOptions = {}): Command {
         io.stdout(`Run started: ${runId}`);
       }
 
+      let shellApproval: ReturnType<typeof createBusShellApprovalPrompter> | undefined;
+      if (instance !== null) {
+        shellApproval = createBusShellApprovalPrompter({ bus, runId });
+      }
+
       try {
         const result = await pipelineRunner({
           runId,
@@ -261,6 +267,9 @@ export function createRunCommand(options: RunCommandOptions = {}): Command {
           store,
           bus,
           config: loaded.resolved,
+          ...(shellApproval !== undefined
+            ? { shellApprover: shellApproval.approver }
+            : {}),
         });
         if (!stdoutIsTTY) {
           io.stdout(`Run completed: ${result.state.runId}`);
@@ -269,6 +278,7 @@ export function createRunCommand(options: RunCommandOptions = {}): Command {
         io.stderr((error as Error).message);
         process.exitCode = 1;
       } finally {
+        shellApproval?.dispose();
         instance?.unmount();
       }
     });

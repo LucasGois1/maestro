@@ -33,6 +33,11 @@ export {
   type RunAgentResult,
 } from './runner.js';
 
+export {
+  createBusShellApprovalPrompter,
+  type BusShellApprovalPrompter,
+} from './bus-shell-approval-prompter.js';
+
 export { AgentLoaderError, loadCustomAgents } from './loader.js';
 
 export {

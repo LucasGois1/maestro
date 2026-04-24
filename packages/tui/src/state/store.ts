@@ -139,6 +139,17 @@ export type TuiPipelineStatus =
   | 'completed'
   | 'failed';
 
+/** Pedido de aprovação para `runShell` (espelha `shell.approval_pending`). */
+export interface TuiShellApprovalPending {
+  readonly runId: string;
+  readonly requestId: string;
+  readonly cmd: string;
+  readonly agentId?: string;
+  readonly commandLine: string;
+  readonly cwd: string;
+  readonly reason: 'strict' | 'unmatched';
+}
+
 /** Contexto de escalação humana (espelha `pipeline.escalation_pending`). */
 export interface TuiEscalationDetail {
   readonly reason: string;
@@ -212,6 +223,8 @@ export interface TuiPipelineState {
   readonly history: readonly TuiStageRecord[];
   /** Preenchido quando há escalação pendente (aguarda feedback / resume). */
   readonly escalationDetail: TuiEscalationDetail | null;
+  /** Comando shell à espera de aprovação humana (policy `ask`). */
+  readonly shellApprovalPending: TuiShellApprovalPending | null;
 }
 
 export interface TuiSprintState {
@@ -397,6 +410,7 @@ export function createInitialTuiState(
       error: null,
       history: [],
       escalationDetail: null,
+      shellApprovalPending: null,
     },
     sprints: [],
     agent: {

@@ -19,6 +19,8 @@ import {
   type ToolSet,
 } from 'ai';
 
+import type { ApprovalPrompter } from '@maestro/sandbox';
+
 import { generateTextWithRateLimitBackoff } from './generate-text-with-backoff.js';
 
 import {
@@ -246,6 +248,13 @@ function stringifyInput(input: unknown): string {
   return JSON.stringify(input, null, 2);
 }
 
+function shellApproverFromMetadata(
+  meta: Readonly<Record<string, unknown>>,
+): ApprovalPrompter | undefined {
+  const v = meta.shellApprover;
+  return typeof v === 'function' ? (v as ApprovalPrompter) : undefined;
+}
+
 /** When the tool loop hits maxSteps on tool-calls, the model may never emit structured output. */
 const TOOL_LOOP_JSON_RECOVERY_USER =
   'The tool exploration phase finished without structured output. Using the conversation and tool results above, produce the final structured output required by the system message. Do not use tools.';
@@ -410,6 +419,7 @@ export async function runAgent<TInput, TOutput>(
         : context.workingDir;
     const maestroDirMeta =
       typeof meta.maestroDir === 'string' ? meta.maestroDir : undefined;
+    const shellApprover = shellApproverFromMetadata(meta);
 
     let toolAugmented: { tools: ToolSet; maxSteps: number } | null = null;
     if (definition.id === 'planner') {
@@ -433,6 +443,7 @@ export async function runAgent<TInput, TOutput>(
           ...(maestroDirMeta !== undefined
             ? { maestroDir: maestroDirMeta }
             : {}),
+          ...(shellApprover !== undefined ? { shellApprover } : {}),
         }),
         maxSteps: 72,
       };
@@ -448,6 +459,7 @@ export async function runAgent<TInput, TOutput>(
           ...(maestroDirMeta !== undefined
             ? { maestroDir: maestroDirMeta }
             : {}),
+          ...(shellApprover !== undefined ? { shellApprover } : {}),
           codeDiff: evInput.codeDiff,
           sprintContract: evInput.sprintContract,
         }),
@@ -464,6 +476,7 @@ export async function runAgent<TInput, TOutput>(
           ...(maestroDirMeta !== undefined
             ? { maestroDir: maestroDirMeta }
             : {}),
+          ...(shellApprover !== undefined ? { shellApprover } : {}),
         }),
         maxSteps: 32,
       };
@@ -478,6 +491,7 @@ export async function runAgent<TInput, TOutput>(
           ...(maestroDirMeta !== undefined
             ? { maestroDir: maestroDirMeta }
             : {}),
+          ...(shellApprover !== undefined ? { shellApprover } : {}),
           ...(typeof meta.codeDiff === 'string'
             ? { codeDiff: meta.codeDiff }
             : {}),

@@ -1,6 +1,10 @@
 import type { PermissionMode } from '@maestro/config';
 
-import { DEFAULT_ALLOWLIST, DEFAULT_DENYLIST } from './defaults.js';
+import {
+  DEFAULT_ALLOWLIST,
+  DEFAULT_DENYLIST,
+  TRUSTED_AUTOMATION_PATTERNS,
+} from './defaults.js';
 import { matchAny, renderCommandLine } from './patterns.js';
 
 export type PolicyDecision =
@@ -58,6 +62,10 @@ export function checkCommand(options: CheckCommandOptions): PolicyDecision {
       pattern: denyPattern,
       commandLine,
     };
+  }
+
+  if (matchAny(TRUSTED_AUTOMATION_PATTERNS, commandLine)) {
+    return { kind: 'allow', reason: 'allowlist' };
   }
 
   if (options.policy.mode === 'yolo') {

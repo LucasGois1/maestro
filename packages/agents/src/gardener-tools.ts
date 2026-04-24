@@ -14,6 +14,7 @@ import {
   composePolicy,
   denyAllPrompter,
   runShellCommand,
+  type ApprovalPrompter,
 } from '@maestro/sandbox';
 import { tool, type ToolSet } from 'ai';
 import { z } from 'zod';
@@ -50,6 +51,7 @@ export type GardenerToolContext = {
   readonly bus: EventBus;
   readonly maestroDir?: string;
   readonly codeDiff?: string;
+  readonly shellApprover?: ApprovalPrompter;
 };
 
 function policyFromConfig(config: MaestroConfig) {
@@ -98,6 +100,7 @@ export function createGardenerToolSet(ctx: GardenerToolContext): ToolSet {
         const result = await runShellCommand({
           cmd,
           args,
+          agentId: 'doc-gardener',
           cwd: ctx.worktreeRoot,
           runId: ctx.runId,
           repoRoot: ctx.repoRoot,
@@ -105,7 +108,7 @@ export function createGardenerToolSet(ctx: GardenerToolContext): ToolSet {
             ? { maestroDir: ctx.maestroDir }
             : {}),
           policy,
-          approver: denyAllPrompter,
+          approver: ctx.shellApprover ?? denyAllPrompter,
           timeoutMs: 180_000,
         });
         const head =

@@ -9,6 +9,7 @@ import {
   composePolicy,
   denyAllPrompter,
   runShellCommand,
+  type ApprovalPrompter,
 } from '@maestro/sandbox';
 import { tool, type ToolSet } from 'ai';
 import { z } from 'zod';
@@ -50,6 +51,7 @@ export type MergerToolContext = {
   readonly runId: string;
   readonly bus: EventBus;
   readonly maestroDir?: string;
+  readonly shellApprover?: ApprovalPrompter;
 };
 
 export type MergerToolHooks = {
@@ -156,6 +158,7 @@ export function createMergerToolSet(
         const result = await runShellCommand({
           cmd,
           args,
+          agentId: 'merger',
           cwd: ctx.worktreeRoot,
           runId: ctx.runId,
           repoRoot: ctx.repoRoot,
@@ -163,7 +166,7 @@ export function createMergerToolSet(
             ? { maestroDir: ctx.maestroDir }
             : {}),
           policy,
-          approver: denyAllPrompter,
+          approver: ctx.shellApprover ?? denyAllPrompter,
           timeoutMs: 180_000,
         });
         const head =

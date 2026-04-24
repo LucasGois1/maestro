@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { createBusShellApprovalPrompter } from '@maestro/agents';
 import { computeBranchName, createWorktree } from '@maestro/git';
 import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import type { EventBus } from '@maestro/core';
@@ -179,6 +180,10 @@ async function executeRun(options: {
           runId,
           branch,
         });
+    const shellApproval = createBusShellApprovalPrompter({
+      bus: options.bus,
+      runId,
+    });
     void runPipeline({
       runId,
       prompt: parsed.prompt,
@@ -188,20 +193,25 @@ async function executeRun(options: {
       store: options.store,
       bus: options.bus,
       config: loaded.resolved,
-    }).catch((error: unknown) => {
-      if (
-        error instanceof PipelineEscalationError ||
-        error instanceof PipelinePauseError
-      ) {
-        return;
-      }
-      options.bus.emit({
-        type: 'pipeline.failed',
-        runId,
-        at: 'planning',
-        error: formatCliError(error),
+      shellApprover: shellApproval.approver,
+    })
+      .catch((error: unknown) => {
+        if (
+          error instanceof PipelineEscalationError ||
+          error instanceof PipelinePauseError
+        ) {
+          return;
+        }
+        options.bus.emit({
+          type: 'pipeline.failed',
+          runId,
+          at: 'planning',
+          error: formatCliError(error),
+        });
+      })
+      .finally(() => {
+        shellApproval.dispose();
       });
-    });
     return {
       level: 'info',
       message: `Run started: ${runId}`,
@@ -235,29 +245,38 @@ async function executeResume(options: {
     }
     const runId: string = candidateRunId;
 
+    const shellApproval = createBusShellApprovalPrompter({
+      bus: options.bus,
+      runId,
+    });
     void resumePipeline({
       runId,
       repoRoot: options.repoRoot,
       store: options.store,
       bus: options.bus,
       config: loaded.resolved,
+      shellApprover: shellApproval.approver,
       ...(parsed.resumeTargetOverride !== undefined
         ? { resumeTargetOverride: parsed.resumeTargetOverride }
         : {}),
-    }).catch((error: unknown) => {
-      if (
-        error instanceof PipelineEscalationError ||
-        error instanceof PipelinePauseError
-      ) {
-        return;
-      }
-      options.bus.emit({
-        type: 'pipeline.failed',
-        runId,
-        at: 'planning',
-        error: formatCliError(error),
+    })
+      .catch((error: unknown) => {
+        if (
+          error instanceof PipelineEscalationError ||
+          error instanceof PipelinePauseError
+        ) {
+          return;
+        }
+        options.bus.emit({
+          type: 'pipeline.failed',
+          runId,
+          at: 'planning',
+          error: formatCliError(error),
+        });
+      })
+      .finally(() => {
+        shellApproval.dispose();
       });
-    });
     return {
       level: 'info',
       message: `Resume requested: ${runId}`,

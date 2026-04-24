@@ -8,6 +8,7 @@ import {
   composePolicy,
   denyAllPrompter,
   runShellCommand,
+  type ApprovalPrompter,
 } from '@maestro/sandbox';
 import { tool, type ToolSet } from 'ai';
 import { z } from 'zod';
@@ -58,6 +59,8 @@ export type GeneratorToolContext = {
   readonly runId: string;
   readonly bus: EventBus;
   readonly maestroDir?: string;
+  /** Quando definido (TUI), pede aprovação humana para shell fora da allowlist. */
+  readonly shellApprover?: ApprovalPrompter;
 };
 
 export type GeneratorToolHooks = {
@@ -164,6 +167,7 @@ export function createGeneratorToolSet(
         const result = await runShellCommand({
           cmd,
           args,
+          agentId: 'generator',
           cwd: ctx.workspaceRoot,
           runId: ctx.runId,
           repoRoot: ctx.stateRepoRoot,
@@ -171,7 +175,7 @@ export function createGeneratorToolSet(
             ? { maestroDir: ctx.maestroDir }
             : {}),
           policy,
-          approver: denyAllPrompter,
+          approver: ctx.shellApprover ?? denyAllPrompter,
           timeoutMs: 120_000,
         });
         const head =

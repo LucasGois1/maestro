@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -23,6 +24,15 @@ beforeEach(async () => {
 afterEach(async () => {
   await rm(repoRoot, { recursive: true, force: true });
 });
+
+function ghCliAvailable(): boolean {
+  try {
+    execFileSync('gh', ['--version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 describe('runShellCommand', () => {
   it('executes an allowlisted command and appends an audit entry', async () => {
@@ -103,8 +113,28 @@ describe('runShellCommand', () => {
     );
     const parsed = JSON.parse(audit.trim().split('\n').pop() ?? '{}');
     expect(parsed.agentId).toBe('evaluator');
-    expect(parsed.note).toBe('rejected by user');
+    expect(parsed.approvedBy).toBe('user');
+    expect(parsed.note).toBe('rejected by user in shell approval UI');
   });
+
+  it.runIf(ghCliAvailable())(
+    'trusted gh pr create never calls approver (strict + deny-all prompter unused)',
+    async () => {
+      const approver = vi.fn(async () => ({ choice: 'deny' as const }));
+      const result = await runShellCommand({
+        cmd: 'gh',
+        args: ['pr', 'create', '--help'],
+        cwd: repoRoot,
+        runId: 'r-gh-trusted',
+        repoRoot,
+        policy: composePolicy({ mode: 'strict' }),
+        approver,
+      });
+      expect(approver).not.toHaveBeenCalled();
+      expect(result.decision.kind).toBe('allow');
+      expect(result.exitCode).toBe(0);
+    },
+  );
 
   it('uses the default deny-all prompter when approval is required', async () => {
     await expect(
@@ -115,7 +145,10 @@ describe('runShellCommand', () => {
         cwd: repoRoot,
         reason: 'unmatched',
       }),
-    ).resolves.toEqual({ choice: 'deny' });
+    ).resolves.toEqual({
+      choice: 'deny',
+      denyReason: 'no_interactive_approver',
+    });
 
     await expect(
       runShellCommand({
@@ -127,6 +160,16 @@ describe('runShellCommand', () => {
         policy: composePolicy({ mode: 'allowlist' }),
       }),
     ).rejects.toBeInstanceOf(CommandRejectedError);
+
+    const auditDefault = await readFile(
+      auditFilePath({ repoRoot, runId: 'r-default-deny' }),
+      'utf8',
+    );
+    const parsedDefault = JSON.parse(auditDefault.trim().split('\n').pop() ?? '{}');
+    expect(parsedDefault.approvedBy).toBe('system');
+    expect(parsedDefault.note).toBe(
+      'rejected by default (no interactive shell approver)',
+    );
   });
 
   it('passes through when the approver says once', async () => {

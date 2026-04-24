@@ -7,6 +7,7 @@ import {
   composePolicy,
   denyAllPrompter,
   runShellCommand,
+  type ApprovalPrompter,
 } from '@maestro/sandbox';
 import { tool, type ToolSet } from 'ai';
 import { z } from 'zod';
@@ -62,6 +63,7 @@ export type EvaluatorToolContext = {
   /** Diff do sprint para sensores inferenciais (ex.: code-review). */
   readonly codeDiff?: string;
   readonly sprintContract?: string;
+  readonly shellApprover?: ApprovalPrompter;
 };
 
 export type EvaluatorToolHooks = {
@@ -153,6 +155,7 @@ export function createEvaluatorToolSet(
         const result = await runShellCommand({
           cmd,
           args,
+          agentId: 'evaluator',
           cwd: ctx.worktreeRoot,
           runId: ctx.runId,
           repoRoot: ctx.repoRoot,
@@ -160,7 +163,7 @@ export function createEvaluatorToolSet(
             ? { maestroDir: ctx.maestroDir }
             : {}),
           policy,
-          approver: denyAllPrompter,
+          approver: ctx.shellApprover ?? denyAllPrompter,
           timeoutMs: 120_000,
         });
         const head =

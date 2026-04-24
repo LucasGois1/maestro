@@ -38,10 +38,20 @@ export class CommandTimedOutError extends Error {
   }
 }
 
+/** Só aplica quando `choice` é `deny` (auditoria e diagnóstico). */
+export type ShellApprovalDenyReason =
+  | 'user'
+  | 'no_interactive_approver'
+  | 'approval_timeout'
+  | 'approval_disposed';
+
 export type ApprovalDecision =
   | { readonly choice: 'once' }
   | { readonly choice: 'always'; readonly pattern?: string }
-  | { readonly choice: 'deny' };
+  | {
+      readonly choice: 'deny';
+      readonly denyReason?: ShellApprovalDenyReason;
+    };
 
 export type ApprovalRequest = {
   readonly cmd: string;
@@ -58,6 +68,7 @@ export type ApprovalPrompter = (
 
 export const denyAllPrompter: ApprovalPrompter = async () => ({
   choice: 'deny',
+  denyReason: 'no_interactive_approver',
 });
 
 export type RunCommandOptions = {
@@ -93,6 +104,51 @@ function toTextOutput(value: unknown): string {
     return Buffer.from(value).toString('utf8');
   }
   return '';
+}
+
+function denyAuditEntry(options: {
+  readonly approvalDecision: ApprovalDecision;
+  readonly usedInteractiveApprover: boolean;
+}): { readonly approvedBy: AuditApprover; readonly note: string } {
+  const d = options.approvalDecision;
+  if (d.choice !== 'deny') {
+    throw new Error('denyAuditEntry expects choice deny');
+  }
+  const dr = d.denyReason;
+  if (dr === 'approval_timeout') {
+    return {
+      approvedBy: 'system',
+      note: 'shell approval timed out (no response)',
+    };
+  }
+  if (dr === 'approval_disposed') {
+    return {
+      approvedBy: 'system',
+      note: 'shell approval cancelled (prompter disposed or run ended)',
+    };
+  }
+  if (dr === 'no_interactive_approver') {
+    return {
+      approvedBy: 'system',
+      note: 'rejected by default (no interactive shell approver)',
+    };
+  }
+  if (dr === 'user') {
+    return {
+      approvedBy: 'user',
+      note: 'rejected by user in shell approval UI',
+    };
+  }
+  if (!options.usedInteractiveApprover) {
+    return {
+      approvedBy: 'system',
+      note: 'rejected by default (no interactive shell approver)',
+    };
+  }
+  return {
+    approvedBy: 'user',
+    note: 'rejected by user in shell approval UI',
+  };
 }
 
 function approverToAudit(
@@ -217,6 +273,8 @@ export async function runShellCommand(
 
   let approvalDecision: ApprovalDecision | null = null;
   if (decision.kind === 'ask') {
+    const usedInteractiveApprover =
+      options.approver !== undefined && options.approver !== denyAllPrompter;
     const approver = options.approver ?? denyAllPrompter;
     approvalDecision = await approver({
       cmd: options.cmd,
@@ -227,6 +285,10 @@ export async function runShellCommand(
       reason: decision.reason,
     });
     if (approvalDecision.choice === 'deny') {
+      const { approvedBy, note } = denyAuditEntry({
+        approvalDecision,
+        usedInteractiveApprover,
+      });
       await appendAudit({
         repoRoot: options.repoRoot,
         runId: options.runId,
@@ -241,8 +303,8 @@ export async function runShellCommand(
           cmd: options.cmd,
           args: options.args,
           cwd: options.cwd,
-          approvedBy: 'user',
-          note: 'rejected by user',
+          approvedBy,
+          note,
         },
       });
       throw new CommandRejectedError(

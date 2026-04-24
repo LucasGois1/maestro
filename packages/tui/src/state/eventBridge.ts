@@ -68,11 +68,55 @@ interface InternalConfig {
   readonly feedbackAttemptByRunSprint: Map<string, number>;
 }
 
+function handleShellApprovalEvent(event: MaestroEvent, store: TuiStore): void {
+  if (event.type === 'shell.approval_pending') {
+    store.setState((state) => ({
+      ...state,
+      runId: event.runId,
+      pipeline: {
+        ...state.pipeline,
+        shellApprovalPending: {
+          runId: event.runId,
+          requestId: event.requestId,
+          cmd: event.cmd,
+          ...(event.agentId !== undefined ? { agentId: event.agentId } : {}),
+          commandLine: event.commandLine,
+          cwd: event.cwd,
+          reason: event.reason,
+        },
+      },
+    }));
+    return;
+  }
+  if (event.type === 'shell.approval_resolved') {
+    store.setState((state) => {
+      const pending = state.pipeline.shellApprovalPending;
+      if (pending === null || pending.requestId !== event.requestId) {
+        return state;
+      }
+      return {
+        ...state,
+        pipeline: {
+          ...state.pipeline,
+          shellApprovalPending: null,
+        },
+      };
+    });
+  }
+}
+
 function handleEvent(
   event: MaestroEvent,
   store: TuiStore,
   config: InternalConfig,
 ): void {
+  if (
+    event.type === 'shell.approval_pending' ||
+    event.type === 'shell.approval_resolved'
+  ) {
+    handleShellApprovalEvent(event, store);
+    return;
+  }
   if (isPipelineEvent(event)) {
     handlePipelineEvent(event, store, config);
     return;
@@ -149,6 +193,7 @@ function handlePipelineEvent(
           retryCount: 0,
           history: [],
           escalationDetail: null,
+          shellApprovalPending: null,
         },
         focus: {
           ...state.focus,
@@ -297,6 +342,7 @@ function handlePipelineEvent(
           stage: event.phaseAtEscalation,
           sprintIdx: event.sprintIdx,
           error: null,
+          shellApprovalPending: null,
           escalationDetail: {
             reason: event.reason,
             sprintIdx: event.sprintIdx,
@@ -322,6 +368,7 @@ function handlePipelineEvent(
           status: 'paused',
           stage: event.at,
           escalationDetail: null,
+          shellApprovalPending: null,
         },
       }));
       return;
@@ -336,6 +383,7 @@ function handlePipelineEvent(
               ? (event.phaseBeforeEscalation ?? state.pipeline.stage)
               : event.from,
           escalationDetail: null,
+          shellApprovalPending: null,
         },
       }));
       return;
@@ -350,6 +398,7 @@ function handlePipelineEvent(
             status: 'completed',
             history: closed,
             escalationDetail: null,
+            shellApprovalPending: null,
           },
           sprints: state.sprints.map((sprint) =>
             sprint.status === 'running'
@@ -379,6 +428,7 @@ function handlePipelineEvent(
             error: event.error,
             history: closed,
             escalationDetail: null,
+            shellApprovalPending: null,
           },
           sprints:
             activeIdx === null

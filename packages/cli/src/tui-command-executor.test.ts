@@ -188,6 +188,7 @@ describe('createTuiCommandExecutor', () => {
         worktreePath: repoRoot,
         repoRoot,
         store,
+        shellApprover: expect.any(Function),
       }),
     );
   });
@@ -204,6 +205,7 @@ describe('createTuiCommandExecutor', () => {
       expect.objectContaining({
         branch: 'maestro/custom',
         worktreePath: join(repoRoot, '..', 'maestro-run-1'),
+        shellApprover: expect.any(Function),
       }),
     );
   });
@@ -277,11 +279,21 @@ describe('createTuiCommandExecutor', () => {
 
     expect(mocks.resumePipeline).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ runId: 'run-42', repoRoot, store }),
+      expect.objectContaining({
+        runId: 'run-42',
+        repoRoot,
+        store,
+        shellApprover: expect.any(Function),
+      }),
     );
     expect(mocks.resumePipeline).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ runId: 'infer-me', repoRoot, store }),
+      expect.objectContaining({
+        runId: 'infer-me',
+        repoRoot,
+        store,
+        shellApprover: expect.any(Function),
+      }),
     );
   });
 

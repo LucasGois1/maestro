@@ -27,6 +27,7 @@ import {
   type PlannerReplanContext,
 } from '@maestro/agents';
 import type { MaestroConfig } from '@maestro/config';
+import type { ApprovalPrompter } from '@maestro/sandbox';
 import { detectRemote, getWorkingTreeDiff, removeWorktree } from '@maestro/git';
 import {
   sprintContractFrontmatterSchema,
@@ -109,6 +110,11 @@ export type PipelineRunOptions = {
   readonly humanFeedback?: string;
   /** Sobrepõe `RunState.escalation.resumeTarget` na retomada. */
   readonly resumeTargetOverride?: ResumeTarget;
+  /**
+   * Quando definido (ex.: TUI), comandos shell fora da allowlist pedem aprovação
+   * humana via eventos `shell.approval_*` em vez de falharem silenciosamente.
+   */
+  readonly shellApprover?: ApprovalPrompter;
 };
 
 export type PipelineRunResult = {
@@ -172,6 +178,9 @@ function pipelineAgentMetadata(
   return {
     worktreeRoot: options.worktreePath,
     stateRepoRoot: options.repoRoot,
+    ...(options.shellApprover !== undefined
+      ? { shellApprover: options.shellApprover }
+      : {}),
     ...extra,
   };
 }

@@ -182,6 +182,27 @@ export type SensorEvent =
     };
 
 /** Emitted by tooling / pipeline to drive the contextual diff · preview · feedback slot in the TUI. */
+/** Pedido / resposta de aprovação humana para `runShell` quando a policy devolve `ask`. */
+export type ShellApprovalEvent =
+  | {
+      readonly type: 'shell.approval_pending';
+      readonly runId: string;
+      readonly requestId: string;
+      readonly agentId?: string;
+      readonly cmd: string;
+      readonly args: readonly string[];
+      readonly commandLine: string;
+      readonly cwd: string;
+      readonly reason: 'strict' | 'unmatched';
+    }
+  | {
+      readonly type: 'shell.approval_resolved';
+      readonly runId: string;
+      readonly requestId: string;
+      readonly choice: 'once' | 'always' | 'deny';
+      readonly pattern?: string;
+    };
+
 export type ContextEvent =
   | {
       readonly type: 'artifact.diff_updated';
@@ -215,12 +236,14 @@ export type MaestroEvent =
   | AgentEvent
   | PipelineEvent
   | SensorEvent
-  | ContextEvent;
+  | ContextEvent
+  | ShellApprovalEvent;
 
 export type AgentEventType = AgentEvent['type'];
 export type PipelineEventType = PipelineEvent['type'];
 export type SensorEventType = SensorEvent['type'];
 export type ContextEventType = ContextEvent['type'];
+export type ShellApprovalEventType = ShellApprovalEvent['type'];
 export type MaestroEventType = MaestroEvent['type'];
 
 export type AgentEventListener = (event: AgentEvent) => void;

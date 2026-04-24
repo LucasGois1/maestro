@@ -1,3 +1,13 @@
+/**
+ * Comandos permitidos sem prompt em qualquer `permissions.mode` (após o denylist).
+ * Usado para automação do Merger/Doc Gardener (PR/MR) sem `approver` interativo —
+ * os toolsets ainda passam `denyAllPrompter`, que nega qualquer `kind: 'ask'`.
+ */
+export const TRUSTED_AUTOMATION_PATTERNS: readonly string[] = [
+  'gh pr create*',
+  'glab mr create*',
+] as const;
+
 export const DEFAULT_DENYLIST: readonly string[] = [
   'rm -rf /',
   'rm -rf /*',

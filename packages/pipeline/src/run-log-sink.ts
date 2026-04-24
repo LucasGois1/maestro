@@ -281,6 +281,18 @@ export function attachRunLogToEventBus(options: {
             detail: `${event.sensorId} — ${truncate(event.error, MAX_ERR)}`,
           });
           return;
+        case 'shell.approval_pending':
+          await appendEntry(logBase, {
+            event: 'shell.approval_pending',
+            detail: `${event.requestId} — ${truncate(event.commandLine, 500)}`,
+          });
+          return;
+        case 'shell.approval_resolved':
+          await appendEntry(logBase, {
+            event: 'shell.approval_resolved',
+            detail: `${event.requestId} ${event.choice}`,
+          });
+          return;
         default:
           return;
       }

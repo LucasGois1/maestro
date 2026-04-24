@@ -44,6 +44,7 @@ export {
   type TuiSensorState,
   type TuiSensorStatus,
   type TuiSprintState,
+  type TuiShellApprovalPending,
   type TuiStageDurationMap,
   type TuiStageRecord,
   type TuiStageStatus,

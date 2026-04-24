@@ -24,6 +24,7 @@
     "@maestro/config": "workspace:*",
     "@maestro/contract": "workspace:*",
     "@maestro/core": "workspace:*",
+    "@maestro/sandbox": "workspace:*",
     "@maestro/state": "workspace:*"
   }
 }

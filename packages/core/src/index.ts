@@ -20,4 +20,6 @@ export {
   type PipelineStageName,
   type SensorEvent,
   type SensorEventType,
+  type ShellApprovalEvent,
+  type ShellApprovalEventType,
 } from './events.js';

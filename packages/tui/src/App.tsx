@@ -13,6 +13,7 @@ import {
   CommandInput,
   type TuiCommandExecutor,
 } from './components/CommandInput.js';
+import { ShellApprovalGate } from './components/ShellApprovalGate.js';
 import { StdinExitCapture } from './components/StdinExitCapture.js';
 import { Footer, deriveFooterState } from './components/Footer.js';
 import { Header } from './components/Header.js';
@@ -154,6 +155,9 @@ export function App({
 
   const content = (
     <OverlayHostProvider initialStack={initialOverlay ? [initialOverlay] : []}>
+      {bus !== undefined ? (
+        <ShellApprovalGate bus={bus} store={activeStore} />
+      ) : null}
       <AppBody
         store={activeStore}
         keybindingRouter={keybindingRouter}
@@ -314,8 +318,14 @@ function AppShell({
   const colorMode = useStoreSelector(store, (state) => state.colorMode);
   const size = useTerminalSize();
   const overlayOpen = overlayHost.overlays.length > 0;
+  const shellApprovalPending = useStoreSelector(
+    store,
+    (s) => s.pipeline.shellApprovalPending,
+  );
   const lockStdin =
-    pipeline.status === 'escalated' && !overlayOpen && mode !== 'discovery';
+    (pipeline.status === 'escalated' || shellApprovalPending !== null) &&
+    !overlayOpen &&
+    mode !== 'discovery';
   const footerState = deriveFooterState(pipeline.status, overlayOpen);
 
   useEffect(() => {

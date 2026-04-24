@@ -3,6 +3,7 @@ import { cwd as processCwd } from 'node:process';
 import { ConfigValidationError, type LoadedConfig } from '@maestro/config';
 import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import { createEventBus, type EventBus } from '@maestro/core';
+import { createBusShellApprovalPrompter } from '@maestro/agents';
 import {
   PipelineResumeNotAllowedError,
   PipelineRunNotFoundError,
@@ -162,6 +163,20 @@ export function createResumeCommand(
           })
         : null;
 
+      let shellApproval: ReturnType<typeof createBusShellApprovalPrompter> | undefined;
+      if (instance !== null) {
+        const targetRunId =
+          runId !== undefined
+            ? runId
+            : (await store.latestResumable())?.runId;
+        if (targetRunId !== undefined) {
+          shellApproval = createBusShellApprovalPrompter({
+            bus,
+            runId: targetRunId,
+          });
+        }
+      }
+
       try {
         const result = await pipelineResumer({
           ...(runId !== undefined ? { runId } : {}),
@@ -169,6 +184,9 @@ export function createResumeCommand(
           store,
           bus,
           config: loaded.resolved,
+          ...(shellApproval !== undefined
+            ? { shellApprover: shellApproval.approver }
+            : {}),
         });
         if (!stdoutIsTTY) {
           io.stdout(`Run completed: ${result.state.runId}`);
@@ -183,6 +201,7 @@ export function createResumeCommand(
         }
         process.exitCode = 1;
       } finally {
+        shellApproval?.dispose();
         instance?.unmount();
       }
     });

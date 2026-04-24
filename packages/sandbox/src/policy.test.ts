@@ -41,13 +41,51 @@ describe('checkCommand', () => {
     expect(decision.kind).toBe('ask');
   });
 
-  it('strict mode always asks, even for allowlisted commands', () => {
+  it('strict mode asks for commands that are not denylisted, trusted, or matched by defaults', () => {
     const decision = checkCommand({
       cmd: 'pytest',
       args: [],
       policy: policy('strict'),
     });
     expect(decision.kind).toBe('ask');
+  });
+
+  it('strict mode allows trusted PR/MR creation without prompt', () => {
+    const gh = checkCommand({
+      cmd: 'gh',
+      args: ['pr', 'create', '--title', 'x', '--body', 'y'],
+      policy: policy('strict'),
+    });
+    expect(gh.kind).toBe('allow');
+    const glab = checkCommand({
+      cmd: 'glab',
+      args: ['mr', 'create', '--title', 'x'],
+      policy: policy('strict'),
+    });
+    expect(glab.kind).toBe('allow');
+  });
+
+  it('allowlist mode allows trusted gh pr create before generic allowlist (no ask)', () => {
+    const decision = checkCommand({
+      cmd: 'gh',
+      args: [
+        'pr',
+        'create',
+        '--title',
+        'feat(contributing): English version of CONTRIBUTING.md',
+        '--base',
+        'main',
+        '--head',
+        'maestro/feat-x',
+        '--body',
+        'x',
+      ],
+      policy: policy('allowlist'),
+    });
+    expect(decision.kind).toBe('allow');
+    if (decision.kind === 'allow') {
+      expect(decision.reason).toBe('allowlist');
+    }
   });
 
   it('yolo mode approves everything that survives the denylist', () => {
