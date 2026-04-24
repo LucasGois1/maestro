@@ -108,6 +108,25 @@ export type PipelineEvent =
       readonly artifactHints?: readonly string[];
     }
   | {
+      readonly type: 'pipeline.planning_interview_pending';
+      readonly runId: string;
+      readonly mode: 'round' | 'continue_gate' | 'summary_review';
+      readonly roundInBlock: number;
+      readonly blockIndex: number;
+      readonly totalRounds: number;
+      readonly questions: readonly {
+        readonly id: string;
+        readonly prompt: string;
+        readonly topic: string;
+      }[];
+      readonly answers: readonly {
+        readonly questionId: string;
+        readonly answer: string;
+      }[];
+      readonly summaryMarkdown?: string;
+      readonly contextTrail: readonly string[];
+    }
+  | {
       readonly type: 'pipeline.plan_revised';
       readonly runId: string;
       /** 1-based replan attempt within this pipeline run. */

@@ -21,7 +21,10 @@ import { createRunCommand } from './commands/run.js';
 import { createRunsCommand } from './commands/runs.js';
 import { createTuiCommand } from './commands/tui.js';
 import { resolveCliMode } from './mode.js';
-import { createPersistEscalationHumanFeedback } from './persist-escalation-feedback.js';
+import {
+  createPersistEscalationHumanFeedback,
+  createPersistPlanningInterviewResponse,
+} from './persist-escalation-feedback.js';
 import { createTuiCommandExecutor } from './tui-command-executor.js';
 import { createTuiStoreForWorkspace } from './tui-workspace-store.js';
 import { ensureWorkspaceTrustInteractive } from './workspace-trust.js';
@@ -65,6 +68,15 @@ async function renderInkApp(_version: string, stdoutIsTTY: boolean) {
       commandExecutor,
       maestroVersion: packageJson.version,
       persistEscalationHumanFeedback: createPersistEscalationHumanFeedback({
+        stateStore,
+        tuiStore: store,
+        resumeAfterPersist: {
+          repoRoot,
+          bus,
+          loadConfig: loadConfigWithAutoResolvedModels,
+        },
+      }),
+      persistPlanningInterviewResponse: createPersistPlanningInterviewResponse({
         stateStore,
         tuiStore: store,
         resumeAfterPersist: {

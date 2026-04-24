@@ -5,6 +5,7 @@ import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import { createEventBus, type EventBus } from '@maestro/core';
 import { createBusShellApprovalPrompter } from '@maestro/agents';
 import {
+  PipelinePauseError,
   PipelineResumeNotAllowedError,
   PipelineRunNotFoundError,
   resumePipeline,
@@ -18,7 +19,10 @@ import { render, type Instance } from 'ink';
 import { createElement } from 'react';
 
 import { CLI_PACKAGE_VERSION } from '../cli-version.js';
-import { createPersistEscalationHumanFeedback } from '../persist-escalation-feedback.js';
+import {
+  createPersistEscalationHumanFeedback,
+  createPersistPlanningInterviewResponse,
+} from '../persist-escalation-feedback.js';
 import { createTuiCommandExecutor } from '../tui-command-executor.js';
 import { createTuiStoreForWorkspace } from '../tui-workspace-store.js';
 import { ensureWorkspaceTrustInteractive } from '../workspace-trust.js';
@@ -92,6 +96,18 @@ function renderPipelineApp(options: {
           },
         })
       : undefined;
+  const persistPlanningInterviewResponse =
+    options.commandExecutor !== undefined
+      ? createPersistPlanningInterviewResponse({
+          stateStore: options.stateStore,
+          tuiStore: options.store,
+          resumeAfterPersist: {
+            repoRoot: options.repoRoot,
+            bus: options.bus,
+            loadConfig: options.loadConfig,
+          },
+        })
+      : undefined;
   instance = render(
     createElement(App, {
       store: options.store,
@@ -99,6 +115,9 @@ function renderPipelineApp(options: {
       maestroVersion: CLI_PACKAGE_VERSION,
       ...(persistEscalationHumanFeedback !== undefined
         ? { persistEscalationHumanFeedback }
+        : {}),
+      ...(persistPlanningInterviewResponse !== undefined
+        ? { persistPlanningInterviewResponse }
         : {}),
       ...(options.commandExecutor
         ? {
@@ -118,6 +137,26 @@ function renderPipelineApp(options: {
     },
   );
   return instance;
+}
+
+function waitForInteractiveRunResolution(
+  bus: EventBus,
+  runId: string,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const dispose = bus.on((event) => {
+      if (!('runId' in event) || event.runId !== runId) {
+        return;
+      }
+      if (event.type === 'pipeline.completed') {
+        dispose();
+        resolve();
+      } else if (event.type === 'pipeline.failed') {
+        dispose();
+        reject(new Error(event.error));
+      }
+    });
+  });
 }
 
 export function createResumeCommand(
@@ -164,11 +203,12 @@ export function createResumeCommand(
         : null;
 
       let shellApproval: ReturnType<typeof createBusShellApprovalPrompter> | undefined;
+      const targetState =
+        runId !== undefined
+          ? await store.load(runId)
+          : await store.latestResumable();
+      const targetRunId = targetState?.runId;
       if (instance !== null) {
-        const targetRunId =
-          runId !== undefined
-            ? runId
-            : (await store.latestResumable())?.runId;
         if (targetRunId !== undefined) {
           shellApproval = createBusShellApprovalPrompter({
             bus,
@@ -178,6 +218,14 @@ export function createResumeCommand(
       }
 
       try {
+        if (
+          instance !== null &&
+          targetState?.planningInterview !== undefined &&
+          targetRunId !== undefined
+        ) {
+          await waitForInteractiveRunResolution(bus, targetRunId);
+          return;
+        }
         const result = await pipelineResumer({
           ...(runId !== undefined ? { runId } : {}),
           repoRoot,
@@ -192,6 +240,19 @@ export function createResumeCommand(
           io.stdout(`Run completed: ${result.state.runId}`);
         }
       } catch (error) {
+        const planningInterviewPending =
+          error instanceof PipelinePauseError &&
+          targetRunId !== undefined &&
+          (await store.load(targetRunId))?.planningInterview !== undefined;
+        if (planningInterviewPending && instance !== null && targetRunId) {
+          try {
+            await waitForInteractiveRunResolution(bus, targetRunId);
+          } catch (waitError) {
+            io.stderr((waitError as Error).message);
+            process.exitCode = 1;
+          }
+          return;
+        }
         if (error instanceof PipelineRunNotFoundError) {
           io.stderr(error.message);
         } else if (error instanceof PipelineResumeNotAllowedError) {

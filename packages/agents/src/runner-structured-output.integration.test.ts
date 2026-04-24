@@ -83,7 +83,12 @@ describe('AI SDK structured output (Output.object)', () => {
 
   it('accepts planner escalation union via the same Zod schema used in production', async () => {
     const payload = {
+      kind: 'escalation',
       escalationReason: 'blocked',
+      questions: null,
+      continuePrompt: null,
+      summaryMarkdown: null,
+      interviewState: null,
       feature: null,
       overview: null,
       userStories: null,
@@ -111,7 +116,12 @@ describe('AI SDK structured output (Output.object)', () => {
 
   it('rejects planner success payloads that fail superRefine (sprint references unknown story id)', async () => {
     const invalidPlan = {
+      kind: 'plan',
       escalationReason: null,
+      questions: null,
+      continuePrompt: null,
+      summaryMarkdown: null,
+      interviewState: null,
       feature: 'f',
       overview: 'o',
       userStories: [

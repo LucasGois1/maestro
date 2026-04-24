@@ -8,14 +8,21 @@ import {
   generatorAgent,
   generatorModelOutputSchema,
   inferLabelsFromPaths,
+  isPlannerContinueGate,
   mergerAgent,
   mergerInputSchema,
   mergerModelOutputSchema,
   isPlannerEscalation,
+  isPlannerQuestions,
+  isPlannerSummary,
   normalizePlannerModelOutput,
   plannerOutputSnapshotSchema,
   plannerAgent,
   renderArchitectNotesMarkdown,
+  type PlannerInterviewAnswer,
+  type PlannerInterviewInput,
+  type PlannerInterviewQuestion,
+  type PlannerInterviewState,
   type AgentContext,
   type AgentDefinition,
   type AgentRegistry,
@@ -42,8 +49,12 @@ import {
   feedbackPath,
   handoffPath,
   maestroRoot,
+  planningStatePath,
+  planningSummaryPath,
+  planningTranscriptPath,
   removePipelineProcessMarker,
   runPipelineProcessPath,
+  runPlanningDir,
   runPlanPath,
   runPlanSnapshotPath,
   sprintOutcomeCheckpointPath,
@@ -53,6 +64,7 @@ import {
   type EscalationSource,
   type PipelineFailureAt,
   type PipelineStage,
+  type RunStatePlanningInterview,
   type ResumeTarget,
   type RunState,
   type StateStore,
@@ -108,6 +120,8 @@ export type PipelineRunOptions = {
   readonly maxPlanReplans?: number;
   /** Notas humanas (TUI) injectadas no generator/planner quando aplicável. */
   readonly humanFeedback?: string;
+  /** Resposta estruturada para a entrevista iterativa do Planner. */
+  readonly plannerInterviewResponse?: PlannerInterviewResponse;
   /** Sobrepõe `RunState.escalation.resumeTarget` na retomada. */
   readonly resumeTargetOverride?: ResumeTarget;
   /**
@@ -128,6 +142,20 @@ export type PipelineRunResult = {
   }>;
   readonly merger: MergerModelOutput;
 };
+
+export type PlannerInterviewResponse =
+  | {
+      readonly kind: 'answers';
+      readonly answers: readonly PlannerInterviewAnswer[];
+    }
+  | {
+      readonly kind: 'continue_gate';
+      readonly decision: 'continue' | 'proceed';
+    }
+  | {
+      readonly kind: 'summary_review';
+      readonly feedback: string | null;
+    };
 
 type AgentRef<I, O> = AgentDefinition<I, O>;
 
@@ -258,6 +286,205 @@ async function readOptionalUtf8(filePath: string): Promise<string | undefined> {
   } catch {
     return undefined;
   }
+}
+
+type PlannerPhaseResult = {
+  readonly kind: 'plan';
+  readonly plan: PlannerOutput;
+};
+
+function summarizeInterviewContextTrail(
+  context: PlannerInterviewState['context'],
+): string[] {
+  return [
+    ...context.goals.map((value) => `Goal: ${value}`),
+    ...context.personas.map((value) => `Persona: ${value}`),
+    ...context.requirements.map((value) => `Requirement: ${value}`),
+    ...context.flows.map((value) => `Flow: ${value}`),
+    ...context.businessRules.map((value) => `Rule: ${value}`),
+    ...context.constraints.map((value) => `Constraint: ${value}`),
+    ...context.outOfScope.map((value) => `Out of scope: ${value}`),
+    ...context.assumptions.map((value) => `Assumption: ${value}`),
+    ...context.openQuestions.map((value) => `Open: ${value}`),
+  ].slice(0, 24);
+}
+
+function runStatePlanningInterviewDetail(options: {
+  readonly mode: RunStatePlanningInterview['mode'];
+  readonly interviewState: PlannerInterviewState;
+  readonly questions?: readonly PlannerInterviewQuestion[];
+  readonly summaryMarkdown?: string | null;
+}): RunStatePlanningInterview {
+  return {
+    mode: options.mode,
+    roundInBlock: options.interviewState.roundInBlock,
+    blockIndex: options.interviewState.blockIndex,
+    totalRounds: options.interviewState.totalRounds,
+    questions: [...(options.questions ?? [])],
+    answers: [...options.interviewState.latestAnswers],
+    summaryMarkdown: options.summaryMarkdown ?? null,
+    contextTrail: summarizeInterviewContextTrail(options.interviewState.context),
+  };
+}
+
+async function writePlanningInterviewArtifacts(
+  options: Pick<PipelineRunOptions, 'repoRoot' | 'runId'>,
+  maestroDir: string | undefined,
+  interview: PlannerInterviewInput,
+  detail: RunStatePlanningInterview,
+): Promise<void> {
+  const base = {
+    repoRoot: options.repoRoot,
+    runId: options.runId,
+    ...(maestroDir !== undefined ? { maestroDir } : {}),
+  };
+  await mkdir(runPlanningDir(base), { recursive: true });
+  await writeFile(
+    planningTranscriptPath(base),
+    `${JSON.stringify(
+      {
+        transcript: interview.transcript,
+        questions: interview.pendingQuestions,
+        answers: interview.latestAnswers,
+        summaryMarkdown: detail.summaryMarkdown,
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+  await writeFile(
+    planningStatePath(base),
+    `${JSON.stringify(interview, null, 2)}\n`,
+    'utf8',
+  );
+  await writeFile(
+    planningSummaryPath(base),
+    detail.summaryMarkdown ?? '',
+    'utf8',
+  );
+}
+
+async function readPlanningInterviewInput(
+  options: Pick<PipelineRunOptions, 'repoRoot' | 'runId'>,
+  maestroDir: string | undefined,
+): Promise<PlannerInterviewInput | null> {
+  const base = {
+    repoRoot: options.repoRoot,
+    runId: options.runId,
+    ...(maestroDir !== undefined ? { maestroDir } : {}),
+  };
+  const raw = await readOptionalUtf8(planningStatePath(base));
+  if (raw === undefined) {
+    return null;
+  }
+  return JSON.parse(raw) as PlannerInterviewInput;
+}
+
+function applyPlannerInterviewResponse(
+  interview: PlannerInterviewInput,
+  response: PlannerInterviewResponse,
+): PlannerInterviewInput {
+  switch (response.kind) {
+    case 'answers':
+      return {
+        ...interview,
+        stage: 'after_answers',
+        transcript: [
+          ...interview.transcript,
+          ...response.answers.map((answer) => ({
+            role: 'user' as const,
+            kind: 'answer' as const,
+            text: answer.answer,
+            topic:
+              interview.pendingQuestions.find((q) => q.id === answer.questionId)
+                ?.topic ?? null,
+            questionId: answer.questionId,
+            round: interview.totalRounds,
+          })),
+        ],
+        pendingQuestions: [],
+        latestAnswers: [...response.answers],
+      };
+    case 'continue_gate':
+      return {
+        ...interview,
+        stage: 'continue_gate',
+        continueDecision: response.decision,
+        transcript: [
+          ...interview.transcript,
+          {
+            role: 'user' as const,
+            kind: 'decision' as const,
+            text: response.decision,
+            topic: 'continue_gate',
+            questionId: null,
+            round: interview.totalRounds,
+          },
+        ],
+      };
+    case 'summary_review':
+      return {
+        ...interview,
+        stage: response.feedback === null ? 'finalize_plan' : 'summary_review',
+        summaryFeedback: response.feedback ?? undefined,
+        transcript:
+          response.feedback === null
+            ? interview.transcript
+            : [
+                ...interview.transcript,
+                {
+                  role: 'user' as const,
+                  kind: 'note' as const,
+                  text: response.feedback,
+                  topic: 'summary_review',
+                  questionId: null,
+                  round: interview.totalRounds,
+                },
+              ],
+      };
+  }
+}
+
+async function pauseForPlanningInterview(
+  options: PipelineRunOptions,
+  maestroDir: string | undefined,
+  interview: PlannerInterviewInput,
+  detail: RunStatePlanningInterview,
+): Promise<never> {
+  await writePlanningInterviewArtifacts(options, maestroDir, interview, detail);
+  await options.store.update(options.runId, {
+    phase: 'planning',
+    status: 'paused',
+    planningInterview: detail,
+    escalation: undefined,
+    failure: null,
+    pausedAt: new Date().toISOString(),
+  });
+  options.bus.emit({
+    type: 'pipeline.planning_interview_pending',
+    runId: options.runId,
+    mode: detail.mode,
+    roundInBlock: detail.roundInBlock,
+    blockIndex: detail.blockIndex,
+    totalRounds: detail.totalRounds,
+    questions: detail.questions,
+    answers: detail.answers,
+    ...(detail.summaryMarkdown !== null
+      ? { summaryMarkdown: detail.summaryMarkdown }
+      : {}),
+    contextTrail: detail.contextTrail,
+  });
+  await appendRunLog({
+    repoRoot: options.repoRoot,
+    runId: options.runId,
+    ...(maestroDir !== undefined ? { maestroDir } : {}),
+    entry: {
+      event: 'pipeline.paused',
+      detail: `planning interview (${detail.mode}) round=${detail.totalRounds.toString()}`,
+    },
+  });
+  throw new PipelinePauseError('Planner interview pending', 'planning');
 }
 
 async function writePlanSnapshotFile(
@@ -507,11 +734,16 @@ function dedupeNonemptyPaths(paths: readonly string[]): string[] {
 }
 
 /**
- * Seeds contract `scope` from Architect `scopeTecnico` so generator/evaluator
- * see allowed paths (the planner does not author the contract file — the
- * pipeline does, and previously left scope empty).
+ * Derives sprint contract `scope.files_*` from Architect `scopeTecnico` (deterministic;
+ * does not reinterpret user intent — fix wrong scopes in the Architect, not here).
+ *
+ * - `files_may_touch`: union of `filesToTouch`, paths listed in `newFiles`, and `testFiles`.
+ * - `files_expected`: if `filesToTouch` is non-empty, equals that list (primary deliverable
+ *   is editing existing paths); otherwise equals the `newFiles` paths (primary deliverable
+ *   is new artifacts). Empty both → returns undefined and the contract omits filled scope
+ *   or uses schema defaults depending on caller.
  */
-function contractScopeFromArchitect(
+export function contractScopeFromArchitect(
   architect: ArchitectPipelineResult,
 ):
   | { readonly files_expected: string[]; readonly files_may_touch: string[] }
@@ -775,7 +1007,8 @@ async function runPlannerPhase(
   executor: AgentExecutor,
   replan: PlannerReplanContext | undefined,
   maestroDir: string | undefined,
-): Promise<PlannerOutput> {
+  interview: PlannerInterviewInput | undefined,
+): Promise<PlannerPhaseResult> {
   assertNotAborted(options.abortSignal, 'planning');
   await updatePhase(options, 'planning');
   const planner = resolveAgent(options.registry, plannerAgent);
@@ -789,6 +1022,7 @@ async function runPlannerPhase(
             options.humanFeedback.trim().length > 0
               ? { humanGuidance: options.humanFeedback.trim() }
               : {}),
+            ...(interview !== undefined ? { interview } : {}),
           }
         : {
             prompt: options.prompt,
@@ -835,10 +1069,79 @@ async function runPlannerPhase(
       message: `Planner escalation: ${reason}`,
     });
   }
-  return normalizePlannerModelOutput(rawPlan, {
-    runId: options.runId,
-    prompt: options.prompt,
-  });
+  if (replan === undefined && isPlannerQuestions(rawPlan)) {
+    const nextInterview: PlannerInterviewInput = {
+      stage: rawPlan.interviewState.stage,
+      roundInBlock: rawPlan.interviewState.roundInBlock,
+      blockIndex: rawPlan.interviewState.blockIndex,
+      totalRounds: rawPlan.interviewState.totalRounds,
+      transcript: [...rawPlan.interviewState.transcript],
+      pendingQuestions: [...rawPlan.questions],
+      latestAnswers: [...rawPlan.interviewState.latestAnswers],
+      context: rawPlan.interviewState.context,
+    };
+    await pauseForPlanningInterview(
+      options,
+      maestroDir,
+      nextInterview,
+      runStatePlanningInterviewDetail({
+        mode: 'round',
+        interviewState: rawPlan.interviewState,
+        questions: rawPlan.questions,
+      }),
+    );
+  }
+  if (replan === undefined && isPlannerContinueGate(rawPlan)) {
+    const nextInterview: PlannerInterviewInput = {
+      stage: rawPlan.interviewState.stage,
+      roundInBlock: rawPlan.interviewState.roundInBlock,
+      blockIndex: rawPlan.interviewState.blockIndex,
+      totalRounds: rawPlan.interviewState.totalRounds,
+      transcript: [...rawPlan.interviewState.transcript],
+      pendingQuestions: [],
+      latestAnswers: [...rawPlan.interviewState.latestAnswers],
+      context: rawPlan.interviewState.context,
+    };
+    await pauseForPlanningInterview(
+      options,
+      maestroDir,
+      nextInterview,
+      runStatePlanningInterviewDetail({
+        mode: 'continue_gate',
+        interviewState: rawPlan.interviewState,
+        summaryMarkdown: rawPlan.continuePrompt,
+      }),
+    );
+  }
+  if (replan === undefined && isPlannerSummary(rawPlan)) {
+    const nextInterview: PlannerInterviewInput = {
+      stage: rawPlan.interviewState.stage,
+      roundInBlock: rawPlan.interviewState.roundInBlock,
+      blockIndex: rawPlan.interviewState.blockIndex,
+      totalRounds: rawPlan.interviewState.totalRounds,
+      transcript: [...rawPlan.interviewState.transcript],
+      pendingQuestions: [],
+      latestAnswers: [...rawPlan.interviewState.latestAnswers],
+      context: rawPlan.interviewState.context,
+    };
+    await pauseForPlanningInterview(
+      options,
+      maestroDir,
+      nextInterview,
+      runStatePlanningInterviewDetail({
+        mode: 'summary_review',
+        interviewState: rawPlan.interviewState,
+        summaryMarkdown: rawPlan.summaryMarkdown,
+      }),
+    );
+  }
+  return {
+    kind: 'plan',
+    plan: normalizePlannerModelOutput(rawPlan, {
+      runId: options.runId,
+      prompt: options.prompt,
+    }),
+  };
 }
 
 export async function runPipeline(
@@ -925,6 +1228,7 @@ export async function runPipeline(
       options.resume === true &&
       existing !== null &&
       canAutoResumeFromCheckpoint(existing);
+    let plannerInterviewResume: PlannerInterviewInput | undefined;
 
     let escalatedResume: {
       sprintIdx: number;
@@ -961,6 +1265,34 @@ export async function runPipeline(
         entry: { event: 'pipeline.resumed', detail: 'from_escalated' },
       });
     }
+    if (
+      options.resume === true &&
+      existing !== null &&
+      existing.planningInterview !== undefined
+    ) {
+      const persisted = await readPlanningInterviewInput(options, maestroDir);
+      if (persisted !== null) {
+        plannerInterviewResume =
+          options.plannerInterviewResponse !== undefined
+            ? applyPlannerInterviewResponse(
+                persisted,
+                options.plannerInterviewResponse,
+              )
+            : persisted;
+      }
+      await options.store.update(options.runId, {
+        status: 'running',
+        planningInterview: undefined,
+        failure: null,
+        phase: 'planning',
+      });
+      await appendRunLog({
+        repoRoot: options.repoRoot,
+        runId: options.runId,
+        ...(maestroDir !== undefined ? { maestroDir } : {}),
+        entry: { event: 'pipeline.resumed', detail: 'from_planning_interview' },
+      });
+    }
 
     let plan: PlannerOutput;
     let startSprintIdx = 0;
@@ -993,12 +1325,15 @@ export async function runPipeline(
             sprintOutcomes.push(row);
           }
         } else {
-          plan = await runPlannerPhase(
-            options,
-            executor,
-            undefined,
-            maestroDir,
-          );
+          plan = (
+            await runPlannerPhase(
+              options,
+              executor,
+              undefined,
+              maestroDir,
+              plannerInterviewResume,
+            )
+          ).plan;
           await writePlanFile(
             options.repoRoot,
             options.runId,
@@ -1008,11 +1343,27 @@ export async function runPipeline(
           startSprintIdx = 0;
         }
       } else {
-        plan = await runPlannerPhase(options, executor, undefined, maestroDir);
+        plan = (
+          await runPlannerPhase(
+            options,
+            executor,
+            undefined,
+            maestroDir,
+            plannerInterviewResume,
+          )
+        ).plan;
         await writePlanFile(options.repoRoot, options.runId, plan, maestroDir);
       }
     } else {
-      plan = await runPlannerPhase(options, executor, undefined, maestroDir);
+      plan = (
+        await runPlannerPhase(
+          options,
+          executor,
+          undefined,
+          maestroDir,
+          plannerInterviewResume,
+        )
+      ).plan;
       await writePlanFile(options.repoRoot, options.runId, plan, maestroDir);
     }
 
@@ -1047,18 +1398,21 @@ export async function runPipeline(
           replanLoopPass === 1 &&
           escalatedResume.resumeTarget === 'ReplanOnly'
         ) {
-          plan = await runPlannerPhase(
-            options,
-            executor,
-            buildPlannerReplanContextFromEscalation(
-              plan,
-              sprintIdx,
-              escalatedResume.reason,
-              escalatedResume.humanGuidance,
-              1,
-            ),
-            maestroDir,
-          );
+          plan = (
+            await runPlannerPhase(
+              options,
+              executor,
+              buildPlannerReplanContextFromEscalation(
+                plan,
+                sprintIdx,
+                escalatedResume.reason,
+                escalatedResume.humanGuidance,
+                1,
+              ),
+              maestroDir,
+              undefined,
+            )
+          ).plan;
           await writePlanFile(
             options.repoRoot,
             options.runId,
@@ -1169,17 +1523,20 @@ export async function runPipeline(
                 attempt: planReplansUsed,
                 reasonSummary: summarizeArchitectBlockReason(architectResult),
               });
-              plan = await runPlannerPhase(
-                options,
-                executor,
-                buildPlannerReplanContext(
-                  plan,
-                  sprintIdx,
-                  architectResult,
-                  planReplansUsed,
-                ),
-                maestroDir,
-              );
+              plan = (
+                await runPlannerPhase(
+                  options,
+                  executor,
+                  buildPlannerReplanContext(
+                    plan,
+                    sprintIdx,
+                    architectResult,
+                    planReplansUsed,
+                  ),
+                  maestroDir,
+                  undefined,
+                )
+              ).plan;
               await writePlanFile(
                 options.repoRoot,
                 options.runId,
@@ -1670,15 +2027,18 @@ export async function runPipeline(
     };
   } catch (error) {
     if (error instanceof PipelinePauseError) {
-      await options.store.update(options.runId, {
-        status: 'paused',
-        pausedAt: new Date().toISOString(),
-      });
-      options.bus.emit({
-        type: 'pipeline.paused',
-        runId: options.runId,
-        at: error.at,
-      });
+      const current = await options.store.load(options.runId);
+      if (current?.planningInterview === undefined) {
+        await options.store.update(options.runId, {
+          status: 'paused',
+          pausedAt: new Date().toISOString(),
+        });
+        options.bus.emit({
+          type: 'pipeline.paused',
+          runId: options.runId,
+          at: error.at,
+        });
+      }
       throw error;
     }
     if (error instanceof PipelineEscalationError) throw error;

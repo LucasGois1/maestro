@@ -10,7 +10,10 @@ import { render, type Instance } from 'ink';
 import { createElement } from 'react';
 
 import { CLI_PACKAGE_VERSION } from '../cli-version.js';
-import { createPersistEscalationHumanFeedback } from '../persist-escalation-feedback.js';
+import {
+  createPersistEscalationHumanFeedback,
+  createPersistPlanningInterviewResponse,
+} from '../persist-escalation-feedback.js';
 import { listMaestroFilesUnderRepo } from '../tui-kb.js';
 import { createTuiCommandExecutor } from '../tui-command-executor.js';
 import { createTuiStoreForWorkspace } from '../tui-workspace-store.js';
@@ -160,6 +163,16 @@ export function defaultRenderApp({
       loadConfig: loadConfigWithAutoResolvedModels,
     },
   });
+  const persistPlanningInterviewResponse =
+    createPersistPlanningInterviewResponse({
+      stateStore,
+      tuiStore: store,
+      resumeAfterPersist: {
+        repoRoot,
+        bus,
+        loadConfig: loadConfigWithAutoResolvedModels,
+      },
+    });
   return render(
     createElement(App, {
       store,
@@ -167,6 +180,7 @@ export function defaultRenderApp({
       colorMode,
       maestroVersion: CLI_PACKAGE_VERSION,
       persistEscalationHumanFeedback,
+      persistPlanningInterviewResponse,
       ...(kbExplorer ? { kbExplorer } : {}),
       ...(editPlan ? { editPlan } : {}),
       ...(commandExecutor ? { commandExecutor } : {}),

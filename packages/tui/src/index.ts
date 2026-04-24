@@ -37,6 +37,9 @@ export {
   type TuiMode,
   type TuiPanelId,
   type TuiEscalationDetail,
+  type TuiPlanningInterviewAnswer,
+  type TuiPlanningInterviewDetail,
+  type TuiPlanningInterviewQuestion,
   type TuiPipelineState,
   type TuiPipelineStatus,
   RECENT_RUNS_CAP,
@@ -99,6 +102,11 @@ export {
 } from './panels/DiscoveryScreen.js';
 export { DiscoveryPhaseChecklist } from './panels/DiscoveryPhaseChecklist.js';
 export { DiffPreviewPanel } from './panels/DiffPreviewPanel.js';
+export {
+  PlanningInterviewScreen,
+  type PersistPlanningInterviewResult,
+  type PlanningInterviewSubmission,
+} from './panels/PlanningInterviewScreen.js';
 export {
   AGENT_LOG_OVERLAY_ID,
   AgentLogOverlay,

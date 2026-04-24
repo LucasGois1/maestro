@@ -32,13 +32,12 @@ describe('loadCustomAgents', () => {
     await writeAgentFile(
       'my-agent.mjs',
       `
-import { z } from 'zod';
 export default {
   id: 'my-agent',
   role: 'sensor',
   systemPrompt: 'hi',
-  inputSchema: z.any(),
-  outputSchema: z.any(),
+  inputSchema: { parse: (v) => v },
+  outputSchema: { parse: (v) => v },
 };
 `,
     );
@@ -52,13 +51,12 @@ export default {
     await writeAgentFile(
       'bad.mjs',
       `
-import { z } from 'zod';
 export default {
   id: 'bad',
   role: 'pipeline',
   systemPrompt: 'hi',
-  inputSchema: z.any(),
-  outputSchema: z.any(),
+  inputSchema: { parse: (v) => v },
+  outputSchema: { parse: (v) => v },
 };
 `,
     );

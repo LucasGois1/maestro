@@ -325,6 +325,42 @@ describe('bridgeBusToStore', () => {
       expect(store.getState().pipeline.escalationDetail).toBeNull();
     });
 
+    it('tracks planner interview pending state separately from escalation', () => {
+      const bus = createEventBus();
+      const store = createTuiStore();
+      bridgeBusToStore(bus, store);
+
+      bus.emit({ type: 'pipeline.started', runId: 'r1' });
+      bus.emit({
+        type: 'pipeline.planning_interview_pending',
+        runId: 'r1',
+        mode: 'round',
+        roundInBlock: 1,
+        blockIndex: 1,
+        totalRounds: 1,
+        questions: [
+          {
+            id: 'q1',
+            prompt: 'Qual o objetivo principal?',
+            topic: 'goal',
+          },
+          {
+            id: 'q2',
+            prompt: 'Quais restricoes nao podem ser quebradas?',
+            topic: 'constraints',
+          },
+        ],
+        answers: [],
+        contextTrail: ['Objetivo geral ainda em aberto.'],
+      });
+
+      const st = store.getState();
+      expect(st.pipeline.status).toBe('paused');
+      expect(st.pipeline.escalationDetail).toBeNull();
+      expect(st.pipeline.planningInterviewDetail?.mode).toBe('round');
+      expect(st.pipeline.planningInterviewDetail?.questions).toHaveLength(2);
+    });
+
     it('reflects pause, resume, completion and failure', () => {
       const bus = createEventBus();
       const store = createTuiStore();

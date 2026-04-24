@@ -6,6 +6,7 @@ import {
 } from './errors.js';
 import {
   runPipeline,
+  type PlannerInterviewResponse,
   type PipelineRunOptions,
   type PipelineRunResult,
 } from './engine.js';
@@ -16,6 +17,7 @@ export type ResumePipelineOptions = Omit<
 > & {
   readonly runId?: string;
   readonly humanFeedback?: string;
+  readonly plannerInterviewResponse?: PlannerInterviewResponse;
   readonly resumeTargetOverride?: ResumeTarget;
 };
 
@@ -45,6 +47,9 @@ export async function resumePipeline(
     resume: true,
     ...(options.humanFeedback !== undefined
       ? { humanFeedback: options.humanFeedback }
+      : {}),
+    ...(options.plannerInterviewResponse !== undefined
+      ? { plannerInterviewResponse: options.plannerInterviewResponse }
       : {}),
     ...(options.resumeTargetOverride !== undefined
       ? { resumeTargetOverride: options.resumeTargetOverride }

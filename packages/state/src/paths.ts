@@ -8,6 +8,7 @@ export const CONTRACTS_DIR = 'contracts';
 export const CHECKPOINTS_DIR = 'checkpoints';
 export const LOGS_DIR = 'logs';
 export const FEEDBACK_DIR = 'feedback';
+export const PLANNING_DIR = 'planning';
 
 export const STATE_FILE = 'state.json';
 export const META_FILE = 'meta.json';
@@ -87,6 +88,10 @@ export function runFeedbackDir(opts: RunPathOptions): string {
   return join(runRoot(opts), FEEDBACK_DIR);
 }
 
+export function runPlanningDir(opts: RunPathOptions): string {
+  return join(runRoot(opts), PLANNING_DIR);
+}
+
 export function handoffPath(opts: RunPathOptions & { sprint: number }): string {
   return join(runCheckpointsDir(opts), `sprint-${opts.sprint}-handoff.md`);
 }
@@ -104,6 +109,18 @@ export function feedbackPath(
     runFeedbackDir(opts),
     `sprint-${opts.sprint}-eval-${opts.iteration}.md`,
   );
+}
+
+export function planningTranscriptPath(opts: RunPathOptions): string {
+  return join(runPlanningDir(opts), 'transcript.json');
+}
+
+export function planningStatePath(opts: RunPathOptions): string {
+  return join(runPlanningDir(opts), 'state.json');
+}
+
+export function planningSummaryPath(opts: RunPathOptions): string {
+  return join(runPlanningDir(opts), 'summary.md');
 }
 
 export function projectLogPath(repoRoot: string, dirOverride?: string): string {

@@ -33,6 +33,12 @@ async function loadRunFixture(id: string): Promise<RunFixtureJson> {
 
 function plannerOutput(sprints = 2) {
   return {
+    kind: 'plan',
+    escalationReason: null,
+    questions: null,
+    continuePrompt: null,
+    summaryMarkdown: null,
+    interviewState: null,
     feature: 'Testing Harness',
     overview: 'Exercise the deterministic test pipeline.',
     userStories: [

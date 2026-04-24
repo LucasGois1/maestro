@@ -29,8 +29,18 @@ const filePathSchema = z
 
 const scopeSchema = z
   .object({
-    files_expected: z.array(filePathSchema).default([]),
-    files_may_touch: z.array(filePathSchema).default([]),
+    files_expected: z
+      .array(filePathSchema)
+      .default([])
+      .describe(
+        'Primary deliverable paths: set by the pipeline from the Architect (if filesToTouch was non-empty, matches those; otherwise matches newFiles paths).',
+      ),
+    files_may_touch: z
+      .array(filePathSchema)
+      .default([])
+      .describe(
+        'Paths the sprint may modify: union of Architect filesToTouch, newFiles, and testFiles.',
+      ),
   })
   .strict();
 

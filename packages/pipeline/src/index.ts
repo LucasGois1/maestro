@@ -1,11 +1,13 @@
 export const PIPELINE_PACKAGE_NAME = '@maestro/pipeline';
 
 export {
+  contractScopeFromArchitect,
   DEFAULT_MAX_PLAN_REPLANS,
   DEFAULT_RETRIES,
   runPipeline,
   type EvaluatorModelOutput,
   type MergerModelOutput,
+  type PlannerInterviewResponse,
   type PipelineRunOptions,
   type PipelineRunResult,
   type PlannerOutput,

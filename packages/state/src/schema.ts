@@ -78,6 +78,53 @@ export type EscalationHumanFeedback = z.output<
   typeof escalationHumanFeedbackSchema
 >;
 
+export const planningInterviewModeSchema = z.enum([
+  'round',
+  'continue_gate',
+  'summary_review',
+]);
+
+export const planningInterviewQuestionSchema = z
+  .object({
+    id: z.string().min(1),
+    prompt: z.string().min(1),
+    topic: z.string().min(1),
+  })
+  .strict();
+
+export const planningInterviewAnswerSchema = z
+  .object({
+    questionId: z.string().min(1),
+    answer: z.string().min(1),
+  })
+  .strict();
+
+export const planningInterviewStateSchema = z
+  .object({
+    mode: planningInterviewModeSchema,
+    roundInBlock: z.number().int().min(1),
+    blockIndex: z.number().int().min(1),
+    totalRounds: z.number().int().min(1),
+    questions: z.array(planningInterviewQuestionSchema),
+    answers: z.array(planningInterviewAnswerSchema),
+    summaryMarkdown: z.union([z.string(), z.null()]),
+    contextTrail: z.array(z.string().min(1)),
+  })
+  .strict();
+
+export type PlanningInterviewMode = z.output<
+  typeof planningInterviewModeSchema
+>;
+export type PlanningInterviewQuestion = z.output<
+  typeof planningInterviewQuestionSchema
+>;
+export type PlanningInterviewAnswer = z.output<
+  typeof planningInterviewAnswerSchema
+>;
+export type RunStatePlanningInterview = z.output<
+  typeof planningInterviewStateSchema
+>;
+
 const escalationRawSchema = z
   .object({
     reason: z.string().min(1),
@@ -127,6 +174,7 @@ export const runStateSchema = z
     /** Presente quando `status === 'failed'`; `null` limpa após retomada ou conclusão. */
     failure: z.union([runFailureSchema, z.null()]).optional(),
     escalation: escalationSchema.optional(),
+    planningInterview: planningInterviewStateSchema.optional(),
     metadata: z
       .object({
         prompt: z.string().min(1),

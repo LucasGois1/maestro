@@ -29,7 +29,7 @@ export const PLANNER_FEW_SHOT_EXAMPLES: readonly FewShotExample[] = [
   {
     input: VAGUE.input,
     output: VAGUE.output,
-    note: 'vago → escalation',
+    note: 'vago → entrevista inicial',
   },
   {
     input: CONTRADICTION.input,

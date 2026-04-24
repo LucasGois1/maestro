@@ -13,6 +13,7 @@ import { loadConfigWithAutoResolvedModels } from '@maestro/provider';
 import { createEventBus, type EventBus } from '@maestro/core';
 import { createBusShellApprovalPrompter } from '@maestro/agents';
 import {
+  PipelinePauseError,
   runPipeline,
   type PipelineRunOptions,
   type PipelineRunResult,
@@ -24,7 +25,10 @@ import { render, type Instance } from 'ink';
 import { createElement } from 'react';
 
 import { CLI_PACKAGE_VERSION } from '../cli-version.js';
-import { createPersistEscalationHumanFeedback } from '../persist-escalation-feedback.js';
+import {
+  createPersistEscalationHumanFeedback,
+  createPersistPlanningInterviewResponse,
+} from '../persist-escalation-feedback.js';
 import { createTuiCommandExecutor } from '../tui-command-executor.js';
 import { createTuiStoreForWorkspace } from '../tui-workspace-store.js';
 import { ensureWorkspaceTrustInteractive } from '../workspace-trust.js';
@@ -107,6 +111,18 @@ function renderPipelineApp(options: {
           },
         })
       : undefined;
+  const persistPlanningInterviewResponse =
+    options.commandExecutor !== undefined
+      ? createPersistPlanningInterviewResponse({
+          stateStore: options.stateStore,
+          tuiStore: options.store,
+          resumeAfterPersist: {
+            repoRoot: options.repoRoot,
+            bus: options.bus,
+            loadConfig: options.loadConfig,
+          },
+        })
+      : undefined;
   instance = render(
     createElement(App, {
       store: options.store,
@@ -114,6 +130,9 @@ function renderPipelineApp(options: {
       maestroVersion: CLI_PACKAGE_VERSION,
       ...(persistEscalationHumanFeedback !== undefined
         ? { persistEscalationHumanFeedback }
+        : {}),
+      ...(persistPlanningInterviewResponse !== undefined
+        ? { persistPlanningInterviewResponse }
         : {}),
       ...(options.commandExecutor
         ? {
@@ -159,6 +178,26 @@ function resolveBranch(options: {
       runId: options.runId,
       prompt: options.prompt,
     },
+  });
+}
+
+function waitForInteractiveRunResolution(
+  bus: EventBus,
+  runId: string,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const dispose = bus.on((event) => {
+      if (!('runId' in event) || event.runId !== runId) {
+        return;
+      }
+      if (event.type === 'pipeline.completed') {
+        dispose();
+        resolve();
+      } else if (event.type === 'pipeline.failed') {
+        dispose();
+        reject(new Error(event.error));
+      }
+    });
   });
 }
 
@@ -275,6 +314,18 @@ export function createRunCommand(options: RunCommandOptions = {}): Command {
           io.stdout(`Run completed: ${result.state.runId}`);
         }
       } catch (error) {
+        const planningInterviewPending =
+          error instanceof PipelinePauseError &&
+          (await store.load(runId))?.planningInterview !== undefined;
+        if (planningInterviewPending && instance !== null) {
+          try {
+            await waitForInteractiveRunResolution(bus, runId);
+          } catch (waitError) {
+            io.stderr((waitError as Error).message);
+            process.exitCode = 1;
+          }
+          return;
+        }
         io.stderr((error as Error).message);
         process.exitCode = 1;
       } finally {

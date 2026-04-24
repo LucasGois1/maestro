@@ -10,7 +10,12 @@ export const NARROW_DELIVERY: {
       'Replace Portuguese UI copy with English in the TUI help/footer and error strings; limit to packages/tui and related CLI copy.',
   },
   output: {
+    kind: 'plan',
     escalationReason: null,
+    questions: null,
+    continuePrompt: null,
+    summaryMarkdown: null,
+    interviewState: null,
     feature: 'EN copy for TUI',
     overview:
       'Users see consistent English strings in the terminal UI and related CLI messages.\nOne cohesive change set for the scoped surfaces.',
@@ -45,7 +50,12 @@ export const SIMPLE: {
 } = {
   input: { prompt: 'Ship authentication for our SaaS' },
   output: {
+    kind: 'plan',
     escalationReason: null,
+    questions: null,
+    continuePrompt: null,
+    summaryMarkdown: null,
+    interviewState: null,
     feature: 'Auth SaaS',
     overview:
       'Users sign in securely; admins manage sessions.\nSecond paragraph for vision.',
@@ -96,7 +106,12 @@ export const IMPLICIT_SCOPE: {
     prompt: 'Quero que as pessoas partilhem ficheiros grandes sem email',
   },
   output: {
+    kind: 'plan',
     escalationReason: null,
+    questions: null,
+    continuePrompt: null,
+    summaryMarkdown: null,
+    interviewState: null,
     feature: 'Partilha de ficheiros',
     overview: 'Partilha simples de links com expiração.\nFoco em UX mínima.',
     userStories: [
@@ -144,8 +159,44 @@ export const VAGUE: {
 } = {
   input: { prompt: 'Melhora isto' },
   output: {
-    escalationReason:
-      'O pedido não identifica produto, utilizadores nem resultado mensurável; é necessário contexto antes de planear sprints.',
+    kind: 'questions',
+    escalationReason: null,
+    questions: [
+      {
+        id: 'q1',
+        prompt: 'Qual produto ou área precisa de melhoria?',
+        topic: 'goal',
+      },
+      {
+        id: 'q2',
+        prompt: 'Quem é o utilizador afetado por esta melhoria?',
+        topic: 'personas',
+      },
+    ],
+    continuePrompt: null,
+    summaryMarkdown: null,
+    interviewState: {
+      stage: 'start',
+      roundInBlock: 1,
+      blockIndex: 1,
+      totalRounds: 1,
+      transcript: [],
+      latestAnswers: [],
+      context: {
+        goals: [],
+        personas: [],
+        requirements: [],
+        flows: [],
+        businessRules: [],
+        constraints: [],
+        outOfScope: [],
+        assumptions: [],
+        openQuestions: [
+          'Produto alvo da melhoria',
+          'Utilizador ou stakeholder principal',
+        ],
+      },
+    },
     feature: null,
     overview: null,
     userStories: null,
@@ -164,8 +215,13 @@ export const CONTRADICTION: {
       'Quero um produto sem login mas cada utilizador só vê os seus dados privados.',
   },
   output: {
+    kind: 'escalation',
     escalationReason:
       'Sem identidade de utilizador não é possível garantir dados privados por pessoa; requisitos incompatíveis.',
+    questions: null,
+    continuePrompt: null,
+    summaryMarkdown: null,
+    interviewState: null,
     feature: null,
     overview: null,
     userStories: null,

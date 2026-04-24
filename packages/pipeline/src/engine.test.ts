@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   AgentContext,
   ArchitectModelOutput,
+  ArchitectPipelineResult,
   EvaluatorModelOutput,
   GeneratorModelOutput,
   MergerModelOutput,
@@ -19,6 +20,7 @@ import type {
 import { normalizePlannerModelOutput } from '@maestro/agents';
 
 import {
+  contractScopeFromArchitect,
   DEFAULT_MAX_PLAN_REPLANS,
   runPipeline,
   type PlannerOutput,
@@ -32,7 +34,12 @@ let repoRoot: string;
 
 /** Raw model JSON consumed by `normalizePlannerModelOutput` inside `runPipeline`. */
 const plannerModelOutput: PlannerModelOutput = {
+  kind: 'plan',
   escalationReason: null,
+  questions: null,
+  continuePrompt: null,
+  summaryMarkdown: null,
+  interviewState: null,
   feature: 'Auth',
   overview: 'Ship authentication end-to-end.\nCoverage for sessions.',
   userStories: [
@@ -74,7 +81,12 @@ const plannerModelOutput: PlannerModelOutput = {
 
 /** Three sprints for architect integration coverage. */
 const plannerModelOutputThreeSprints: PlannerModelOutput = {
+  kind: 'plan',
   escalationReason: null,
+  questions: null,
+  continuePrompt: null,
+  summaryMarkdown: null,
+  interviewState: null,
   feature: 'Payments',
   overview: 'End-to-end payments.',
   userStories: [
@@ -173,9 +185,32 @@ function mockArchitectOkWithFileScope(input: unknown): ArchitectModelOutput {
   };
 }
 
+/** Doc in-place only: drives files_expected from filesToTouch. */
+function mockArchitectDocInPlaceOnly(input: unknown): ArchitectModelOutput {
+  const i = input as { sprint: { idx: number } };
+  return {
+    sprintIdx: i.sprint.idx,
+    scopeTecnico: {
+      newFiles: [],
+      filesToTouch: ['docs/HANDBOOK.md'],
+      testFiles: [],
+    },
+    patternsToFollow: [],
+    libraries: [],
+    boundaryCheck: 'ok',
+    boundaryNotes: null,
+    escalation: null,
+  };
+}
+
 /** Single-sprint plan after a simulated Architect-driven replan. */
 const plannerModelOutputNarrow: PlannerModelOutput = {
+  kind: 'plan',
   escalationReason: null,
+  questions: null,
+  continuePrompt: null,
+  summaryMarkdown: null,
+  interviewState: null,
   feature: 'Narrow slice',
   overview: 'One sprint only.',
   userStories: [
@@ -193,6 +228,108 @@ const plannerModelOutputNarrow: PlannerModelOutput = {
       keyFeatures: ['Docs'],
     },
   ],
+};
+
+const plannerInterviewQuestions: PlannerModelOutput = {
+  kind: 'questions',
+  escalationReason: null,
+  questions: [
+    {
+      id: 'q1',
+      prompt: 'Qual e o objetivo principal da feature?',
+      topic: 'goal',
+    },
+    {
+      id: 'q2',
+      prompt: 'Existe alguma restricao obrigatoria?',
+      topic: 'constraints',
+    },
+  ],
+  continuePrompt: null,
+  summaryMarkdown: null,
+  interviewState: {
+    stage: 'start',
+    roundInBlock: 1,
+    blockIndex: 1,
+    totalRounds: 1,
+    transcript: [],
+    latestAnswers: [],
+    context: {
+      goals: [],
+      personas: [],
+      requirements: [],
+      flows: [],
+      businessRules: [],
+      constraints: [],
+      outOfScope: [],
+      assumptions: [],
+      openQuestions: ['Objetivo principal da feature'],
+    },
+  },
+  feature: null,
+  overview: null,
+  userStories: null,
+  aiFeatures: null,
+  sprints: null,
+};
+
+const plannerInterviewSummary: PlannerModelOutput = {
+  kind: 'summary',
+  escalationReason: null,
+  questions: null,
+  continuePrompt: null,
+  summaryMarkdown:
+    '## Resumo\n\n- Objetivo: autenticar usuarios.\n- Restricoes: manter cookies seguros.',
+  interviewState: {
+    stage: 'summary_review',
+    roundInBlock: 1,
+    blockIndex: 1,
+    totalRounds: 1,
+    transcript: [
+      {
+        role: 'planner',
+        kind: 'question',
+        text: 'Qual e o objetivo principal da feature?',
+        topic: 'goal',
+        questionId: 'q1',
+        round: 1,
+      },
+      {
+        role: 'user',
+        kind: 'answer',
+        text: 'Autenticar usuarios com sessoes seguras.',
+        topic: 'goal',
+        questionId: 'q1',
+        round: 1,
+      },
+    ],
+    latestAnswers: [
+      {
+        questionId: 'q1',
+        answer: 'Autenticar usuarios com sessoes seguras.',
+      },
+      {
+        questionId: 'q2',
+        answer: 'Usar cookies seguros.',
+      },
+    ],
+    context: {
+      goals: ['Autenticar usuarios com sessoes seguras.'],
+      personas: [],
+      requirements: ['Login com sessao'],
+      flows: [],
+      businessRules: [],
+      constraints: ['Usar cookies seguros'],
+      outOfScope: [],
+      assumptions: [],
+      openQuestions: [],
+    },
+  },
+  feature: null,
+  overview: null,
+  userStories: null,
+  aiFeatures: null,
+  sprints: null,
 };
 
 function mockGeneratorOk(input: unknown): GeneratorModelOutput {
@@ -427,6 +564,41 @@ describe('runPipeline (happy path)', () => {
       ]),
     );
     expect(parsed.frontmatter.scope.files_may_touch).toHaveLength(4);
+  });
+
+  it('seeds contract scope from filesToTouch-only doc path (newFiles empty)', async () => {
+    const env = makeEnv();
+    const executor = buildExecutor({
+      planner: () => plannerModelOutputNarrow,
+      architect: (input) => mockArchitectDocInPlaceOnly(input),
+      generator: (input) => mockGeneratorOk(input),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () => mockMergerModelOutput('maestro/doc-scope'),
+    });
+
+    await runPipeline({
+      runId: 'r-doc-scope',
+      prompt: 'narrow',
+      branch: 'maestro/doc-scope',
+      worktreePath: repoRoot,
+      repoRoot,
+      store: env.store,
+      bus: env.bus,
+      config: env.config,
+      executor,
+    });
+
+    const contractPath = join(
+      repoRoot,
+      '.maestro',
+      'runs',
+      'r-doc-scope',
+      'contracts',
+      'sprint-1.md',
+    );
+    const parsed = parseSprintContract(await readFile(contractPath, 'utf8'));
+    expect(parsed.frontmatter.scope.files_expected).toEqual(['docs/HANDBOOK.md']);
+    expect(parsed.frontmatter.scope.files_may_touch).toEqual(['docs/HANDBOOK.md']);
   });
 
   it('appends project log and writes completed exec-plan after merger', async () => {
@@ -999,7 +1171,12 @@ describe('resumePipeline', () => {
     const env = makeEnv();
     const runId = 'r-snapshot-resume';
     const oneSprintPlanner: PlannerModelOutput = {
+      kind: 'plan',
       escalationReason: null,
+      questions: null,
+      continuePrompt: null,
+      summaryMarkdown: null,
+      interviewState: null,
       feature: 'Solo',
       overview: 'Single sprint resume fixture.',
       userStories: [{ id: 1, role: 'user', action: 'x', value: 'y' }],
@@ -1091,5 +1268,183 @@ describe('resumePipeline', () => {
     expect(plannerCalls).toBe(0);
     expect(architectCalls).toBe(0);
     expect(result.state.status).toBe('completed');
+  });
+});
+
+describe('runPipeline (planner interview)', () => {
+  it('pauses in planning when the planner emits an interview round and persists artifacts', async () => {
+    const env = makeEnv();
+    const executor = buildExecutor({
+      planner: () => plannerInterviewQuestions,
+      architect: (input) => mockArchitectOk(input),
+      generator: (input) => mockGeneratorOk(input),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () => mockMergerModelOutput('maestro/interview'),
+    });
+
+    await expect(
+      runPipeline({
+        runId: 'r-interview-1',
+        prompt: 'ship auth',
+        branch: 'maestro/interview',
+        worktreePath: repoRoot,
+        repoRoot,
+        store: env.store,
+        bus: env.bus,
+        config: env.config,
+        executor,
+      }),
+    ).rejects.toBeInstanceOf(PipelinePauseError);
+
+    const state = await env.store.load('r-interview-1');
+    expect(state?.status).toBe('paused');
+    expect(state?.phase).toBe('planning');
+    expect(state?.planningInterview?.mode).toBe('round');
+    expect(env.events.map((event) => event.type)).toContain(
+      'pipeline.planning_interview_pending',
+    );
+
+    const transcript = await readFile(
+      join(
+        repoRoot,
+        '.maestro',
+        'runs',
+        'r-interview-1',
+        'planning',
+        'transcript.json',
+      ),
+      'utf8',
+    );
+    expect(transcript).toContain('"questions"');
+  });
+
+  it('resumes from interview answers, pauses on summary review, then completes after approval', async () => {
+    const env = makeEnv();
+    let plannerCalls = 0;
+    const executor = buildExecutor({
+      planner: () => {
+        plannerCalls += 1;
+        if (plannerCalls === 1) return plannerInterviewQuestions;
+        if (plannerCalls === 2) return plannerInterviewSummary;
+        return plannerModelOutput;
+      },
+      architect: (input) => mockArchitectOk(input),
+      generator: (input) => mockGeneratorOk(input),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () => mockMergerModelOutput('maestro/interview-resume'),
+    });
+
+    await expect(
+      runPipeline({
+        runId: 'r-interview-2',
+        prompt: 'ship auth',
+        branch: 'maestro/interview-resume',
+        worktreePath: repoRoot,
+        repoRoot,
+        store: env.store,
+        bus: env.bus,
+        config: env.config,
+        executor,
+      }),
+    ).rejects.toBeInstanceOf(PipelinePauseError);
+
+    await expect(
+      resumePipeline({
+        runId: 'r-interview-2',
+        repoRoot,
+        store: env.store,
+        bus: env.bus,
+        config: env.config,
+        executor,
+        plannerInterviewResponse: {
+          kind: 'answers',
+          answers: [
+            {
+              questionId: 'q1',
+              answer: 'Autenticar usuarios com sessao segura.',
+            },
+            {
+              questionId: 'q2',
+              answer: 'Cookies precisam ser seguros.',
+            },
+          ],
+        },
+      }),
+    ).rejects.toBeInstanceOf(PipelinePauseError);
+
+    const pausedOnSummary = await env.store.load('r-interview-2');
+    expect(pausedOnSummary?.planningInterview?.mode).toBe('summary_review');
+
+    const result = await resumePipeline({
+      runId: 'r-interview-2',
+      repoRoot,
+      store: env.store,
+      bus: env.bus,
+      config: env.config,
+      executor,
+      plannerInterviewResponse: {
+        kind: 'summary_review',
+        feedback: null,
+      },
+    });
+
+    expect(result.state.status).toBe('completed');
+    expect(result.plan.feature).toBe('Auth');
+    expect(plannerCalls).toBe(3);
+  });
+});
+
+function architectScopeFixture(
+  scope: ArchitectPipelineResult['scopeTecnico'],
+): ArchitectPipelineResult {
+  return {
+    sprintIdx: 1,
+    scopeTecnico: scope,
+    patternsToFollow: [],
+    libraries: [],
+    boundaryCheck: 'ok',
+    boundaryNotes: null,
+    escalation: null,
+    approved: true,
+  };
+}
+
+describe('contractScopeFromArchitect', () => {
+  it('returns undefined when scope lists are all empty', () => {
+    expect(
+      contractScopeFromArchitect(
+        architectScopeFixture({ newFiles: [], filesToTouch: [], testFiles: [] }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it('uses newFiles paths as files_expected when filesToTouch is empty', () => {
+    expect(
+      contractScopeFromArchitect(
+        architectScopeFixture({
+          newFiles: [{ path: 'src/a.ts', layer: 'app' }],
+          filesToTouch: [],
+          testFiles: [],
+        }),
+      ),
+    ).toEqual({
+      files_expected: ['src/a.ts'],
+      files_may_touch: ['src/a.ts'],
+    });
+  });
+
+  it('uses filesToTouch as files_expected when non-empty', () => {
+    expect(
+      contractScopeFromArchitect(
+        architectScopeFixture({
+          newFiles: [{ path: 'src/new.ts', layer: 'app' }],
+          filesToTouch: ['README.md'],
+          testFiles: ['src/new.test.ts'],
+        }),
+      ),
+    ).toEqual({
+      files_expected: ['README.md'],
+      files_may_touch: ['README.md', 'src/new.ts', 'src/new.test.ts'],
+    });
   });
 });

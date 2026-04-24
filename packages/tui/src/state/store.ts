@@ -160,6 +160,28 @@ export interface TuiEscalationDetail {
   readonly artifactHints?: readonly string[];
 }
 
+export interface TuiPlanningInterviewQuestion {
+  readonly id: string;
+  readonly prompt: string;
+  readonly topic: string;
+}
+
+export interface TuiPlanningInterviewAnswer {
+  readonly questionId: string;
+  readonly answer: string;
+}
+
+export interface TuiPlanningInterviewDetail {
+  readonly mode: 'round' | 'continue_gate' | 'summary_review';
+  readonly roundInBlock: number;
+  readonly blockIndex: number;
+  readonly totalRounds: number;
+  readonly questions: readonly TuiPlanningInterviewQuestion[];
+  readonly answers: readonly TuiPlanningInterviewAnswer[];
+  readonly summaryMarkdown: string | null;
+  readonly contextTrail: readonly string[];
+}
+
 /** Finished pipeline runs for the home screen “Recent activity” list (newest first). */
 export interface TuiRecentRun {
   readonly runId: string;
@@ -223,6 +245,8 @@ export interface TuiPipelineState {
   readonly history: readonly TuiStageRecord[];
   /** Preenchido quando há escalação pendente (aguarda feedback / resume). */
   readonly escalationDetail: TuiEscalationDetail | null;
+  /** Contexto de entrevista iterativa do Planner (aguarda respostas / decisão). */
+  readonly planningInterviewDetail: TuiPlanningInterviewDetail | null;
   /** Comando shell à espera de aprovação humana (policy `ask`). */
   readonly shellApprovalPending: TuiShellApprovalPending | null;
 }
@@ -410,6 +434,7 @@ export function createInitialTuiState(
       error: null,
       history: [],
       escalationDetail: null,
+      planningInterviewDetail: null,
       shellApprovalPending: null,
     },
     sprints: [],

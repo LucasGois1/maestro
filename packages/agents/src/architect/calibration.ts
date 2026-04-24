@@ -2,6 +2,7 @@ import type { FewShotExample } from '../definition.js';
 import { appendCalibrationSection } from '../calibration-format.js';
 import { ARCHITECT_SYSTEM_PROMPT } from './system-prompt.js';
 import {
+  DOC_IN_PLACE,
   FITS_LAYERS,
   LOW_LAYER_FIRST,
   NEW_LIB,
@@ -28,6 +29,11 @@ export const ARCHITECT_FEW_SHOT_EXAMPLES: readonly FewShotExample[] = [
     input: LOW_LAYER_FIRST.input,
     output: LOW_LAYER_FIRST.output,
     note: 'dependência de camada baixa → sprint prévio',
+  },
+  {
+    input: DOC_IN_PLACE.input,
+    output: DOC_IN_PLACE.output,
+    note: 'doc existente — filesToTouch in-place, newFiles vazio',
   },
 ];
 

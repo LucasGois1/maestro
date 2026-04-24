@@ -91,3 +91,29 @@ export const LOW_LAYER_FIRST: {
     escalation: null,
   },
 };
+
+/** Existing doc: translate or update in place (no parallel file). */
+export const DOC_IN_PLACE: {
+  readonly input: Record<string, unknown>;
+  readonly output: ArchitectModelOutput;
+} = {
+  input: {
+    sprintIdx: 1,
+    sprintName: 'Translate handbook to English',
+  },
+  output: {
+    sprintIdx: 1,
+    scopeTecnico: {
+      newFiles: [],
+      filesToTouch: ['docs/HANDBOOK.md'],
+      testFiles: [],
+    },
+    patternsToFollow: [
+      'Preserve structure and links; edit the existing handbook file in place.',
+    ],
+    libraries: [],
+    boundaryCheck: 'ok',
+    boundaryNotes: null,
+    escalation: null,
+  },
+};

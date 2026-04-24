@@ -1,7 +1,8 @@
 import {
   isPlannerEscalation,
+  isPlannerPlan,
   type PlannerModelOutput,
-  type PlannerSuccessModelOutput,
+  type PlannerPlanOutput,
   type UserStory,
 } from './plan-output.schema.js';
 
@@ -72,8 +73,11 @@ export function normalizePlannerModelOutput(
   if (isPlannerEscalation(raw)) {
     throw new Error(`Planner escalation: ${raw.escalationReason}`);
   }
+  if (!isPlannerPlan(raw)) {
+    throw new Error(`Planner output is not a final plan: ${raw.kind}`);
+  }
 
-  const plan = raw as PlannerSuccessModelOutput;
+  const plan: PlannerPlanOutput = raw;
 
   const storyById = new Map(plan.userStories.map((s) => [s.id, s] as const));
 

@@ -13,9 +13,13 @@ import {
   runFeedbackDir,
   runLogsDir,
   runMetaPath,
+  runPlanningDir,
   runPlanPath,
   runPlanSnapshotPath,
   runRoot,
+  planningStatePath,
+  planningSummaryPath,
+  planningTranscriptPath,
   sprintOutcomeCheckpointPath,
   runStatePath,
   runsRoot,
@@ -76,6 +80,7 @@ describe('path helpers', () => {
     expect(runLogsDir(opts)).toBe('/repo/.maestro/runs/r1/logs');
     expect(runCheckpointsDir(opts)).toBe('/repo/.maestro/runs/r1/checkpoints');
     expect(runFeedbackDir(opts)).toBe('/repo/.maestro/runs/r1/feedback');
+    expect(runPlanningDir(opts)).toBe('/repo/.maestro/runs/r1/planning');
   });
 
   it('resolves self-eval and exec-plan paths', () => {
@@ -90,6 +95,18 @@ describe('path helpers', () => {
     );
     expect(completedExecPlanRelativePath('auth-flow.md')).toBe(
       '.maestro/docs/exec-plans/completed/auth-flow.md',
+    );
+  });
+
+  it('resolves planning interview artifact paths', () => {
+    expect(planningTranscriptPath(opts)).toBe(
+      '/repo/.maestro/runs/r1/planning/transcript.json',
+    );
+    expect(planningStatePath(opts)).toBe(
+      '/repo/.maestro/runs/r1/planning/state.json',
+    );
+    expect(planningSummaryPath(opts)).toBe(
+      '/repo/.maestro/runs/r1/planning/summary.md',
     );
   });
 });

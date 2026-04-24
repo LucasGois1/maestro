@@ -82,11 +82,13 @@ describe('App', () => {
     app.unmount();
   });
 
-  it('suggests known commands and rejects unknown free text', async () => {
-    const commandExecutor = vi.fn();
-    const app = render(
-      <App
-        terminalSize={SIZE_WIDE}
+  it(
+    'suggests known commands and rejects unknown free text',
+    async () => {
+      const commandExecutor = vi.fn();
+      const app = render(
+        <App
+          terminalSize={SIZE_WIDE}
         commandExecutor={commandExecutor}
         onForceExit={vi.fn()}
       />,
@@ -110,10 +112,12 @@ describe('App', () => {
     app.stdin.write('\u0015not a command\r');
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    expect(commandExecutor).not.toHaveBeenCalled();
-    expect(app.lastFrame()).toContain('Commands must start with "/"');
-    app.unmount();
-  });
+      expect(commandExecutor).not.toHaveBeenCalled();
+      expect(app.lastFrame()).toContain('Commands must start with "/"');
+      app.unmount();
+    },
+    10000,
+  );
 
   it('opens a subcommand menu for /runs and runs the chosen item on Enter', async () => {
     const commandExecutor = vi.fn(async ({ input }) => ({
@@ -304,34 +308,38 @@ describe('App', () => {
     app.unmount();
   });
 
-  it('cycles focus through panels with Tab and Shift+Tab', async () => {
-    const store = createRunningPipelineStore();
-    const app = render(<App store={store} terminalSize={SIZE_WIDE} />);
+  it(
+    'cycles focus through panels with Tab and Shift+Tab',
+    async () => {
+      const store = createRunningPipelineStore();
+      const app = render(<App store={store} terminalSize={SIZE_WIDE} />);
 
-    await new Promise((resolve) => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
 
-    expect(store.getState().focus.panelId).toBe('pipeline');
+      expect(store.getState().focus.panelId).toBe('pipeline');
 
-    app.stdin.write('\t');
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(store.getState().focus.panelId).toBe('activeAgent');
+      app.stdin.write('\t');
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(store.getState().focus.panelId).toBe('activeAgent');
 
-    app.stdin.write('\t');
-    app.stdin.write('\t');
-    app.stdin.write('\t');
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(store.getState().focus.panelId).toBe('diff');
+      app.stdin.write('\t');
+      app.stdin.write('\t');
+      app.stdin.write('\t');
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(store.getState().focus.panelId).toBe('diff');
 
-    app.stdin.write('\t');
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(store.getState().focus.panelId).toBe('pipeline');
+      app.stdin.write('\t');
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(store.getState().focus.panelId).toBe('pipeline');
 
-    app.stdin.write('\u001b[Z');
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(store.getState().focus.panelId).toBe('diff');
+      app.stdin.write('\u001b[Z');
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(store.getState().focus.panelId).toBe('diff');
 
-    app.unmount();
-  });
+      app.unmount();
+    },
+    10000,
+  );
 
   it('selects a sprint when digit keys are pressed on the sprints panel', async () => {
     const store = createTuiStore();

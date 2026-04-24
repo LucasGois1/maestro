@@ -193,6 +193,7 @@ function handlePipelineEvent(
           retryCount: 0,
           history: [],
           escalationDetail: null,
+          planningInterviewDetail: null,
           shellApprovalPending: null,
         },
         focus: {
@@ -343,6 +344,7 @@ function handlePipelineEvent(
           sprintIdx: event.sprintIdx,
           error: null,
           shellApprovalPending: null,
+          planningInterviewDetail: null,
           escalationDetail: {
             reason: event.reason,
             sprintIdx: event.sprintIdx,
@@ -360,6 +362,31 @@ function handlePipelineEvent(
         },
       }));
       return;
+    case 'pipeline.planning_interview_pending':
+      store.setState((state) => ({
+        ...state,
+        runId: event.runId,
+        mode: 'run',
+        pipeline: {
+          ...state.pipeline,
+          status: 'paused',
+          stage: 'planning',
+          error: null,
+          escalationDetail: null,
+          shellApprovalPending: null,
+          planningInterviewDetail: {
+            mode: event.mode,
+            roundInBlock: event.roundInBlock,
+            blockIndex: event.blockIndex,
+            totalRounds: event.totalRounds,
+            questions: [...event.questions],
+            answers: [...event.answers],
+            summaryMarkdown: event.summaryMarkdown ?? null,
+            contextTrail: [...event.contextTrail],
+          },
+        },
+      }));
+      return;
     case 'pipeline.paused':
       store.setState((state) => ({
         ...state,
@@ -368,6 +395,7 @@ function handlePipelineEvent(
           status: 'paused',
           stage: event.at,
           escalationDetail: null,
+          planningInterviewDetail: null,
           shellApprovalPending: null,
         },
       }));
@@ -383,6 +411,7 @@ function handlePipelineEvent(
               ? (event.phaseBeforeEscalation ?? state.pipeline.stage)
               : event.from,
           escalationDetail: null,
+          planningInterviewDetail: null,
           shellApprovalPending: null,
         },
       }));
@@ -398,6 +427,7 @@ function handlePipelineEvent(
             status: 'completed',
             history: closed,
             escalationDetail: null,
+            planningInterviewDetail: null,
             shellApprovalPending: null,
           },
           sprints: state.sprints.map((sprint) =>
@@ -428,6 +458,7 @@ function handlePipelineEvent(
             error: event.error,
             history: closed,
             escalationDetail: null,
+            planningInterviewDetail: null,
             shellApprovalPending: null,
           },
           sprints:

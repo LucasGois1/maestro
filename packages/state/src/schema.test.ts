@@ -99,4 +99,31 @@ describe('runStateSchema', () => {
     expect(parsed.escalation?.resumeTarget).toBe('ReplanOnly');
     expect(parsed.escalation?.humanFeedback?.text).toBe('Try smaller scope');
   });
+
+  it('accepts paused planning interview state separately from escalation', () => {
+    const parsed = runStateSchema.parse({
+      ...valid,
+      status: 'paused',
+      phase: 'planning',
+      planningInterview: {
+        mode: 'round',
+        roundInBlock: 1,
+        blockIndex: 1,
+        totalRounds: 1,
+        questions: [
+          {
+            id: 'q1',
+            prompt: 'Qual o objetivo principal?',
+            topic: 'goal',
+          },
+        ],
+        answers: [],
+        summaryMarkdown: null,
+        contextTrail: ['Objetivo ainda em aberto.'],
+      },
+    });
+
+    expect(parsed.planningInterview?.mode).toBe('round');
+    expect(parsed.planningInterview?.questions[0]?.id).toBe('q1');
+  });
 });

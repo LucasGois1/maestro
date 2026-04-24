@@ -44,6 +44,11 @@ import {
   EscalationScreen,
   type PersistEscalationFeedbackResult,
 } from './panels/EscalationScreen.js';
+import {
+  PlanningInterviewScreen,
+  type PersistPlanningInterviewResult,
+  type PlanningInterviewSubmission,
+} from './panels/PlanningInterviewScreen.js';
 import { MaestroHomeScreen } from './panels/MaestroHomeScreen.js';
 import { DiffPreviewPanel } from './panels/DiffPreviewPanel.js';
 import {
@@ -112,6 +117,9 @@ export interface AppProps {
   readonly persistEscalationHumanFeedback?: (
     text: string,
   ) => Promise<PersistEscalationFeedbackResult>;
+  readonly persistPlanningInterviewResponse?: (
+    submission: PlanningInterviewSubmission,
+  ) => Promise<PersistPlanningInterviewResult>;
   /**
    * Invoked after the second Control+C within 2s (see CommandInput). Required
    * for double Control-C exit when `commandExecutor` is set (CLI should unmount Ink).
@@ -132,6 +140,7 @@ export function App({
   commandExecutor,
   maestroVersion,
   persistEscalationHumanFeedback,
+  persistPlanningInterviewResponse,
   onForceExit,
 }: AppProps) {
   const activeStore = useMemo(
@@ -169,6 +178,9 @@ export function App({
         {...(persistEscalationHumanFeedback !== undefined
           ? { persistEscalationHumanFeedback }
           : {})}
+        {...(persistPlanningInterviewResponse !== undefined
+          ? { persistPlanningInterviewResponse }
+          : {})}
         {...(onForceExit !== undefined ? { onForceExit } : {})}
       />
     </OverlayHostProvider>
@@ -194,6 +206,7 @@ interface AppBodyProps {
   readonly commandExecutor?: TuiCommandExecutor;
   readonly maestroVersion?: string;
   readonly persistEscalationHumanFeedback?: AppProps['persistEscalationHumanFeedback'];
+  readonly persistPlanningInterviewResponse?: AppProps['persistPlanningInterviewResponse'];
   readonly onForceExit?: () => void;
 }
 
@@ -252,6 +265,7 @@ function AppBody({
   commandExecutor,
   maestroVersion,
   persistEscalationHumanFeedback,
+  persistPlanningInterviewResponse,
   onForceExit,
 }: AppBodyProps) {
   const overlayHost = useOverlayHost();
@@ -280,6 +294,9 @@ function AppBody({
         {...(persistEscalationHumanFeedback !== undefined
           ? { persistEscalationHumanFeedback }
           : {})}
+        {...(persistPlanningInterviewResponse !== undefined
+          ? { persistPlanningInterviewResponse }
+          : {})}
         {...(onForceExit !== undefined ? { onForceExit } : {})}
       />
     </KeybindingShell>
@@ -294,6 +311,7 @@ function AppShell({
   commandExecutor,
   maestroVersion,
   persistEscalationHumanFeedback,
+  persistPlanningInterviewResponse,
   onForceExit,
 }: {
   readonly store: TuiStore;
@@ -303,6 +321,7 @@ function AppShell({
   readonly commandExecutor?: TuiCommandExecutor;
   readonly maestroVersion?: string;
   readonly persistEscalationHumanFeedback?: AppProps['persistEscalationHumanFeedback'];
+  readonly persistPlanningInterviewResponse?: AppProps['persistPlanningInterviewResponse'];
   readonly onForceExit?: () => void;
 }) {
   const overlayHost = useOverlayHost();
@@ -621,7 +640,14 @@ function AppShell({
     <Box flexDirection="column" width={size.columns}>
       <Header mode={mode} header={header} colorMode={colorMode} />
       {showDashboard ? (
-        pipeline.status === 'escalated' ? (
+        pipeline.planningInterviewDetail !== null ? (
+          <PlanningInterviewScreen
+            store={store}
+            {...(persistPlanningInterviewResponse !== undefined
+              ? { persistPlanningInterviewResponse }
+              : {})}
+          />
+        ) : pipeline.status === 'escalated' ? (
           <EscalationScreen
             store={store}
             {...(persistEscalationHumanFeedback !== undefined
