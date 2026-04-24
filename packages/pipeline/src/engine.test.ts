@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { configSchema } from '@maestro/config';
+import { parseSprintContract } from '@maestro/contract';
 import { createEventBus, type MaestroEvent } from '@maestro/core';
 import { createStateStore } from '@maestro/state';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -150,6 +151,24 @@ function mockArchitectRefactorNeeded(input: unknown): ArchitectModelOutput {
     libraries: [],
     boundaryCheck: 'refactor_needed',
     boundaryNotes: 'Narrow scope before implementation.',
+    escalation: null,
+  };
+}
+
+/** Architect OK with concrete paths (contract `scope` must mirror these). */
+function mockArchitectOkWithFileScope(input: unknown): ArchitectModelOutput {
+  const i = input as { sprint: { idx: number } };
+  return {
+    sprintIdx: i.sprint.idx,
+    scopeTecnico: {
+      newFiles: [{ path: 'src/new-module.ts', layer: 'app' }],
+      filesToTouch: ['CONTRIBUTING.md', 'src/existing.ts'],
+      testFiles: ['src/existing.test.ts'],
+    },
+    patternsToFollow: ['Follow repo conventions.'],
+    libraries: [],
+    boundaryCheck: 'ok',
+    boundaryNotes: null,
     escalation: null,
   };
 }
@@ -330,7 +349,26 @@ describe('runPipeline (happy path)', () => {
       'contracts',
       'sprint-1.md',
     );
-    await expect(readFile(contractPath, 'utf8')).resolves.toMatch(/^---/u);
+    const contractText = await readFile(contractPath, 'utf8');
+    expect(contractText).toMatch(/^---/u);
+    expect(contractText).toContain('files_expected: []');
+    expect(contractText).toContain('files_may_touch: []');
+    expect(parseSprintContract(contractText).frontmatter.depends_on).toEqual(
+      [],
+    );
+
+    const contract2Path = join(
+      repoRoot,
+      '.maestro',
+      'runs',
+      'r1',
+      'contracts',
+      'sprint-2.md',
+    );
+    expect(
+      parseSprintContract(await readFile(contract2Path, 'utf8')).frontmatter
+        .depends_on,
+    ).toEqual([1]);
 
     const handoffPath = join(
       repoRoot,
@@ -343,6 +381,52 @@ describe('runPipeline (happy path)', () => {
     await expect(readFile(handoffPath, 'utf8')).resolves.toMatch(
       /Sprint 1 — Handoff/,
     );
+  });
+
+  it('seeds sprint contract scope from architect scopeTecnico', async () => {
+    const env = makeEnv();
+    const executor = buildExecutor({
+      planner: () => plannerModelOutputNarrow,
+      architect: (input) => mockArchitectOkWithFileScope(input),
+      generator: (input) => mockGeneratorOk(input),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () => mockMergerModelOutput('maestro/scope'),
+    });
+
+    await runPipeline({
+      runId: 'r-scope',
+      prompt: 'narrow',
+      branch: 'maestro/scope',
+      worktreePath: repoRoot,
+      repoRoot,
+      store: env.store,
+      bus: env.bus,
+      config: env.config,
+      executor,
+    });
+
+    const contractPath = join(
+      repoRoot,
+      '.maestro',
+      'runs',
+      'r-scope',
+      'contracts',
+      'sprint-1.md',
+    );
+    const parsed = parseSprintContract(await readFile(contractPath, 'utf8'));
+    expect(parsed.frontmatter.scope.files_expected).toEqual([
+      'CONTRIBUTING.md',
+      'src/existing.ts',
+    ]);
+    expect(parsed.frontmatter.scope.files_may_touch).toEqual(
+      expect.arrayContaining([
+        'CONTRIBUTING.md',
+        'src/existing.ts',
+        'src/new-module.ts',
+        'src/existing.test.ts',
+      ]),
+    );
+    expect(parsed.frontmatter.scope.files_may_touch).toHaveLength(4);
   });
 
   it('appends project log and writes completed exec-plan after merger', async () => {
@@ -537,11 +621,7 @@ describe('runPipeline (happy path)', () => {
     const generatorInputs: unknown[] = [];
     const architectInputs: unknown[] = [];
 
-    const executor: AgentExecutor = async ({
-      definition,
-      input,
-      context,
-    }) => {
+    const executor: AgentExecutor = async ({ definition, input, context }) => {
       contexts.push(context);
       if (definition.id === 'architect') {
         architectInputs.push(input);
@@ -557,7 +637,14 @@ describe('runPipeline (happy path)', () => {
           evaluator: () => mockEvaluatorPassed(),
           merger: () => mockMergerModelOutput('maestro/demo'),
         } as const
-      )[definition.id as 'planner' | 'architect' | 'generator' | 'evaluator' | 'merger'];
+      )[
+        definition.id as
+          | 'planner'
+          | 'architect'
+          | 'generator'
+          | 'evaluator'
+          | 'merger'
+      ];
       if (!fn) throw new Error(`No stub for ${definition.id}`);
       return fn(input as never) as never;
     };
@@ -833,7 +920,9 @@ describe('runPipeline (plan replan)', () => {
       }),
     ).rejects.toBeInstanceOf(PipelineEscalationError);
 
-    const revised = env.events.filter((e) => e.type === 'pipeline.plan_revised');
+    const revised = env.events.filter(
+      (e) => e.type === 'pipeline.plan_revised',
+    );
     expect(revised).toHaveLength(1);
   });
 });
@@ -934,7 +1023,11 @@ describe('resumePipeline', () => {
     const runDir = join(repoRoot, '.maestro', 'runs', runId);
     await mkdir(join(runDir, 'contracts'), { recursive: true });
     await mkdir(join(runDir, 'design-notes'), { recursive: true });
-    await writeFile(join(runDir, 'plan.snapshot.json'), JSON.stringify(plan), 'utf8');
+    await writeFile(
+      join(runDir, 'plan.snapshot.json'),
+      JSON.stringify(plan),
+      'utf8',
+    );
     await writeFile(
       join(runDir, 'plan.md'),
       serializePlanMarkdown(plan),

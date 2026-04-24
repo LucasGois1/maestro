@@ -12,11 +12,6 @@ acceptance_criteria:
   - id: session_create
     description: Creates a session for a valid user
     verifier: pytest tests/test_session.py::test_create
-sensors_required:
-  - ruff
-  - pytest
-thresholds:
-  coverage_delta: '>= 0'
 negotiated_by:
   - architect
   - generator

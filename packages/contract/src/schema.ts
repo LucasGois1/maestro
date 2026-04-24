@@ -42,14 +42,6 @@ const acceptanceCriterionSchema = z
   })
   .strict();
 
-const thresholdsSchema = z
-  .object({
-    coverage_delta: z.string().min(1).optional(),
-    type_errors_new: z.string().min(1).optional(),
-    arch_violations: z.string().min(1).optional(),
-  })
-  .catchall(z.string().min(1));
-
 export const sprintContractFrontmatterSchema = z
   .object({
     sprint: z.number().int().positive(),
@@ -58,8 +50,6 @@ export const sprintContractFrontmatterSchema = z
     status: z.enum(CONTRACT_STATUSES),
     scope: scopeSchema.prefault({}),
     acceptance_criteria: z.array(acceptanceCriterionSchema).min(1),
-    sensors_required: z.array(z.string().min(1)).default([]),
-    thresholds: thresholdsSchema.prefault({}),
     negotiated_by: z.array(z.enum(NEGOTIATION_ROLES)).default([]),
     iterations: z.number().int().nonnegative().default(0),
   })

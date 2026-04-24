@@ -29,6 +29,16 @@ export class ContractValidationError extends Error {
 
 const FRONTMATTER_DELIMITER = '---';
 
+/** Legacy frontmatter keys no longer in the schema; stripped so old files still parse. */
+const LEGACY_SPRINT_CONTRACT_KEYS = ['sensors_required', 'thresholds'] as const;
+
+function stripLegacySprintContractKeys(data: object): void {
+  const rec = data as Record<string, unknown>;
+  for (const k of LEGACY_SPRINT_CONTRACT_KEYS) {
+    delete rec[k];
+  }
+}
+
 type SplitResult = {
   readonly rawFrontmatter: string;
   readonly body: string;
@@ -77,6 +87,8 @@ export function parseSprintContract(source: string): SprintContract {
   if (rawData === null || typeof rawData !== 'object') {
     throw new ContractParseError('Frontmatter must be a YAML mapping.');
   }
+
+  stripLegacySprintContractKeys(rawData);
 
   const parsed = sprintContractFrontmatterSchema.safeParse(rawData);
   if (!parsed.success) {

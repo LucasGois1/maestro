@@ -10,6 +10,16 @@ import {
 import { mergerModelOutputSchema } from './merger-output.schema.js';
 
 describe('mergerModelOutputSchema', () => {
+  it('rejects non-URL prUrl when paired with prNumber', () => {
+    const bad = {
+      ...FIXTURE_COMPLETED_GH.output,
+      prUrl: 'not-a-url',
+    };
+    expect(() => mergerModelOutputSchema.parse(bad)).toThrow(
+      /parseable absolute URL/u,
+    );
+  });
+
   it.each([
     ['FIXTURE_COMPLETED_GH', FIXTURE_COMPLETED_GH.output],
     ['FIXTURE_NO_REMOTE', FIXTURE_NO_REMOTE.output],

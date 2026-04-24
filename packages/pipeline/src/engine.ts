@@ -63,6 +63,7 @@ import type { AgentExecutor } from './executor.js';
 import { defaultAgentExecutor } from './executor.js';
 import { defaultResumeTargetForEscalation } from './escalation-target.js';
 import { PipelineEscalationError, PipelinePauseError } from './errors.js';
+import { attachRunLogToEventBus } from './run-log-sink.js';
 import {
   loadArchitectureDocument,
   patchPlanFileWithArchitectNotes,
@@ -194,7 +195,9 @@ function canAutoResumeFromCheckpoint(state: RunState): boolean {
   return false;
 }
 
-function mapRunPhaseToFailureAt(phase: PipelineStage | undefined): PipelineFailureAt {
+function mapRunPhaseToFailureAt(
+  phase: PipelineStage | undefined,
+): PipelineFailureAt {
   switch (phase) {
     case 'discovering':
     case 'planning':
@@ -276,7 +279,9 @@ async function tryLoadPlanSnapshot(
   const raw = await readOptionalUtf8(path);
   if (raw === undefined || raw.trim().length === 0) return null;
   try {
-    const parsed = plannerOutputSnapshotSchema.parse(JSON.parse(raw) as unknown);
+    const parsed = plannerOutputSnapshotSchema.parse(
+      JSON.parse(raw) as unknown,
+    );
     return parsed as PlannerOutput;
   } catch {
     return null;
@@ -478,17 +483,71 @@ async function writePlanFile(
   await writePlanSnapshotFile(repoRoot, runId, plan, maestroDir);
 }
 
+function dedupeNonemptyPaths(paths: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of paths) {
+    const p = raw.trim();
+    if (p.length === 0 || seen.has(p)) {
+      continue;
+    }
+    seen.add(p);
+    out.push(p);
+  }
+  return out;
+}
+
+/**
+ * Seeds contract `scope` from Architect `scopeTecnico` so generator/evaluator
+ * see allowed paths (the planner does not author the contract file — the
+ * pipeline does, and previously left scope empty).
+ */
+function contractScopeFromArchitect(
+  architect: ArchitectPipelineResult,
+):
+  | { readonly files_expected: string[]; readonly files_may_touch: string[] }
+  | undefined {
+  const touch = dedupeNonemptyPaths(architect.scopeTecnico.filesToTouch);
+  const newPaths = dedupeNonemptyPaths(
+    architect.scopeTecnico.newFiles.map((f) => f.path),
+  );
+  const tests = dedupeNonemptyPaths(architect.scopeTecnico.testFiles);
+  const mayTouch = dedupeNonemptyPaths([...touch, ...newPaths, ...tests]);
+  const expected = touch.length > 0 ? touch : newPaths;
+  if (mayTouch.length === 0 && expected.length === 0) {
+    return undefined;
+  }
+  return {
+    files_expected: expected,
+    files_may_touch: mayTouch.length > 0 ? mayTouch : expected,
+  };
+}
+
 async function writeInitialContract(
   repoRoot: string,
   runId: string,
   sprintIdx: number,
   sprint: PlannerOutput['sprints'][number],
   maestroDir = '.maestro',
+  architectScope?: ArchitectPipelineResult,
 ): Promise<SprintContractFrontmatter> {
+  const scope =
+    architectScope !== undefined
+      ? contractScopeFromArchitect(architectScope)
+      : undefined;
   const frontmatter = sprintContractFrontmatterSchema.parse({
     sprint: sprintIdx + 1,
     feature: sprint.name,
+    depends_on: [...sprint.dependsOn],
     status: 'agreed',
+    ...(scope !== undefined
+      ? {
+          scope: {
+            files_expected: [...scope.files_expected],
+            files_may_touch: [...scope.files_may_touch],
+          },
+        }
+      : {}),
     acceptance_criteria: sprint.acceptance.length
       ? sprint.acceptance.map((description, idx) => ({
           id: `${sprint.id}-${idx + 1}`,
@@ -540,10 +599,7 @@ const PLAN_REASON_SUMMARY_MAX = 400;
 
 function summarizePlanForReplan(plan: PlannerOutput): string {
   return plan.sprints
-    .map(
-      (sp) =>
-        `Sprint ${sp.idx.toString()} — ${sp.name}: ${sp.objective}`,
-    )
+    .map((sp) => `Sprint ${sp.idx.toString()} — ${sp.name}: ${sp.objective}`)
     .join('\n');
 }
 
@@ -659,7 +715,11 @@ async function escalateAndThrow(
     ...(maestroDir !== undefined ? { maestroDir } : {}),
     entry: {
       event: 'sprint_escalated',
-      detail: `${args.source} @${args.phaseAtEscalation} → ${resumeTarget}`,
+      detail: `${args.source} @${args.phaseAtEscalation} → ${resumeTarget}${
+        args.evaluatorRetryExhausted === true
+          ? ' (evaluator retries exhausted; reason from last evaluator output)'
+          : ''
+      }`,
     },
   });
   throw new PipelineEscalationError(
@@ -808,9 +868,7 @@ export async function runPipeline(
       type: 'pipeline.resumed',
       runId: options.runId,
       from,
-      ...(phaseBeforeEscalation !== undefined
-        ? { phaseBeforeEscalation }
-        : {}),
+      ...(phaseBeforeEscalation !== undefined ? { phaseBeforeEscalation } : {}),
     });
   }
 
@@ -836,7 +894,14 @@ export async function runPipeline(
     'utf8',
   );
 
+  let detachRunLogSink: (() => void) | undefined;
   try {
+    detachRunLogSink = attachRunLogToEventBus({
+      bus: options.bus,
+      repoRoot: options.repoRoot,
+      runId: options.runId,
+      ...(maestroDir !== undefined ? { maestroDir } : {}),
+    });
     if (!existing) {
       await appendRunLog({
         repoRoot: options.repoRoot,
@@ -867,8 +932,7 @@ export async function runPipeline(
       const e = existing.escalation;
       escalatedResume = {
         sprintIdx: e.sprintIdx,
-        resumeTarget:
-          options.resumeTargetOverride ?? e.resumeTarget,
+        resumeTarget: options.resumeTargetOverride ?? e.resumeTarget,
         humanGuidance:
           options.humanFeedback !== undefined
             ? options.humanFeedback
@@ -920,8 +984,18 @@ export async function runPipeline(
             sprintOutcomes.push(row);
           }
         } else {
-          plan = await runPlannerPhase(options, executor, undefined, maestroDir);
-          await writePlanFile(options.repoRoot, options.runId, plan, maestroDir);
+          plan = await runPlannerPhase(
+            options,
+            executor,
+            undefined,
+            maestroDir,
+          );
+          await writePlanFile(
+            options.repoRoot,
+            options.runId,
+            plan,
+            maestroDir,
+          );
           startSprintIdx = 0;
         }
       } else {
@@ -948,153 +1022,31 @@ export async function runPipeline(
         sprintIdx < plan.sprints.length;
         sprintIdx += 1
       ) {
-      assertNotAborted(options.abortSignal, 'architecting');
-      const sprint = plan.sprints[sprintIdx];
-      if (!sprint) continue;
-      options.bus.emit({
-        type: 'pipeline.sprint_started',
-        runId: options.runId,
-        sprintIdx,
-        totalSprints: plan.sprints.length,
-      });
-
-      if (
-        escalatedResume !== null &&
-        sprintIdx === escalatedResume.sprintIdx &&
-        replanLoopPass === 1 &&
-        escalatedResume.resumeTarget === 'ReplanOnly'
-      ) {
-        plan = await runPlannerPhase(
-          options,
-          executor,
-          buildPlannerReplanContextFromEscalation(
-            plan,
-            sprintIdx,
-            escalatedResume.reason,
-            escalatedResume.humanGuidance,
-            1,
-          ),
-          maestroDir,
-        );
-        await writePlanFile(
-          options.repoRoot,
-          options.runId,
-          plan,
-          maestroDir,
-        );
-        escalatedResume = null;
-        startSprintIdx = 0;
-        continue replanLoop;
-      }
-
-      const resumeFirstIncomplete =
-        didAutoResume &&
-        sprintIdx === startSprintIdx &&
-        replanLoopPass === 1;
-
-      const hasArtifacts = await sprintContractAndDesignNotesExist(
-        options.repoRoot,
-        options.runId,
-        sprintIdx,
-        maestroDir,
-      );
-
-      const effectiveResume =
-        escalatedResume !== null &&
-        sprintIdx === escalatedResume.sprintIdx &&
-        replanLoopPass === 1
-          ? escalatedResume.resumeTarget
-          : null;
-
-      let skipArchitect = false;
-      let skipContract = false;
-      if (resumeFirstIncomplete) {
-        if (effectiveResume === 'ReArchitectAndContract') {
-          skipArchitect = false;
-          skipContract = false;
-        } else if (effectiveResume === 'ReSeedContract') {
-          skipArchitect = true;
-          skipContract = false;
-        } else if (
-          effectiveResume === 'ContinueGenerate' ||
-          effectiveResume === null
-        ) {
-          if (hasArtifacts) {
-            skipArchitect = true;
-            skipContract = true;
-          }
-        }
-      }
-
-      const skipArchitectAndContract = skipArchitect && skipContract;
-
-      // architecting + contracting (skipped when resuming a sprint with artifacts on disk)
-      if (skipArchitect && !skipContract) {
-        assertNotAborted(options.abortSignal, 'contracting');
-        await updatePhase(options, 'contracting', {
-          currentSprintIdx: sprintIdx,
-        });
-        await writeInitialContract(
-          options.repoRoot,
-          options.runId,
-          sprintIdx,
-          sprint,
-          maestroDir,
-        );
-      } else if (!skipArchitectAndContract) {
-      await updatePhase(options, 'architecting', {
-        currentSprintIdx: sprintIdx,
-      });
-      const architect = resolveAgent(options.registry, architectAgent);
-      const rawArchitect = await executor({
-        definition: architect,
-        input: {
-          plan,
-          architecture: architectureDoc,
-          sprint,
-          sprintIdx,
-        },
-        context: contextFor(
-          'architect',
-          options.runId,
-          implementationRoot(options),
-          pipelineAgentMetadata(options),
-        ),
-        bus: options.bus,
-        config: options.config,
-      });
-      const parsedArchitect = architectModelOutputSchema.parse(rawArchitect);
-      const architectResult = finalizeArchitectOutput(parsedArchitect);
-      if (architectResult.sprintIdx !== sprint.idx) {
+        assertNotAborted(options.abortSignal, 'architecting');
+        const sprint = plan.sprints[sprintIdx];
+        if (!sprint) continue;
         options.bus.emit({
-          type: 'agent.decision',
-          agentId: 'architect',
+          type: 'pipeline.sprint_started',
           runId: options.runId,
-          message: `Architect sprintIdx ${architectResult.sprintIdx.toString()} != plan sprint.idx ${sprint.idx.toString()}; using plan idx for artifacts.`,
+          sprintIdx,
+          totalSprints: plan.sprints.length,
         });
-      }
-      if (!architectResult.approved) {
-        const reason =
-          architectResult.escalation?.reason ??
-          architectResult.boundaryNotes ??
-          architectResult.boundaryCheck;
 
-        if (planReplansUsed < maxPlanReplans) {
-          planReplansUsed += 1;
-          options.bus.emit({
-            type: 'pipeline.plan_revised',
-            runId: options.runId,
-            attempt: planReplansUsed,
-            reasonSummary: summarizeArchitectBlockReason(architectResult),
-          });
+        if (
+          escalatedResume !== null &&
+          sprintIdx === escalatedResume.sprintIdx &&
+          replanLoopPass === 1 &&
+          escalatedResume.resumeTarget === 'ReplanOnly'
+        ) {
           plan = await runPlannerPhase(
             options,
             executor,
-            buildPlannerReplanContext(
+            buildPlannerReplanContextFromEscalation(
               plan,
               sprintIdx,
-              architectResult,
-              planReplansUsed,
+              escalatedResume.reason,
+              escalatedResume.humanGuidance,
+              1,
             ),
             maestroDir,
           );
@@ -1104,92 +1056,216 @@ export async function runPipeline(
             plan,
             maestroDir,
           );
+          escalatedResume = null;
+          startSprintIdx = 0;
           continue replanLoop;
         }
 
-        const archReason = `Architect: ${String(reason)}`;
-        const hints = [
-          `.maestro/runs/${options.runId}/design-notes/design-notes-sprint-${(sprintIdx + 1).toString()}.md`,
-        ];
-        await escalateAndThrow(options, maestroDir, {
+        const resumeFirstIncomplete =
+          didAutoResume && sprintIdx === startSprintIdx && replanLoopPass === 1;
+
+        const hasArtifacts = await sprintContractAndDesignNotesExist(
+          options.repoRoot,
+          options.runId,
           sprintIdx,
-          reason: archReason,
-          source: 'architect',
-          phaseAtEscalation: 'architecting',
-          message: `Sprint ${sprintIdx + 1} blocked by Architect: ${String(reason)}`,
-          artifactHints: hints,
-        });
-      }
-
-      const designDoc = renderArchitectNotesMarkdown(
-        architectResult,
-        sprint.name,
-      );
-      await writeDesignNotesSprintFile(
-        options.repoRoot,
-        options.runId,
-        sprint.idx,
-        designDoc,
-        maestroDir,
-      );
-      const embed = architectNotesForPlanEmbed(architectResult, sprint.name);
-      await patchPlanFileWithArchitectNotes(
-        options.repoRoot,
-        options.runId,
-        sprint.idx,
-        embed,
-        maestroDir,
-      );
-
-      // contracting (minimal: seed a contract file; negotiation comes when we wire contract pkg in v0.2)
-      assertNotAborted(options.abortSignal, 'contracting');
-      await updatePhase(options, 'contracting', {
-        currentSprintIdx: sprintIdx,
-      });
-      await writeInitialContract(
-        options.repoRoot,
-        options.runId,
-        sprintIdx,
-        sprint,
-        maestroDir,
-      );
-      }
-
-      // generating + evaluating with retry budget
-      const root = maestroRoot(options.repoRoot, maestroDir);
-      const contractPath = join(
-        root,
-        'runs',
-        options.runId,
-        'contracts',
-        `sprint-${(sprintIdx + 1).toString()}.md`,
-      );
-      const contractText = (await readOptionalUtf8(contractPath)) ?? '';
-
-      const designNotesPath = join(
-        root,
-        'runs',
-        options.runId,
-        'design-notes',
-        `design-notes-sprint-${(sprintIdx + 1).toString()}.md`,
-      );
-      const architectNotesText =
-        (await readOptionalUtf8(designNotesPath)) ?? '';
-
-      let previousHandoff: string | undefined;
-      if (sprintIdx > 0) {
-        previousHandoff = await readOptionalUtf8(
-          handoffPath({
-            repoRoot: options.repoRoot,
-            runId: options.runId,
-            ...(maestroDir !== undefined ? { maestroDir } : {}),
-            sprint: sprintIdx,
-          }),
+          maestroDir,
         );
-      }
 
-      const humanGuidanceForGen =
-        (() => {
+        const effectiveResume =
+          escalatedResume !== null &&
+          sprintIdx === escalatedResume.sprintIdx &&
+          replanLoopPass === 1
+            ? escalatedResume.resumeTarget
+            : null;
+
+        let skipArchitect = false;
+        let skipContract = false;
+        if (resumeFirstIncomplete) {
+          if (effectiveResume === 'ReArchitectAndContract') {
+            skipArchitect = false;
+            skipContract = false;
+          } else if (effectiveResume === 'ReSeedContract') {
+            skipArchitect = true;
+            skipContract = false;
+          } else if (
+            effectiveResume === 'ContinueGenerate' ||
+            effectiveResume === null
+          ) {
+            if (hasArtifacts) {
+              skipArchitect = true;
+              skipContract = true;
+            }
+          }
+        }
+
+        const skipArchitectAndContract = skipArchitect && skipContract;
+
+        // architecting + contracting (skipped when resuming a sprint with artifacts on disk)
+        if (skipArchitect && !skipContract) {
+          assertNotAborted(options.abortSignal, 'contracting');
+          await updatePhase(options, 'contracting', {
+            currentSprintIdx: sprintIdx,
+          });
+          await writeInitialContract(
+            options.repoRoot,
+            options.runId,
+            sprintIdx,
+            sprint,
+            maestroDir,
+          );
+        } else if (!skipArchitectAndContract) {
+          await updatePhase(options, 'architecting', {
+            currentSprintIdx: sprintIdx,
+          });
+          const architect = resolveAgent(options.registry, architectAgent);
+          const rawArchitect = await executor({
+            definition: architect,
+            input: {
+              plan,
+              architecture: architectureDoc,
+              sprint,
+              sprintIdx,
+            },
+            context: contextFor(
+              'architect',
+              options.runId,
+              implementationRoot(options),
+              pipelineAgentMetadata(options),
+            ),
+            bus: options.bus,
+            config: options.config,
+          });
+          const parsedArchitect =
+            architectModelOutputSchema.parse(rawArchitect);
+          const architectResult = finalizeArchitectOutput(parsedArchitect);
+          if (architectResult.sprintIdx !== sprint.idx) {
+            options.bus.emit({
+              type: 'agent.decision',
+              agentId: 'architect',
+              runId: options.runId,
+              message: `Architect sprintIdx ${architectResult.sprintIdx.toString()} != plan sprint.idx ${sprint.idx.toString()}; using plan idx for artifacts.`,
+            });
+          }
+          if (!architectResult.approved) {
+            const reason =
+              architectResult.escalation?.reason ??
+              architectResult.boundaryNotes ??
+              architectResult.boundaryCheck;
+
+            if (planReplansUsed < maxPlanReplans) {
+              planReplansUsed += 1;
+              options.bus.emit({
+                type: 'pipeline.plan_revised',
+                runId: options.runId,
+                attempt: planReplansUsed,
+                reasonSummary: summarizeArchitectBlockReason(architectResult),
+              });
+              plan = await runPlannerPhase(
+                options,
+                executor,
+                buildPlannerReplanContext(
+                  plan,
+                  sprintIdx,
+                  architectResult,
+                  planReplansUsed,
+                ),
+                maestroDir,
+              );
+              await writePlanFile(
+                options.repoRoot,
+                options.runId,
+                plan,
+                maestroDir,
+              );
+              continue replanLoop;
+            }
+
+            const archReason = `Architect: ${String(reason)}`;
+            const hints = [
+              `.maestro/runs/${options.runId}/design-notes/design-notes-sprint-${(sprintIdx + 1).toString()}.md`,
+            ];
+            await escalateAndThrow(options, maestroDir, {
+              sprintIdx,
+              reason: archReason,
+              source: 'architect',
+              phaseAtEscalation: 'architecting',
+              message: `Sprint ${sprintIdx + 1} blocked by Architect: ${String(reason)}`,
+              artifactHints: hints,
+            });
+          }
+
+          const designDoc = renderArchitectNotesMarkdown(
+            architectResult,
+            sprint.name,
+          );
+          await writeDesignNotesSprintFile(
+            options.repoRoot,
+            options.runId,
+            sprint.idx,
+            designDoc,
+            maestroDir,
+          );
+          const embed = architectNotesForPlanEmbed(
+            architectResult,
+            sprint.name,
+          );
+          await patchPlanFileWithArchitectNotes(
+            options.repoRoot,
+            options.runId,
+            sprint.idx,
+            embed,
+            maestroDir,
+          );
+
+          // contracting (minimal: seed a contract file; negotiation comes when we wire contract pkg in v0.2)
+          assertNotAborted(options.abortSignal, 'contracting');
+          await updatePhase(options, 'contracting', {
+            currentSprintIdx: sprintIdx,
+          });
+          await writeInitialContract(
+            options.repoRoot,
+            options.runId,
+            sprintIdx,
+            sprint,
+            maestroDir,
+            architectResult,
+          );
+        }
+
+        // generating + evaluating with retry budget
+        const root = maestroRoot(options.repoRoot, maestroDir);
+        const contractPath = join(
+          root,
+          'runs',
+          options.runId,
+          'contracts',
+          `sprint-${(sprintIdx + 1).toString()}.md`,
+        );
+        const contractText = (await readOptionalUtf8(contractPath)) ?? '';
+
+        const designNotesPath = join(
+          root,
+          'runs',
+          options.runId,
+          'design-notes',
+          `design-notes-sprint-${(sprintIdx + 1).toString()}.md`,
+        );
+        const architectNotesText =
+          (await readOptionalUtf8(designNotesPath)) ?? '';
+
+        let previousHandoff: string | undefined;
+        if (sprintIdx > 0) {
+          previousHandoff = await readOptionalUtf8(
+            handoffPath({
+              repoRoot: options.repoRoot,
+              runId: options.runId,
+              ...(maestroDir !== undefined ? { maestroDir } : {}),
+              sprint: sprintIdx,
+            }),
+          );
+        }
+
+        const humanGuidanceForGen = (() => {
           const fromOpts = options.humanFeedback?.trim();
           if (fromOpts && fromOpts.length > 0) return fromOpts;
           if (
@@ -1203,202 +1279,203 @@ export async function runPipeline(
           return undefined;
         })();
 
-      let attempts = 0;
-      let generatorOutput: unknown;
-      let evaluatorOutput: EvaluatorModelOutput | undefined;
-      let pendingEvaluatorFeedback:
-        | GeneratorInput['evaluatorFeedback']
-        | undefined;
-      while (attempts < retries) {
-        assertNotAborted(options.abortSignal, 'generating');
-        attempts += 1;
-        if (attempts > 1) {
-          options.bus.emit({
-            type: 'pipeline.sprint_retried',
-            runId: options.runId,
-            sprintIdx,
-            retry: attempts - 1,
-          });
-        }
-        await updatePhase(options, 'generating', {
-          currentSprintIdx: sprintIdx,
-          retriesRemaining: retries - attempts,
-        });
-        const generator = resolveAgent(options.registry, generatorAgent);
-        generatorOutput = await executor({
-          definition: generator,
-          input: {
-            runId: options.runId,
-            sprintIdx,
-            implementationRoot: implementationRoot(options),
-            stateRepoRoot: options.repoRoot,
-            sprint,
-            sprintContract: contractText,
-            planFull: plan,
-            architectNotes: architectNotesText,
-            previousHandoff,
-            ...(pendingEvaluatorFeedback !== undefined
-              ? { evaluatorFeedback: pendingEvaluatorFeedback }
-              : {}),
-            ...(humanGuidanceForGen !== undefined
-              ? { humanGuidance: humanGuidanceForGen }
-              : {}),
-          },
-          context: contextFor(
-            'generator',
-            options.runId,
-            implementationRoot(options),
-            pipelineAgentMetadata(options, {
-              ...(maestroDir !== undefined ? { maestroDir } : {}),
-            }),
-          ),
-          bus: options.bus,
-          config: options.config,
-        });
-
-        assertNotAborted(options.abortSignal, 'evaluating');
-        await updatePhase(options, 'evaluating', {
-          currentSprintIdx: sprintIdx,
-          retriesRemaining: retries - attempts,
-        });
-        const codeDiffText = await getWorkingTreeDiff(options.worktreePath);
-        const evaluator = resolveAgent(options.registry, evaluatorAgent);
-        evaluatorOutput = (await executor({
-          definition: evaluator,
-          input: {
-            runId: options.runId,
-            sprintIdx: sprint.idx,
-            repoRoot: options.repoRoot,
-            worktreeRoot: options.worktreePath,
-            iteration: attempts,
-            sprintContract: contractText,
-            generatorOutput,
-            codeDiff: codeDiffText,
-            sprint,
-            acceptance: [...sprint.acceptance],
-          },
-          context: contextFor(
-            'evaluator',
-            options.runId,
-            implementationRoot(options),
-            pipelineAgentMetadata(options, {
-              ...(maestroDir !== undefined ? { maestroDir } : {}),
-            }),
-          ),
-          bus: options.bus,
-          config: options.config,
-        })) as EvaluatorModelOutput;
-
-        await writeEvaluatorFeedbackMarkdown(
-          options,
-          sprint.idx,
-          attempts,
-          evaluatorOutput,
-          maestroDir,
-        );
-
-        if (evaluatorOutput.decision === 'passed') {
-          pendingEvaluatorFeedback = undefined;
-          if (
-            escalatedResume !== null &&
-            escalatedResume.sprintIdx === sprintIdx
-          ) {
-            escalatedResume = null;
+        let attempts = 0;
+        let generatorOutput: unknown;
+        let evaluatorOutput: EvaluatorModelOutput | undefined;
+        let pendingEvaluatorFeedback:
+          | GeneratorInput['evaluatorFeedback']
+          | undefined;
+        while (attempts < retries) {
+          assertNotAborted(options.abortSignal, 'generating');
+          attempts += 1;
+          if (attempts > 1) {
+            options.bus.emit({
+              type: 'pipeline.sprint_retried',
+              runId: options.runId,
+              sprintIdx,
+              retry: attempts - 1,
+            });
           }
-          break;
+          await updatePhase(options, 'generating', {
+            currentSprintIdx: sprintIdx,
+            retriesRemaining: retries - attempts,
+          });
+          const generator = resolveAgent(options.registry, generatorAgent);
+          generatorOutput = await executor({
+            definition: generator,
+            input: {
+              runId: options.runId,
+              sprintIdx,
+              implementationRoot: implementationRoot(options),
+              stateRepoRoot: options.repoRoot,
+              sprint,
+              sprintContract: contractText,
+              planFull: plan,
+              architectNotes: architectNotesText,
+              previousHandoff,
+              ...(pendingEvaluatorFeedback !== undefined
+                ? { evaluatorFeedback: pendingEvaluatorFeedback }
+                : {}),
+              ...(humanGuidanceForGen !== undefined
+                ? { humanGuidance: humanGuidanceForGen }
+                : {}),
+            },
+            context: contextFor(
+              'generator',
+              options.runId,
+              implementationRoot(options),
+              pipelineAgentMetadata(options, {
+                ...(maestroDir !== undefined ? { maestroDir } : {}),
+              }),
+            ),
+            bus: options.bus,
+            config: options.config,
+          });
+
+          assertNotAborted(options.abortSignal, 'evaluating');
+          await updatePhase(options, 'evaluating', {
+            currentSprintIdx: sprintIdx,
+            retriesRemaining: retries - attempts,
+          });
+          const codeDiffText = await getWorkingTreeDiff(options.worktreePath);
+          const evaluator = resolveAgent(options.registry, evaluatorAgent);
+          evaluatorOutput = (await executor({
+            definition: evaluator,
+            input: {
+              runId: options.runId,
+              sprintIdx: sprint.idx,
+              repoRoot: options.repoRoot,
+              worktreeRoot: options.worktreePath,
+              iteration: attempts,
+              sprintContract: contractText,
+              generatorOutput,
+              codeDiff: codeDiffText,
+              sprint,
+              acceptance: [...sprint.acceptance],
+            },
+            context: contextFor(
+              'evaluator',
+              options.runId,
+              implementationRoot(options),
+              pipelineAgentMetadata(options, {
+                ...(maestroDir !== undefined ? { maestroDir } : {}),
+              }),
+            ),
+            bus: options.bus,
+            config: options.config,
+          })) as EvaluatorModelOutput;
+
+          await writeEvaluatorFeedbackMarkdown(
+            options,
+            sprint.idx,
+            attempts,
+            evaluatorOutput,
+            maestroDir,
+          );
+
+          if (evaluatorOutput.decision === 'passed') {
+            pendingEvaluatorFeedback = undefined;
+            if (
+              escalatedResume !== null &&
+              escalatedResume.sprintIdx === sprintIdx
+            ) {
+              escalatedResume = null;
+            }
+            break;
+          }
+
+          if (evaluatorOutput.decision === 'escalated') {
+            const reason =
+              evaluatorOutput.suggestedActions[0] ??
+              evaluatorOutput.structuredFeedback
+                .split('\n')
+                .find((l) => l.trim().length > 0) ??
+              'Evaluator escalated';
+            const hints = [
+              `.maestro/runs/${options.runId}/contracts/sprint-${(sprintIdx + 1).toString()}.md`,
+              `.maestro/runs/${options.runId}/feedback/sprint-${sprint.idx.toString()}-eval-${attempts.toString()}.md`,
+            ];
+            await escalateAndThrow(options, maestroDir, {
+              sprintIdx,
+              reason,
+              source: 'evaluator',
+              phaseAtEscalation: 'evaluating',
+              message: `Sprint ${sprintIdx + 1} escalated by evaluator: ${reason}`,
+              artifactHints: hints,
+            });
+          }
+
+          pendingEvaluatorFeedback = {
+            failures: [...evaluatorFailuresForGenerator(evaluatorOutput)],
+            structuredFeedback: evaluatorOutput.structuredFeedback,
+            suggestedActions: [...evaluatorOutput.suggestedActions],
+            decision: 'failed',
+          };
         }
 
-        if (evaluatorOutput.decision === 'escalated') {
+        if (!evaluatorOutput || evaluatorOutput.decision !== 'passed') {
           const reason =
-            evaluatorOutput.suggestedActions[0] ??
-            evaluatorOutput.structuredFeedback
-              .split('\n')
+            evaluatorOutput?.suggestedActions?.[0] ??
+            evaluatorOutput?.structuredFeedback
+              ?.split('\n')
               .find((l) => l.trim().length > 0) ??
-            'Evaluator escalated';
+            'Retry budget exhausted';
           const hints = [
             `.maestro/runs/${options.runId}/contracts/sprint-${(sprintIdx + 1).toString()}.md`,
-            `.maestro/runs/${options.runId}/feedback/sprint-${sprint.idx.toString()}-eval-${attempts.toString()}.md`,
           ];
           await escalateAndThrow(options, maestroDir, {
             sprintIdx,
             reason,
-            source: 'evaluator',
+            source: 'pipeline',
             phaseAtEscalation: 'evaluating',
-            message: `Sprint ${sprintIdx + 1} escalated by evaluator: ${reason}`,
+            message: `Sprint ${sprintIdx + 1} escalated after ${attempts.toString()} attempt(s): ${reason}`,
             artifactHints: hints,
+            evaluatorRetryExhausted: true,
           });
         }
 
-        pendingEvaluatorFeedback = {
-          failures: [...evaluatorFailuresForGenerator(evaluatorOutput)],
-          structuredFeedback: evaluatorOutput.structuredFeedback,
-          suggestedActions: [...evaluatorOutput.suggestedActions],
-          decision: 'failed',
-        };
-      }
+        const parsedGenerator =
+          generatorModelOutputSchema.parse(generatorOutput);
 
-      if (!evaluatorOutput || evaluatorOutput.decision !== 'passed') {
-        const reason =
-          evaluatorOutput?.suggestedActions?.[0] ??
-          evaluatorOutput?.structuredFeedback
-            ?.split('\n')
-            .find((l) => l.trim().length > 0) ??
-          'Retry budget exhausted';
-        const hints = [
-          `.maestro/runs/${options.runId}/contracts/sprint-${(sprintIdx + 1).toString()}.md`,
-        ];
-        await escalateAndThrow(options, maestroDir, {
-          sprintIdx,
-          reason,
-          source: 'pipeline',
-          phaseAtEscalation: 'evaluating',
-          message: `Sprint ${sprintIdx + 1} escalated after ${attempts.toString()} attempt(s): ${reason}`,
-          artifactHints: hints,
-          evaluatorRetryExhausted: true,
+        await writeSprintSelfEval({
+          repoRoot: options.repoRoot,
+          runId: options.runId,
+          ...(maestroDir !== undefined ? { maestroDir } : {}),
+          sprint: sprint.idx,
+          selfEval: parsedGenerator.selfEval,
         });
-      }
 
-      const parsedGenerator = generatorModelOutputSchema.parse(generatorOutput);
-
-      await writeSprintSelfEval({
-        repoRoot: options.repoRoot,
-        runId: options.runId,
-        ...(maestroDir !== undefined ? { maestroDir } : {}),
-        sprint: sprint.idx,
-        selfEval: parsedGenerator.selfEval,
-      });
-
-      sprintOutcomes.push({
-        sprintIdx,
-        attempts,
-        generator: parsedGenerator,
-        evaluator: evaluatorOutput!,
-      });
-
-      await writeSprintOutcomeCheckpoint(
-        options,
-        sprintIdx + 1,
-        {
+        sprintOutcomes.push({
           sprintIdx,
           attempts,
           generator: parsedGenerator,
           evaluator: evaluatorOutput!,
-        },
-        maestroDir,
-      );
+        });
 
-      await writeHandoff({
-        repoRoot: options.repoRoot,
-        runId: options.runId,
-        ...(maestroDir !== undefined ? { maestroDir } : {}),
-        handoff: {
-          sprint: sprintIdx + 1,
-          summary: parsedGenerator.handoffNotes.trim() || sprint.objective,
-          changedFiles: extractChangedFiles(parsedGenerator),
-          decisions: [],
-          nextSteps: sprint.acceptance.slice(),
-        },
-      });
+        await writeSprintOutcomeCheckpoint(
+          options,
+          sprintIdx + 1,
+          {
+            sprintIdx,
+            attempts,
+            generator: parsedGenerator,
+            evaluator: evaluatorOutput!,
+          },
+          maestroDir,
+        );
+
+        await writeHandoff({
+          repoRoot: options.repoRoot,
+          runId: options.runId,
+          ...(maestroDir !== undefined ? { maestroDir } : {}),
+          handoff: {
+            sprint: sprintIdx + 1,
+            summary: parsedGenerator.handoffNotes.trim() || sprint.objective,
+            changedFiles: extractChangedFiles(parsedGenerator),
+            decisions: [],
+            nextSteps: sprint.acceptance.slice(),
+          },
+        });
       }
 
       break replanLoop;
@@ -1501,8 +1578,7 @@ export async function runPipeline(
       branch: options.branch,
       plan,
       sprintOutcomes,
-      ...(parsedMerger.summary != null &&
-      parsedMerger.summary.trim().length > 0
+      ...(parsedMerger.summary != null && parsedMerger.summary.trim().length > 0
         ? { mergerSummary: parsedMerger.summary }
         : {}),
     });
@@ -1627,6 +1703,7 @@ export async function runPipeline(
     });
     throw error;
   } finally {
+    detachRunLogSink?.();
     await removePipelineProcessMarker(pipelineProcessPath);
   }
 }

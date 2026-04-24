@@ -104,6 +104,19 @@ export function EscalationScreen({
         Origem: {escalation.source} · fase: {escalation.phaseAtEscalation} ·
         alvo de retomada: {escalation.resumeTarget}
       </Text>
+      {escalation.source === 'pipeline' &&
+      escalation.phaseAtEscalation === 'evaluating' ? (
+        <Box marginTop={1}>
+          <Text dimColor={useColor} wrap="wrap">
+            Nota: origem 'pipeline' e fase 'evaluating' — o motor esgotou o
+            orçamento de tentativas generator/evaluator sem aprovação. O motivo
+            abaixo resume o último feedback do evaluator (geralmente decisão
+            failed), não uma escalação explícita do agente evaluator. Vê os
+            ficheiros feedback/sprint-*-eval-*.md na pasta da run, por
+            tentativa.
+          </Text>
+        </Box>
+      ) : null}
       <Text dimColor={useColor}>
         O pipeline continuará com o alvo indicado acima após submeteres o
         feedback.
@@ -129,9 +142,7 @@ export function EscalationScreen({
         </Text>
         <Text dimColor={useColor}>{draft.length > 0 ? draft : '…'}</Text>
       </Box>
-      {isSubmitting ? (
-        <Text dimColor={useColor}>A submeter…</Text>
-      ) : null}
+      {isSubmitting ? <Text dimColor={useColor}>A submeter…</Text> : null}
       {statusLine !== null && statusLine.length > 0 ? (
         <Text {...(useColor ? { color: 'cyan' } : {})}>{statusLine}</Text>
       ) : null}

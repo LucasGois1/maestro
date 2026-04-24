@@ -11,7 +11,10 @@ export const mergerModelOutputSchema = z
     commitCount: z.number().int().nonnegative(),
     execPlanPath: z.string().min(1),
     cleanupDone: z.boolean(),
-    prUrl: z.union([z.string().url(), z.null()]),
+    // Avoid z.string().url() here: strict JSON Schema for response_format rejects
+    // `format: "uri"` on this branch (OpenAI: "uri is not a valid format"). URL
+    // shape is enforced in superRefine when non-null.
+    prUrl: z.union([z.string().min(1), z.null()]),
     prNumber: z.union([z.number().int().positive(), z.null()]),
     /** Resumo curto para log / UI */
     summary: z.string().nullable(),
@@ -26,6 +29,14 @@ export const mergerModelOutputSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'prUrl and prNumber must both be a value or both null',
+        path: ['prUrl'],
+      });
+      return;
+    }
+    if (val.prUrl !== null && !URL.canParse(val.prUrl)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'prUrl must be a parseable absolute URL when set',
         path: ['prUrl'],
       });
     }

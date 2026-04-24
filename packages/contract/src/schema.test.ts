@@ -20,7 +20,6 @@ describe('sprintContractFrontmatterSchema', () => {
     const parsed = sprintContractFrontmatterSchema.parse(valid);
     expect(parsed.depends_on).toEqual([]);
     expect(parsed.scope.files_expected).toEqual([]);
-    expect(parsed.sensors_required).toEqual([]);
     expect(parsed.iterations).toBe(0);
     expect(parsed.negotiated_by).toEqual([]);
   });

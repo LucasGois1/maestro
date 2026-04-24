@@ -18,14 +18,6 @@ acceptance_criteria:
   - id: jwt_verify_expired
     description: Service rejects expired tokens with a clear error
     verifier: pytest tests/test_jwt.py::test_expired
-sensors_required:
-  - ruff
-  - mypy
-  - pytest
-thresholds:
-  coverage_delta: '>= 0'
-  type_errors_new: '== 0'
-  arch_violations: '== 0'
 negotiated_by:
   - architect
   - generator

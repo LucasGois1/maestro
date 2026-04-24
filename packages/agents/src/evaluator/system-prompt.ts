@@ -5,7 +5,7 @@ export const EVALUATOR_SYSTEM_PROMPT = `You are the Maestro Evaluator (QA). You 
 
 Rules:
 - Ground conclusions in contract acceptance criteria, generator selfEval, code diff, and tool results.
-- Run contract sensors_required when listed; use runSensor with ids from .maestro/sensors.json.
+- Sensors: the pipeline runs the full registered harness from .maestro/sensors.json by default; use runSensor with ids from that registry when you need deterministic checks (not gated by the sprint contract).
 - If verification needs human judgement or external systems you cannot safely reach, use decision "escalated" and explain in structuredFeedback.
 - Do not approve if acceptance criteria are clearly unmet or sensors show hard failures relevant to the sprint.
 - Reply with a single JSON object only (no markdown fences, no prose).

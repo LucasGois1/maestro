@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { negotiateSprintContract, type Negotiator } from './negotiation.js';
-import type {
-  SprintContract,
-  SprintContractFrontmatterInput,
+import {
+  sprintContractFrontmatterSchema,
+  type SprintContract,
+  type SprintContractFrontmatterInput,
 } from './schema.js';
 
 const initialFrontmatter: SprintContractFrontmatterInput = {
@@ -14,15 +15,13 @@ const initialFrontmatter: SprintContractFrontmatterInput = {
 };
 
 const initialContract: SprintContract = {
-  frontmatter: {
+  frontmatter: sprintContractFrontmatterSchema.parse({
     ...initialFrontmatter,
     depends_on: [],
     scope: { files_expected: [], files_may_touch: [] },
-    sensors_required: [],
-    thresholds: {},
     negotiated_by: [],
     iterations: 0,
-  },
+  }),
   body: '# body',
 };
 

@@ -5,7 +5,7 @@ exports[`Evaluator system prompt (snapshot) > matches resolved prompt with few-s
 
 Rules:
 - Ground conclusions in contract acceptance criteria, generator selfEval, code diff, and tool results.
-- Run contract sensors_required when listed; use runSensor with ids from .maestro/sensors.json.
+- Sensors: the pipeline runs the full registered harness from .maestro/sensors.json by default; use runSensor with ids from that registry when you need deterministic checks (not gated by the sprint contract).
 - If verification needs human judgement or external systems you cannot safely reach, use decision "escalated" and explain in structuredFeedback.
 - Do not approve if acceptance criteria are clearly unmet or sensors show hard failures relevant to the sprint.
 - Reply with a single JSON object only (no markdown fences, no prose).
@@ -26,11 +26,11 @@ INPUT: {"runId":"run-fixture","sprintIdx":1,"repoRoot":"/tmp/repo","worktreeRoot
 OUTPUT: {"decision":"failed","structuredFeedback":"## Summary\\nAcceptance criterion **user-facing error message** not met.\\n\\n## Detail\\nLine 42 in \`errors.ts\` still uses \`Error: failed\` instead of a clear message.","coverage":null,"sensorsRun":[],"artifacts":["errors.ts:42"],"suggestedActions":["Replace generic throw with ValidationError and map code ERR_CHECKOUT to user copy."]}
 
 ### Example 3 // escalated — ambiente / credenciais
-INPUT: {"runId":"run-fixture","sprintIdx":1,"repoRoot":"/tmp/repo","worktreeRoot":"/tmp/repo","iteration":1,"sprintContract":"sensors_required: [staging-e2e]","generatorOutput":{"selfEval":{"coversAllCriteria":true}},"codeDiff":"diff --git a/x.ts b/x.ts\\n","sprint":{"name":"API","objective":"Add endpoint"},"acceptance":["Passes staging E2E"]}
+INPUT: {"runId":"run-fixture","sprintIdx":1,"repoRoot":"/tmp/repo","worktreeRoot":"/tmp/repo","iteration":1,"sprintContract":"---\\nsprint: 1\\nfeature: API\\nstatus: agreed\\nacceptance_criteria:\\n  - id: a1\\n    description: Passes staging E2E\\n    verifier: manual\\n---\\n","generatorOutput":{"selfEval":{"coversAllCriteria":true}},"codeDiff":"diff --git a/x.ts b/x.ts\\n","sprint":{"name":"API","objective":"Add endpoint"},"acceptance":["Passes staging E2E"]}
 OUTPUT: {"decision":"escalated","structuredFeedback":"## Summary\\nStaging credentials and VPN are not available in this evaluation environment.\\n\\n## Blocker\\nCannot run \`staging-e2e\` sensor.","coverage":null,"sensorsRun":[{"id":"staging-e2e","ok":false,"detail":"skipped"}],"artifacts":[],"suggestedActions":["Run staging-e2e manually or provide credentials in CI for the evaluator."]}
 
 ### Example 4 // failed — sensor do contrato
-INPUT: {"runId":"run-fixture","sprintIdx":1,"repoRoot":"/tmp/repo","worktreeRoot":"/tmp/repo","iteration":1,"sprintContract":"sensors_required: [\\"lint\\"]","generatorOutput":{"selfEval":{"coversAllCriteria":true}},"codeDiff":"diff --git a/x.ts b/x.ts\\n","sprint":{"name":"API","objective":"Add endpoint"},"acceptance":["Returns 201 on success"]}
+INPUT: {"runId":"run-fixture","sprintIdx":1,"repoRoot":"/tmp/repo","worktreeRoot":"/tmp/repo","iteration":1,"sprintContract":"---\\nsprint: 1\\nfeature: API\\nstatus: agreed\\nacceptance_criteria:\\n  - id: a1\\n    description: Lint clean\\n    verifier: manual\\n---\\n","generatorOutput":{"selfEval":{"coversAllCriteria":true}},"codeDiff":"diff --git a/x.ts b/x.ts\\n","sprint":{"name":"API","objective":"Add endpoint"},"acceptance":["Returns 201 on success"]}
 OUTPUT: {"decision":"failed","structuredFeedback":"## Summary\\nContract requires lint sensor; lint reported violations.\\n\\n## Violations\\n- unused import in \`foo.ts\`","coverage":null,"sensorsRun":[{"id":"lint","ok":false,"detail":"2 errors"}],"artifacts":["foo.ts"],"suggestedActions":["Fix lint errors and re-run."]}
 
 ### Example 5 // passed — evidência API

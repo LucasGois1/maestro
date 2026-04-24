@@ -21,14 +21,6 @@ acceptance_criteria:
   - id: reset_rate_limit
     description: Endpoint rate-limits per email to 3/hour
     verifier: pytest tests/test_reset.py::test_rate_limit
-sensors_required:
-  - ruff
-  - mypy
-  - pytest
-thresholds:
-  coverage_delta: '>= 0'
-  type_errors_new: '== 0'
-  arch_violations: '== 0'
 negotiated_by:
   - architect
   - generator

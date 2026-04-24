@@ -40,7 +40,31 @@ describe('parseSprintContract', () => {
     expect(parsed.frontmatter.scope.files_expected).toContain(
       'app/auth/jwt.py',
     );
-    expect(parsed.frontmatter.thresholds.coverage_delta).toBe('>= 0');
+    expect(parsed.frontmatter.scope.files_may_touch).toContain('app/config.py');
+  });
+
+  it('strips legacy sensors_required and thresholds from frontmatter', () => {
+    const legacy = [
+      '---',
+      'sprint: 1',
+      'feature: Legacy',
+      'status: agreed',
+      'sensors_required: [ruff]',
+      'thresholds:',
+      '  coverage_delta: ">= 0"',
+      'acceptance_criteria:',
+      '  - id: a1',
+      '    description: x',
+      '    verifier: manual',
+      '---',
+      '',
+      'body',
+    ].join('\n');
+    const parsed = parseSprintContract(legacy);
+    const keys = Object.keys(parsed.frontmatter as object);
+    expect(keys).not.toContain('sensors_required');
+    expect(keys).not.toContain('thresholds');
+    expect(parsed.frontmatter.feature).toBe('Legacy');
   });
 
   it('parses the multi-round fixture and preserves human role', async () => {

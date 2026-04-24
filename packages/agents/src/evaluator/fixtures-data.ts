@@ -61,7 +61,8 @@ export const FIXTURE_ESCALATED: {
 } = {
   input: {
     ...baseInput,
-    sprintContract: 'sensors_required: [staging-e2e]',
+    sprintContract:
+      '---\nsprint: 1\nfeature: API\nstatus: agreed\nacceptance_criteria:\n  - id: a1\n    description: Passes staging E2E\n    verifier: manual\n---\n',
     acceptance: ['Passes staging E2E'],
   },
   output: {
@@ -84,7 +85,8 @@ export const FIXTURE_SENSOR_FAILED: {
 } = {
   input: {
     ...baseInput,
-    sprintContract: 'sensors_required: ["lint"]',
+    sprintContract:
+      '---\nsprint: 1\nfeature: API\nstatus: agreed\nacceptance_criteria:\n  - id: a1\n    description: Lint clean\n    verifier: manual\n---\n',
   },
   output: {
     decision: 'failed',
