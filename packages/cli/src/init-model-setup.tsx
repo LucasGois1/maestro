@@ -28,6 +28,8 @@ import { Box, Text, render, useInput } from 'ink';
 import { basename } from 'node:path';
 import { createElement, useCallback, useRef, useState } from 'react';
 
+import { clearTerminalViewport } from './terminal-viewport.js';
+
 const MODEL_PICKER_BACK_KEY = '__back__';
 
 function agentAt(index: number): AgentName {
@@ -115,7 +117,10 @@ type InitModelWizardRootProps = {
 function InitModelWizardRoot(props: InitModelWizardRootProps) {
   const accRef = useRef<MaestroConfigInput>({});
   const promptedRef = useRef(new Set<ProviderName>());
-  const [panel, setPanel] = useState<WizardPanel>({ kind: 'provider', agentIdx: 0 });
+  const [panel, setPanel] = useState<WizardPanel>({
+    kind: 'provider',
+    agentIdx: 0,
+  });
 
   const effectiveConfig = useCallback(
     (): MaestroConfig =>
@@ -294,11 +299,7 @@ function InitModelWizardRoot(props: InitModelWizardRootProps) {
               });
               return;
             }
-            afterCredentialStep(
-              panel.agentIdx,
-              panel.provider,
-              panel.modelRef,
-            );
+            afterCredentialStep(panel.agentIdx, panel.provider, panel.modelRef);
           }}
         />
       );
@@ -417,6 +418,7 @@ export async function runInitModelSetupInk(options: {
         onFinish: (result) => {
           ink?.unmount();
           ink = undefined;
+          clearTerminalViewport();
           resolve(result);
         },
       }),

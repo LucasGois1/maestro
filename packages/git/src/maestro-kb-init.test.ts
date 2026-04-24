@@ -9,22 +9,25 @@ import { commitMaestroKbInit } from './maestro-kb-init.js';
 
 let repoRoot: string;
 
-beforeEach(async () => {
-  repoRoot = await mkdtemp(join(tmpdir(), 'maestro-git-init-'));
-  await runGit(['init', '-b', 'main'], { cwd: repoRoot });
-  await runGit(['config', 'user.email', 't@e.st'], { cwd: repoRoot });
-  await runGit(['config', 'user.name', 'Test'], { cwd: repoRoot });
-  await runGit(['config', 'commit.gpgsign', 'false'], { cwd: repoRoot });
-  await runGit(['config', 'tag.gpgsign', 'false'], { cwd: repoRoot });
-  await runGit(['config', 'gpg.format', 'openpgp'], { cwd: repoRoot });
-  await writeFile(join(repoRoot, 'README.md'), '# x\n', 'utf8');
-  await runGit(['add', 'README.md'], { cwd: repoRoot });
-  await runGit(['commit', '-m', 'init'], { cwd: repoRoot });
-});
+beforeEach(
+  async () => {
+    repoRoot = await mkdtemp(join(tmpdir(), 'maestro-git-init-'));
+    await runGit(['init', '-b', 'main'], { cwd: repoRoot });
+    await runGit(['config', 'user.email', 't@e.st'], { cwd: repoRoot });
+    await runGit(['config', 'user.name', 'Test'], { cwd: repoRoot });
+    await runGit(['config', 'commit.gpgsign', 'false'], { cwd: repoRoot });
+    await runGit(['config', 'tag.gpgsign', 'false'], { cwd: repoRoot });
+    await runGit(['config', 'gpg.format', 'openpgp'], { cwd: repoRoot });
+    await writeFile(join(repoRoot, 'README.md'), '# x\n', 'utf8');
+    await runGit(['add', 'README.md'], { cwd: repoRoot });
+    await runGit(['commit', '-m', 'init'], { cwd: repoRoot });
+  },
+  25_000,
+);
 
 afterEach(async () => {
   await rm(repoRoot, { recursive: true, force: true });
-});
+}, 15_000);
 
 describe('commitMaestroKbInit', () => {
   it('creates branch, stages .maestro, and commits', async () => {

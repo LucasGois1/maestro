@@ -19,6 +19,8 @@ import {
   type ReactNode,
 } from 'react';
 
+import { clearTerminalViewport } from './terminal-viewport.js';
+
 const BULLET_ON = '\u25CF';
 const BULLET_OFF = '\u25CB';
 
@@ -70,7 +72,10 @@ function buildListRows(
   candidates: readonly SensorInitCandidate[],
   manualExtras: readonly SensorDefinition[],
 ): ListRow[] {
-  const rows: ListRow[] = candidates.map((c) => ({ kind: 'candidate' as const, c }));
+  const rows: ListRow[] = candidates.map((c) => ({
+    kind: 'candidate' as const,
+    c,
+  }));
   rows.push({ kind: 'inferential' });
   for (const s of manualExtras) {
     rows.push({ kind: 'manual', sensor: s });
@@ -84,15 +89,11 @@ function initialManualExtras(
 ): SensorDefinition[] {
   const candIds = new Set(candidates.map((c) => c.id));
   return initial.filter(
-    (s) =>
-      s.kind === 'computational' &&
-      !candIds.has(s.id),
+    (s) => s.kind === 'computational' && !candIds.has(s.id),
   );
 }
 
-function initialSelectedIds(
-  initial: readonly SensorDefinition[],
-): string[] {
+function initialSelectedIds(initial: readonly SensorDefinition[]): string[] {
   const out: string[] = [];
   for (const s of initial) {
     if (!out.includes(s.id)) {
@@ -134,11 +135,16 @@ type WizardRootProps = {
   readonly initialSensors: readonly SensorDefinition[];
   /** Shown when the LLM discovery step failed but heuristic/catalog suggestions are still available. */
   readonly llmWarning?: string;
-  readonly onDone: (sensorsFile: ReturnType<typeof sensorsFileSchema.parse>) => void;
+  readonly onDone: (
+    sensorsFile: ReturnType<typeof sensorsFileSchema.parse>,
+  ) => void;
   readonly onAbort: (message: string) => void;
 };
 
-function focusDetailPanel(row: ListRow | undefined, useColor: boolean): ReactNode {
+function focusDetailPanel(
+  row: ListRow | undefined,
+  useColor: boolean,
+): ReactNode {
   if (row === undefined) {
     return (
       <Text dimColor={useColor} wrap="wrap">
@@ -150,7 +156,9 @@ function focusDetailPanel(row: ListRow | undefined, useColor: boolean): ReactNod
     const c = row.c;
     const cmdLine = [c.command, ...c.args].join(' ').trim();
     const cwdLine =
-      c.cwd !== undefined && c.cwd.length > 0 ? `Working directory: ${c.cwd}` : null;
+      c.cwd !== undefined && c.cwd.length > 0
+        ? `Working directory: ${c.cwd}`
+        : null;
     return (
       <Box flexDirection="column">
         <Text bold>Command</Text>
@@ -177,8 +185,9 @@ function focusDetailPanel(row: ListRow | undefined, useColor: boolean): ReactNod
     return (
       <Box flexDirection="column">
         <Text dimColor={useColor} wrap="wrap">
-          Runs the code-reviewer agent on changed files (inferential, slower than shell
-          sensors). Applies to: {CODE_REVIEW_PRESET.appliesTo.join(', ')}
+          Runs the code-reviewer agent on changed files (inferential, slower
+          than shell sensors). Applies to:{' '}
+          {CODE_REVIEW_PRESET.appliesTo.join(', ')}
         </Text>
       </Box>
     );
@@ -308,7 +317,8 @@ function SensorsWizardRoot(props: WizardRootProps): ReactNode {
           }
           const id = bufId.trim();
           const cmd = bufCmd.trim();
-          const parts = bufArgs.trim().length > 0 ? bufArgs.trim().split(/\s+/u) : [];
+          const parts =
+            bufArgs.trim().length > 0 ? bufArgs.trim().split(/\s+/u) : [];
           const candConflict = props.candidates.some((c) => c.id === id);
           const manualConflict = manualExtras.some((s) => s.id === id);
           if (id === 'code-review' || candConflict || manualConflict) {
@@ -417,9 +427,7 @@ function SensorsWizardRoot(props: WizardRootProps): ReactNode {
           </Box>
           {llmWarningBlock}
           <Box marginTop={1}>
-            <Text dimColor={useColor}>
-              Enter continue · Ctrl+C cancel
-            </Text>
+            <Text dimColor={useColor}>Enter continue · Ctrl+C cancel</Text>
           </Box>
         </Box>
       );
@@ -433,7 +441,11 @@ function SensorsWizardRoot(props: WizardRootProps): ReactNode {
             ? 'Command (executable name or path)'
             : 'Arguments (space-separated, optional — press Enter if empty)';
       const value =
-        manualStep === 'id' ? bufId : manualStep === 'command' ? bufCmd : bufArgs;
+        manualStep === 'id'
+          ? bufId
+          : manualStep === 'command'
+            ? bufCmd
+            : bufArgs;
       return (
         <Box flexDirection="column" paddingX={1} width={size.columns}>
           <Box marginBottom={1}>
@@ -510,8 +522,8 @@ function SensorsWizardRoot(props: WizardRootProps): ReactNode {
         {props.candidates.length === 0 && manualExtras.length === 0 ? (
           <Box marginBottom={1}>
             <Text dimColor={useColor} wrap="wrap">
-              No scan suggestions — you can still select the inferential row or press m
-              for a custom command.
+              No scan suggestions — you can still select the inferential row or
+              press m for a custom command.
             </Text>
           </Box>
         ) : null}
@@ -535,8 +547,8 @@ function SensorsWizardRoot(props: WizardRootProps): ReactNode {
         <Box flexDirection="column" marginTop={1}>
           <Text dimColor={useColor} wrap="wrap">
             ↑↓ move · Space toggle · Enter finish
-            {canFinish ? '' : ' (select at least one)'} · m custom sensor · Ctrl+C
-            cancel
+            {canFinish ? '' : ' (select at least one)'} · m custom sensor ·
+            Ctrl+C cancel
           </Text>
         </Box>
       </Box>
@@ -552,7 +564,10 @@ function SensorsWizardRoot(props: WizardRootProps): ReactNode {
 }
 
 export type InitSensorsWizardResult =
-  | { readonly kind: 'done'; readonly sensorsFile: ReturnType<typeof sensorsFileSchema.parse> }
+  | {
+      readonly kind: 'done';
+      readonly sensorsFile: ReturnType<typeof sensorsFileSchema.parse>;
+    }
   | { readonly kind: 'abort'; readonly message: string };
 
 export async function runInitSensorsWizard(options: {
@@ -562,7 +577,12 @@ export async function runInitSensorsWizard(options: {
   readonly llmWarning?: string;
   readonly env?: NodeJS.ProcessEnv;
 }): Promise<InitSensorsWizardResult> {
-  const colorMode = resolveColorMode({ args: [], env: options.env ?? process.env });
+  const colorMode = resolveColorMode({
+    args: [],
+    env: options.env ?? process.env,
+  });
+
+  clearTerminalViewport();
 
   return await new Promise<InitSensorsWizardResult>((resolve) => {
     const app = render(
@@ -571,7 +591,9 @@ export async function runInitSensorsWizard(options: {
         colorMode,
         candidates: options.candidates,
         initialSensors: options.initialSensors,
-        ...(options.llmWarning !== undefined ? { llmWarning: options.llmWarning } : {}),
+        ...(options.llmWarning !== undefined
+          ? { llmWarning: options.llmWarning }
+          : {}),
         onDone: (sensorsFile) => {
           app.unmount();
           resolve({ kind: 'done', sensorsFile });

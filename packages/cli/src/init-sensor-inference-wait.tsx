@@ -14,6 +14,8 @@ import { Box, Text, render } from 'ink';
 import { basename } from 'node:path';
 import { createElement } from 'react';
 
+import { clearTerminalViewport } from './terminal-viewport.js';
+
 type WaitRootProps = {
   readonly repoRoot: string;
   readonly colorMode: TuiColorMode;
@@ -79,12 +81,20 @@ export async function runSensorCandidateInferenceWithProgressInk(options: {
   );
 
   try {
-    return await runSensorCandidateInference({
-      repoRoot: options.repoRoot,
-      config: options.config,
-      useLlm: options.useLlm,
-    });
+    try {
+      return await runSensorCandidateInference({
+        repoRoot: options.repoRoot,
+        config: options.config,
+        useLlm: options.useLlm,
+      });
+    } finally {
+      app.unmount();
+    }
   } finally {
-    app.unmount();
+    // Let Ink finish teardown writes before clearing, so the next Ink root does not stack.
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve);
+    });
+    clearTerminalViewport();
   }
 }

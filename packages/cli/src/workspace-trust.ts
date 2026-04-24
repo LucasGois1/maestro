@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { render, type Instance } from 'ink';
 import { createElement } from 'react';
 
+import { clearTerminalViewport } from './terminal-viewport.js';
 import { WorkspaceTrustPrompt } from './workspace-trust-prompt.js';
 
 const STORE_VERSION = 1 as const;
@@ -99,6 +100,9 @@ export async function ensureWorkspaceTrustInteractive(
     const finish = (ok: boolean) => {
       ink?.unmount();
       ink = undefined;
+      if (ok) {
+        clearTerminalViewport();
+      }
       resolve(ok);
     };
 
@@ -109,8 +113,7 @@ export async function ensureWorkspaceTrustInteractive(
           void recordWorkspaceTrust(repoRoot)
             .then(() => finish(true))
             .catch((err: unknown) => {
-              const message =
-                err instanceof Error ? err.message : String(err);
+              const message = err instanceof Error ? err.message : String(err);
               process.stderr.write(
                 `Could not save workspace trust: ${message}\n`,
               );
