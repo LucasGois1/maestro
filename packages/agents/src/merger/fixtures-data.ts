@@ -72,7 +72,7 @@ export const FIXTURE_DRAFT: {
     requireDraftPr: true,
   },
   output: {
-    runStatus: 'partial',
+    runStatus: 'completed',
     branch: 'maestro/feature',
     commitCount: 2,
     execPlanPath: '.maestro/docs/exec-plans/completed/auth.md',

@@ -31,6 +31,7 @@ import { appendCalibrationSection } from './calibration-format.js';
 import type { EvaluatorInput } from './evaluator/evaluator-input.schema.js';
 import { createEvaluatorToolSet } from './evaluator-tools.js';
 import { createGeneratorToolSet } from './generator-tools.js';
+import type { MergerInput } from './merger/merger-input.schema.js';
 import { createMergerToolSet } from './merger-tools.js';
 import { createGardenerToolSet } from './gardener-tools.js';
 import {
@@ -466,6 +467,7 @@ export async function runAgent<TInput, TOutput>(
         maxSteps: 36,
       };
     } else if (definition.id === 'merger') {
+      const mergerInput = inputParse.data as MergerInput;
       toolAugmented = {
         tools: createMergerToolSet({
           repoRoot: stateRepoRoot,
@@ -473,6 +475,14 @@ export async function runAgent<TInput, TOutput>(
           config,
           runId: context.runId,
           bus,
+          branch: mergerInput.branch,
+          ...(mergerInput.baseBranch !== undefined
+            ? { baseBranch: mergerInput.baseBranch }
+            : {}),
+          remote: mergerInput.remote,
+          ...(mergerInput.requireDraftPr !== undefined
+            ? { requireDraftPr: mergerInput.requireDraftPr }
+            : {}),
           ...(maestroDirMeta !== undefined
             ? { maestroDir: maestroDirMeta }
             : {}),

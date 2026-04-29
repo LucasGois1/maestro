@@ -1,6 +1,8 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 
 import { configSchema } from '@maestro/config';
 import { parseSprintContract } from '@maestro/contract';
@@ -31,6 +33,7 @@ import { serializePlanMarkdown } from './plan-markdown.js';
 import { resumePipeline } from './resume.js';
 
 let repoRoot: string;
+const execFileAsync = promisify(execFile);
 
 /** Raw model JSON consumed by `normalizePlannerModelOutput` inside `runPipeline`. */
 const plannerModelOutput: PlannerModelOutput = {
@@ -372,6 +375,24 @@ function mockMergerModelOutput(branch: string): MergerModelOutput {
   };
 }
 
+function mockMergerModelOutputWith(
+  patch: Partial<MergerModelOutput>,
+): MergerModelOutput {
+  return {
+    ...mockMergerModelOutput('maestro/demo'),
+    ...patch,
+  };
+}
+
+async function addOriginRemote(): Promise<void> {
+  await execFileAsync('git', ['init'], { cwd: repoRoot });
+  await execFileAsync(
+    'git',
+    ['remote', 'add', 'origin', 'https://github.com/acme/maestro.git'],
+    { cwd: repoRoot },
+  );
+}
+
 afterEach(async () => {
   await rm(repoRoot, { recursive: true, force: true });
 });
@@ -671,6 +692,76 @@ describe('runPipeline (happy path)', () => {
     expect(captured).toMatchObject({ requireDraftPr: true });
   });
 
+  it('fails in merging when merger reports a different branch than the run branch', async () => {
+    const env = makeEnv();
+    const executor = buildExecutor({
+      planner: () => plannerModelOutput,
+      architect: (input) => mockArchitectOk(input),
+      generator: (input) => mockGeneratorOk(input),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () =>
+        mockMergerModelOutputWith({
+          branch: 'maestro/fake-agent-branch',
+          prUrl: 'https://github.com/acme/maestro/pull/42',
+          prNumber: 42,
+        }),
+    });
+
+    await expect(
+      runPipeline({
+        runId: 'r-merger-branch-mismatch',
+        prompt: 'ship auth',
+        branch: 'maestro/real-run-branch',
+        worktreePath: repoRoot,
+        repoRoot,
+        store: env.store,
+        bus: env.bus,
+        config: env.config,
+        executor,
+      }),
+    ).rejects.toThrow(/different branch/u);
+
+    const state = await env.store.load('r-merger-branch-mismatch');
+    expect(state?.status).toBe('failed');
+    expect(state?.failure).toMatchObject({ at: 'merging' });
+  });
+
+  it('fails in merging when a remote exists but completed merger output has no PR URL', async () => {
+    await addOriginRemote();
+    const env = makeEnv();
+    const executor = buildExecutor({
+      planner: () => plannerModelOutput,
+      architect: (input) => mockArchitectOk(input),
+      generator: (input) => mockGeneratorOk(input),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () =>
+        mockMergerModelOutputWith({
+          branch: 'maestro/needs-pr',
+          runStatus: 'completed',
+          prUrl: null,
+          prNumber: null,
+        }),
+    });
+
+    await expect(
+      runPipeline({
+        runId: 'r-merger-missing-pr',
+        prompt: 'ship auth',
+        branch: 'maestro/needs-pr',
+        worktreePath: repoRoot,
+        repoRoot,
+        store: env.store,
+        bus: env.bus,
+        config: env.config,
+        executor,
+      }),
+    ).rejects.toThrow(/completed without a PR URL/u);
+
+    const state = await env.store.load('r-merger-missing-pr');
+    expect(state?.status).toBe('failed');
+    expect(state?.failure).toMatchObject({ at: 'merging' });
+  });
+
   it('runs architect for three sprints and writes three design-note files', async () => {
     const env = makeEnv();
     const executor = buildExecutor({
@@ -807,7 +898,7 @@ describe('runPipeline (happy path)', () => {
           architect: (inp: unknown) => mockArchitectOk(inp),
           generator: (inp: unknown) => mockGeneratorOk(inp),
           evaluator: () => mockEvaluatorPassed(),
-          merger: () => mockMergerModelOutput('maestro/demo'),
+          merger: () => mockMergerModelOutput('feat/wt'),
         } as const
       )[
         definition.id as
@@ -943,7 +1034,7 @@ describe('runPipeline (retry + escalation)', () => {
         artifacts: [],
         suggestedActions: ['acceptance missing'],
       }),
-      merger: () => mockMergerModelOutput('x'),
+      merger: () => mockMergerModelOutput('maestro/demo'),
     });
 
     await expect(
@@ -991,7 +1082,7 @@ describe('runPipeline (graceful pause)', () => {
       },
       generator: (input) => mockGeneratorOk(input),
       evaluator: () => mockEvaluatorPassed(),
-      merger: () => mockMergerModelOutput('x'),
+      merger: () => mockMergerModelOutput('maestro/demo'),
     });
 
     await expect(
@@ -1139,7 +1230,7 @@ describe('resumePipeline', () => {
       architect: (input) => mockArchitectOk(input),
       generator: (input) => mockGeneratorOk(input),
       evaluator: () => mockEvaluatorPassed(),
-      merger: () => mockMergerModelOutput('x'),
+      merger: () => mockMergerModelOutput('maestro/demo'),
     });
 
     const result = await resumePipeline({
@@ -1391,6 +1482,73 @@ describe('runPipeline (planner interview)', () => {
     expect(result.state.status).toBe('completed');
     expect(result.plan.feature).toBe('Auth');
     expect(plannerCalls).toBe(3);
+  });
+
+  it('removes answered questions from interview open questions before resuming planner', async () => {
+    const env = makeEnv();
+    let plannerCalls = 0;
+    let resumedPlannerInput: unknown = null;
+    const questionRound: PlannerModelOutput = {
+      ...plannerInterviewQuestions,
+      interviewState: {
+        ...plannerInterviewQuestions.interviewState!,
+        context: {
+          ...plannerInterviewQuestions.interviewState!.context,
+          openQuestions: plannerInterviewQuestions.questions!.map(
+            (question) => question.prompt,
+          ),
+        },
+      },
+    };
+    const executor = buildExecutor({
+      planner: (input) => {
+        plannerCalls += 1;
+        if (plannerCalls === 1) return questionRound;
+        resumedPlannerInput = input;
+        return plannerInterviewSummary;
+      },
+      architect: (input) => mockArchitectOk(input),
+      generator: (input) => mockGeneratorOk(input),
+      evaluator: () => mockEvaluatorPassed(),
+      merger: () => mockMergerModelOutput('maestro/interview-clean-open'),
+    });
+
+    await expect(
+      runPipeline({
+        runId: 'r-interview-clean-open',
+        prompt: 'ship auth',
+        branch: 'maestro/interview-clean-open',
+        worktreePath: repoRoot,
+        repoRoot,
+        store: env.store,
+        bus: env.bus,
+        config: env.config,
+        executor,
+      }),
+    ).rejects.toBeInstanceOf(PipelinePauseError);
+
+    await expect(
+      resumePipeline({
+        runId: 'r-interview-clean-open',
+        repoRoot,
+        store: env.store,
+        bus: env.bus,
+        config: env.config,
+        executor,
+        plannerInterviewResponse: {
+          kind: 'answers',
+          answers: [
+            { questionId: 'q1', answer: 'Autenticar usuarios.' },
+            { questionId: 'q2', answer: 'Usar cookies seguros.' },
+          ],
+        },
+      }),
+    ).rejects.toBeInstanceOf(PipelinePauseError);
+
+    expect(
+      (resumedPlannerInput as { interview?: { context: { openQuestions: string[] } } })
+        .interview?.context.openQuestions,
+    ).toEqual([]);
   });
 });
 

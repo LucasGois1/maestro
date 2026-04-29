@@ -341,8 +341,11 @@ function AppShell({
     store,
     (s) => s.pipeline.shellApprovalPending,
   );
+  const planningInterviewPending = pipeline.planningInterviewDetail !== null;
   const lockStdin =
-    (pipeline.status === 'escalated' || shellApprovalPending !== null) &&
+    (pipeline.status === 'escalated' ||
+      shellApprovalPending !== null ||
+      planningInterviewPending) &&
     !overlayOpen &&
     mode !== 'discovery';
   const footerState = deriveFooterState(pipeline.status, overlayOpen);

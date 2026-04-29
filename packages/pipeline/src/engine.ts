@@ -23,6 +23,7 @@ import {
   type PlannerInterviewInput,
   type PlannerInterviewQuestion,
   type PlannerInterviewState,
+  type PlannerTranscriptEntry,
   type AgentContext,
   type AgentDefinition,
   type AgentRegistry,
@@ -309,6 +310,77 @@ function summarizeInterviewContextTrail(
   ].slice(0, 24);
 }
 
+function normalizeInterviewText(value: string): string {
+  return value.trim().replace(/\s+/gu, ' ').toLocaleLowerCase();
+}
+
+function transcriptHasQuestion(
+  transcript: readonly PlannerTranscriptEntry[],
+  questionId: string,
+): boolean {
+  return transcript.some(
+    (entry) =>
+      entry.role === 'planner' &&
+      entry.kind === 'question' &&
+      entry.questionId === questionId,
+  );
+}
+
+function answeredQuestionTranscriptEntries(
+  interview: PlannerInterviewInput,
+  answers: readonly PlannerInterviewAnswer[],
+): PlannerTranscriptEntry[] {
+  const entries: PlannerTranscriptEntry[] = [];
+  for (const answer of answers) {
+    const question =
+      interview.pendingQuestions.find((q) => q.id === answer.questionId) ??
+      null;
+    if (
+      question !== null &&
+      !transcriptHasQuestion(interview.transcript, question.id)
+    ) {
+      entries.push({
+        role: 'planner',
+        kind: 'question',
+        text: question.prompt,
+        topic: question.topic,
+        questionId: question.id,
+        round: interview.totalRounds,
+      });
+    }
+    entries.push({
+      role: 'user',
+      kind: 'answer',
+      text: answer.answer,
+      topic: question?.topic ?? null,
+      questionId: answer.questionId,
+      round: interview.totalRounds,
+    });
+  }
+  return entries;
+}
+
+function removeAnsweredOpenQuestions(
+  interview: PlannerInterviewInput,
+  answers: readonly PlannerInterviewAnswer[],
+): PlannerInterviewState['context'] {
+  const answeredIds = new Set(answers.map((answer) => answer.questionId));
+  const answeredPrompts = new Set(
+    interview.pendingQuestions
+      .filter((question) => answeredIds.has(question.id))
+      .map((question) => normalizeInterviewText(question.prompt)),
+  );
+  if (answeredPrompts.size === 0) {
+    return interview.context;
+  }
+  return {
+    ...interview.context,
+    openQuestions: interview.context.openQuestions.filter(
+      (question) => !answeredPrompts.has(normalizeInterviewText(question)),
+    ),
+  };
+}
+
 function runStatePlanningInterviewDetail(options: {
   readonly mode: RunStatePlanningInterview['mode'];
   readonly interviewState: PlannerInterviewState;
@@ -339,6 +411,34 @@ async function writePlanningInterviewArtifacts(
     ...(maestroDir !== undefined ? { maestroDir } : {}),
   };
   await mkdir(runPlanningDir(base), { recursive: true });
+  const questionsById = new Map(
+    interview.transcript
+      .filter(
+        (entry) =>
+          entry.role === 'planner' &&
+          entry.kind === 'question' &&
+          entry.questionId !== null,
+      )
+      .map((entry) => [
+        entry.questionId!,
+        {
+          id: entry.questionId!,
+          prompt: entry.text,
+          topic: entry.topic,
+        },
+      ]),
+  );
+  for (const question of interview.pendingQuestions) {
+    questionsById.set(question.id, {
+      id: question.id,
+      prompt: question.prompt,
+      topic: question.topic,
+    });
+  }
+  const questionAnswerPairs = interview.latestAnswers.map((answer) => ({
+    question: questionsById.get(answer.questionId) ?? null,
+    answer,
+  }));
   await writeFile(
     planningTranscriptPath(base),
     `${JSON.stringify(
@@ -346,6 +446,8 @@ async function writePlanningInterviewArtifacts(
         transcript: interview.transcript,
         questions: interview.pendingQuestions,
         answers: interview.latestAnswers,
+        questionAnswerPairs,
+        context: interview.context,
         summaryMarkdown: detail.summaryMarkdown,
       },
       null,
@@ -392,19 +494,11 @@ function applyPlannerInterviewResponse(
         stage: 'after_answers',
         transcript: [
           ...interview.transcript,
-          ...response.answers.map((answer) => ({
-            role: 'user' as const,
-            kind: 'answer' as const,
-            text: answer.answer,
-            topic:
-              interview.pendingQuestions.find((q) => q.id === answer.questionId)
-                ?.topic ?? null,
-            questionId: answer.questionId,
-            round: interview.totalRounds,
-          })),
+          ...answeredQuestionTranscriptEntries(interview, response.answers),
         ],
         pendingQuestions: [],
         latestAnswers: [...response.answers],
+        context: removeAnsweredOpenQuestions(interview, response.answers),
       };
     case 'continue_gate':
       return {
@@ -1938,6 +2032,29 @@ export async function runPipeline(
     });
 
     const parsedMerger = mergerModelOutputSchema.parse(rawMerger);
+    if (parsedMerger.branch !== options.branch) {
+      throw new Error(
+        `Merger returned a different branch than the run branch: got "${parsedMerger.branch}", expected "${options.branch}".`,
+      );
+    }
+    if (parsedMerger.runStatus !== 'completed') {
+      const summary =
+        parsedMerger.summary !== null && parsedMerger.summary.trim().length > 0
+          ? ` ${parsedMerger.summary.trim()}`
+          : '';
+      throw new Error(
+        `Merger did not complete successfully (runStatus=${parsedMerger.runStatus}).${summary}`,
+      );
+    }
+    if (
+      remote !== null &&
+      remote.platform !== 'unknown' &&
+      (parsedMerger.prUrl === null || parsedMerger.prNumber === null)
+    ) {
+      throw new Error(
+        `Merger completed without a PR URL despite detected git remote "${remote.name}".`,
+      );
+    }
 
     const execPlanMarkdown = renderCompletedExecPlanMarkdown({
       runId: options.runId,

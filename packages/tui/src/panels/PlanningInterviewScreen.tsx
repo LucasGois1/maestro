@@ -186,6 +186,17 @@ export function PlanningInterviewScreen({
         </Box>
       ) : null}
 
+      {detail.mode !== 'round' && detail.answers.length > 0 ? (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>Respostas registradas</Text>
+          {detail.answers.slice(0, 10).map((answer) => (
+            <Text key={answer.questionId} dimColor={useColor} wrap="wrap">
+              {answer.questionId}: {answer.answer}
+            </Text>
+          ))}
+        </Box>
+      ) : null}
+
       {detail.mode === 'round' && currentQuestion !== null ? (
         <Box flexDirection="column" marginTop={1}>
           <Text bold>

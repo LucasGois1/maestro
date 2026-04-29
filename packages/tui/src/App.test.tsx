@@ -225,6 +225,98 @@ describe('App', () => {
     app.unmount();
   });
 
+  it('routes free text to the planner interview instead of the command input', async () => {
+    const base = createInitialTuiState();
+    const store = createTuiStore({
+      mode: 'run',
+      pipeline: {
+        ...base.pipeline,
+        status: 'paused',
+        stage: 'planning',
+        planningInterviewDetail: {
+          mode: 'round',
+          roundInBlock: 1,
+          blockIndex: 1,
+          totalRounds: 1,
+          questions: [
+            {
+              id: 'q1',
+              prompt: 'What should be translated?',
+              topic: 'scope',
+            },
+          ],
+          answers: [],
+          summaryMarkdown: null,
+          contextTrail: ['Goal: translate docs'],
+        },
+      },
+    });
+    const commandExecutor = vi.fn();
+    const persistPlanningInterviewResponse = vi.fn(async () => ({
+      ok: true,
+      message: 'resumed',
+    }));
+    const app = render(
+      <App
+        store={store}
+        terminalSize={SIZE_WIDE}
+        commandExecutor={commandExecutor}
+        persistPlanningInterviewResponse={persistPlanningInterviewResponse}
+        onForceExit={vi.fn()}
+      />,
+    );
+
+    app.stdin.write('Translate CONTRIBUTING.md in place');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    app.stdin.write('\r');
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    expect(commandExecutor).not.toHaveBeenCalled();
+    expect(persistPlanningInterviewResponse).toHaveBeenCalledWith({
+      kind: 'answers',
+      answers: [
+        {
+          questionId: 'q1',
+          answer: 'Translate CONTRIBUTING.md in place',
+        },
+      ],
+    });
+    expect(app.lastFrame()).not.toContain('Commands must start with "/"');
+    app.unmount();
+  });
+
+  it('shows registered planner interview answers during summary review', () => {
+    const base = createInitialTuiState();
+    const store = createTuiStore({
+      mode: 'run',
+      pipeline: {
+        ...base.pipeline,
+        status: 'paused',
+        stage: 'planning',
+        planningInterviewDetail: {
+          mode: 'summary_review',
+          roundInBlock: 1,
+          blockIndex: 1,
+          totalRounds: 1,
+          questions: [],
+          answers: [
+            { questionId: 'q1', answer: 'root/CONTRIBUTING.md' },
+            { questionId: 'q2', answer: 'entire file' },
+          ],
+          summaryMarkdown: 'Resumo pronto.',
+          contextTrail: ['Goal: translate docs'],
+        },
+      },
+    });
+    const app = render(<App store={store} terminalSize={SIZE_WIDE} />);
+
+    const frame = app.lastFrame() ?? '';
+    expect(frame).toContain('Respostas registradas');
+    expect(frame).toContain('q1: root/CONTRIBUTING.md');
+    expect(frame).toContain('q2: entire file');
+    app.unmount();
+  });
+
   it('reflects pipeline run state via the EventBus bridge', () => {
     const store = createTuiStore();
     const bus = createEventBus();
