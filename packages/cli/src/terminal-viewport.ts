@@ -6,5 +6,8 @@ export function clearTerminalViewport(): void {
   if (!process.stdout.isTTY) {
     return;
   }
+  // Clear entire screen and move cursor to home
   process.stdout.write('\u001b[2J\u001b[H');
+  // Clear scrollback buffer as well to prevent ghosting
+  process.stdout.write('\u001b[3J');
 }

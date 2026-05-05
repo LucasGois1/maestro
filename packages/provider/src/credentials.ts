@@ -18,11 +18,12 @@ export const DISCOVERY_MODEL_DEFAULTS: Readonly<Record<ProviderName, string>> =
     openai: 'openai/gpt-4o-mini',
     google: 'google/gemini-2.0-flash',
     ollama: 'ollama/llama3.2',
+    openrouter: 'openrouter/anthropic/claude-3.5-sonnet',
   };
 
 export function hasApiKey(
   config: MaestroConfig,
-  provider: 'anthropic' | 'openai' | 'google',
+  provider: 'anthropic' | 'openai' | 'google' | 'openrouter',
 ): boolean {
   const key = config.providers[provider].apiKey;
   return typeof key === 'string' && key.trim().length > 0;

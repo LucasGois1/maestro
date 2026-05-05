@@ -47,7 +47,7 @@ describe('createGeneratorToolSet', () => {
 
     await expect(
       writeFileTool({ path: 'src/example.ts', content: 'one two\n' }),
-    ).resolves.toBe('Escrito: src/example.ts');
+    ).resolves.toBe('Written: src/example.ts');
     await expect(readFileTool({ path: 'src/example.ts' })).resolves.toBe(
       'one two\n',
     );
@@ -57,7 +57,7 @@ describe('createGeneratorToolSet', () => {
         oldStr: 'two',
         newStr: 'three',
       }),
-    ).resolves.toBe('Editado: src/example.ts');
+    ).resolves.toBe('Edited: src/example.ts');
     await expect(
       readFile(join(repoRoot, 'src', 'example.ts'), 'utf8'),
     ).resolves.toBe('one three\n');
@@ -67,7 +67,7 @@ describe('createGeneratorToolSet', () => {
         oldStr: 'missing',
         newStr: 'x',
       }),
-    ).resolves.toBe('oldStr não encontrado no ficheiro.');
+    ).resolves.toBe('oldStr not found in the file.');
   });
 
   it('writes under workspaceRoot when stateRepoRoot differs', async () => {
@@ -101,7 +101,7 @@ describe('createGeneratorToolSet', () => {
       );
       await expect(
         writeFileTool({ path: 'lib/x.ts', content: 'export {}\n' }),
-      ).resolves.toBe('Escrito: lib/x.ts');
+      ).resolves.toBe('Written: lib/x.ts');
 
       await expect(
         readFile(join(workspaceRoot, 'lib', 'x.ts'), 'utf8'),
@@ -129,7 +129,7 @@ describe('createGeneratorToolSet', () => {
       toolExec<{ path: string; oldStr: string; newStr: string }>(
         tools.editFile,
       )({ path: 'dup.txt', oldStr: 'same', newStr: 'new' }),
-    ).resolves.toBe('oldStr não é único; torne o fragmento mais específico.');
+    ).resolves.toBe('oldStr is not unique; make the fragment more specific.');
 
     await expect(
       toolExec<{ cmd: string; args: string[] }>(tools.runShell)({
@@ -141,7 +141,7 @@ describe('createGeneratorToolSet', () => {
       toolExec<{ type: string; scope?: string; subject: string }>(
         tools.gitCommit,
       )({ type: 'test', subject: 'commit from non git repo' }),
-    ).resolves.toContain('Erro git:');
+    ).resolves.toContain('Git error:');
   });
 
   it('runSensor hook can simulate fail then pass (tight loop wiring)', async () => {

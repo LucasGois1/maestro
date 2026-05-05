@@ -24,7 +24,7 @@ type WaitRootProps = {
 
 function SensorInferenceWaitRoot(props: WaitRootProps) {
   const useColor = props.colorMode === 'color';
-  const spinner = useSpinnerFrame({ enabled: true, intervalMs: 100 });
+  const spinner = useSpinnerFrame({ enabled: true, intervalMs: 200 });
   const headerState: TuiHeaderState = {
     repoName: basename(props.repoRoot),
     branch: 'init · sensors',

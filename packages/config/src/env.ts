@@ -7,6 +7,7 @@ export const PROVIDER_KEY_ENV_VARS = {
   anthropic: 'MAESTRO_ANTHROPIC_KEY',
   openai: 'MAESTRO_OPENAI_KEY',
   google: 'MAESTRO_GOOGLE_KEY',
+  openrouter: 'MAESTRO_OPENROUTER_KEY',
 } as const;
 
 export const OLLAMA_BASE_URL_ENV_VAR = 'MAESTRO_OLLAMA_BASE_URL';
@@ -21,6 +22,9 @@ export function providerCredentialEnvVar(provider: ProviderName): string {
   }
   if (provider === 'openai') {
     return PROVIDER_KEY_ENV_VARS.openai;
+  }
+  if (provider === 'openrouter') {
+    return PROVIDER_KEY_ENV_VARS.openrouter;
   }
   return PROVIDER_KEY_ENV_VARS.google;
 }

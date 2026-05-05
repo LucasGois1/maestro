@@ -96,6 +96,39 @@ export const OLLAMA_MODEL_STACK_BALANCED: Record<AgentName, string> = {
   discovery: 'ollama/llama3.2',
 };
 
+export const OPENROUTER_MODEL_STACK_BALANCED: Record<AgentName, string> = {
+  planner: 'openrouter/anthropic/claude-3.5-sonnet',
+  architect: 'openrouter/anthropic/claude-3.5-sonnet',
+  generator: 'openrouter/anthropic/claude-3.5-sonnet',
+  evaluator: 'openrouter/anthropic/claude-3.5-sonnet',
+  merger: 'openrouter/anthropic/claude-3-haiku',
+  'code-reviewer': 'openrouter/anthropic/claude-3.5-sonnet',
+  'doc-gardener': 'openrouter/anthropic/claude-3-haiku',
+  discovery: 'openrouter/anthropic/claude-3.5-sonnet',
+};
+
+export const OPENROUTER_MODEL_STACK_CAPABLE: Record<AgentName, string> = {
+  planner: 'openrouter/anthropic/claude-3.5-sonnet',
+  architect: 'openrouter/anthropic/claude-3.5-sonnet',
+  generator: 'openrouter/anthropic/claude-3.5-sonnet',
+  evaluator: 'openrouter/anthropic/claude-3.5-sonnet',
+  merger: 'openrouter/anthropic/claude-3-haiku',
+  'code-reviewer': 'openrouter/anthropic/claude-3.5-sonnet',
+  'doc-gardener': 'openrouter/anthropic/claude-3-haiku',
+  discovery: 'openrouter/anthropic/claude-3.5-sonnet',
+};
+
+export const OPENROUTER_MODEL_STACK_EFFICIENT: Record<AgentName, string> = {
+  planner: 'openrouter/anthropic/claude-3-haiku',
+  architect: 'openrouter/anthropic/claude-3-haiku',
+  generator: 'openrouter/anthropic/claude-3.5-sonnet',
+  evaluator: 'openrouter/anthropic/claude-3.5-sonnet',
+  merger: 'openrouter/anthropic/claude-3-haiku',
+  'code-reviewer': 'openrouter/anthropic/claude-3-haiku',
+  'doc-gardener': 'openrouter/anthropic/claude-3-haiku',
+  discovery: 'openrouter/anthropic/claude-3-haiku',
+};
+
 export const BALANCED_MODEL_STACK_BY_PROVIDER: Record<
   ProviderName,
   Record<AgentName, string>
@@ -104,6 +137,7 @@ export const BALANCED_MODEL_STACK_BY_PROVIDER: Record<
   openai: OPENAI_MODEL_STACK_BALANCED,
   google: GOOGLE_MODEL_STACK_BALANCED,
   ollama: OLLAMA_MODEL_STACK_BALANCED,
+  openrouter: OPENROUTER_MODEL_STACK_BALANCED,
 };
 
 export function applyModelStackToConfig(
@@ -150,6 +184,15 @@ export function modelStackForProviderTier(
       return GOOGLE_MODEL_STACK_EFFICIENT;
     }
     return GOOGLE_MODEL_STACK_BALANCED;
+  }
+  if (provider === 'openrouter') {
+    if (tier === 'frontier') {
+      return OPENROUTER_MODEL_STACK_CAPABLE;
+    }
+    if (tier === 'efficient') {
+      return OPENROUTER_MODEL_STACK_EFFICIENT;
+    }
+    return OPENROUTER_MODEL_STACK_BALANCED;
   }
   return OLLAMA_MODEL_STACK_BALANCED;
 }

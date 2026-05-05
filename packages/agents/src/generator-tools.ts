@@ -21,7 +21,7 @@ const readFileInput = z.object({
   path: z
     .string()
     .min(1)
-    .describe('Caminho relativo à raiz de implementação (worktree / branch).'),
+    .describe('Relative path to the implementation root (worktree / branch).'),
 });
 
 const writeFileInput = z.object({
@@ -77,7 +77,7 @@ function policyFromConfig(config: MaestroConfig) {
 }
 
 /**
- * Ferramentas do Generator: ficheiros, shell com policy, sensor, git, listagem, ripgrep.
+ * Generator Tools: file operations, shell with policy, sensor, git, listing, ripgrep.
  */
 export function createGeneratorToolSet(
   ctx: GeneratorToolContext,
@@ -91,7 +91,7 @@ export function createGeneratorToolSet(
 
   const readFileTool = tool({
     description:
-      'Lê um ficheiro de texto sob a raiz de implementação (caminho relativo).',
+      'Reads a text file at the implementation root (relative path).',
     inputSchema: readFileInput,
     execute: async ({ path: p }) => {
       const norm = p.trim().replace(/^[/\\]+/u, '');
@@ -101,14 +101,14 @@ export function createGeneratorToolSet(
           norm.replace(/\\/gu, '/'),
         );
       } catch (e) {
-        return `Erro ao ler: ${e instanceof Error ? e.message : String(e)}`;
+        return `Error reading: ${e instanceof Error ? e.message : String(e)}`;
       }
     },
   });
 
   const writeFileTool = tool({
     description:
-      'Cria ou substitui um ficheiro sob a raiz de implementação (caminho relativo).',
+      'Creates or replaces a file at the implementation root (relative path).',
     inputSchema: writeFileInput,
     execute: async ({ path: p, content }) => {
       try {
@@ -121,7 +121,7 @@ export function createGeneratorToolSet(
         );
         await mkdir(dirname(abs), { recursive: true });
         await writeFile(abs, content, 'utf8');
-        return `Escrito: ${p}`;
+        return `Written: ${p}`;
       } catch (e) {
         return `Erro ao escrever: ${e instanceof Error ? e.message : String(e)}`;
       }
@@ -130,7 +130,7 @@ export function createGeneratorToolSet(
 
   const editFileTool = tool({
     description:
-      'Substitui uma única ocorrência de oldStr por newStr no ficheiro.',
+      'Replaces a single occurrence of oldStr with newStr in the file.',
     inputSchema: editFileInput,
     execute: async ({ path: p, oldStr, newStr }) => {
       try {
@@ -144,23 +144,23 @@ export function createGeneratorToolSet(
         const before = await readFile(abs, 'utf8');
         const ix = before.indexOf(oldStr);
         if (ix === -1) {
-          return 'oldStr não encontrado no ficheiro.';
+          return 'oldStr not found in the file.';
         }
         if (before.indexOf(oldStr, ix + 1) !== -1) {
-          return 'oldStr não é único; torne o fragmento mais específico.';
+          return 'oldStr is not unique; make the fragment more specific.';
         }
         const after = `${before.slice(0, ix)}${newStr}${before.slice(ix + oldStr.length)}`;
         await writeFile(abs, after, 'utf8');
-        return `Editado: ${p}`;
+        return `Edited: ${p}`;
       } catch (e) {
-        return `Erro ao editar: ${e instanceof Error ? e.message : String(e)}`;
+        return `Error editing: ${e instanceof Error ? e.message : String(e)}`;
       }
     },
   });
 
   const runShellTool = tool({
     description:
-      'Executa comando no shell com cwd = raiz de implementação; sujeito ao permission model.',
+      'Executes a shell command with cwd = the implementation root; subject to the permission model.',
     inputSchema: runShellInput,
     execute: async ({ cmd, args }) => {
       try {
@@ -185,14 +185,14 @@ export function createGeneratorToolSet(
           .join('\n');
         return out.slice(0, 24_000);
       } catch (e) {
-        return `Erro: ${e instanceof Error ? e.message : String(e)}`;
+        return `Error: ${e instanceof Error ? e.message : String(e)}`;
       }
     },
   });
 
   const runSensorTool = tool({
     description:
-      'Executa um sensor registado (computacional ou inferencial) por id.',
+      'Executes a registered sensor (computational or inferential) by id.',
     inputSchema: runSensorInput,
     execute: async ({ id }) =>
       executeRunSensorTool(
@@ -214,7 +214,7 @@ export function createGeneratorToolSet(
 
   const gitCommitTool = tool({
     description:
-      'Faz commit com mensagem Conventional Commits (type, scope opcional, subject).',
+      'Commits with a Conventional Commits message (type, optional scope, subject).',
     inputSchema: gitCommitInput,
     execute: async ({ type, scope, subject }) => {
       try {
@@ -227,7 +227,7 @@ export function createGeneratorToolSet(
         });
         return `Committed ${sha}`;
       } catch (e) {
-        return `Erro git: ${e instanceof Error ? e.message : String(e)}`;
+        return `Git error: ${e instanceof Error ? e.message : String(e)}`;
       }
     },
   });
