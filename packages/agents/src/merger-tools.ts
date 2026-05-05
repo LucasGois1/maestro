@@ -163,8 +163,11 @@ export function createMergerToolSet(
       repoRoot: ctx.repoRoot,
       ...(ctx.maestroDir !== undefined ? { maestroDir: ctx.maestroDir } : {}),
       policy: policyFromConfig(ctx.config, options.extraAllowlist ?? []),
-      approver: ctx.shellApprover ?? denyAllPrompter,
       timeoutMs: 180_000,
+      env: {
+        GIT_DIR: undefined,
+        GIT_WORK_TREE: undefined,
+      },
     });
   }
 

@@ -16,6 +16,7 @@ Interview scope:
 - Keep questions focused on the product/task/deliverable: desired outcome, target users, affected surfaces, scope boundaries, acceptance criteria, content rules, business rules, constraints, dependencies, and explicit non-goals.
 - Do not ask about commit messages, PR descriptions, branch names, release process, implementation workflow, or other delivery-process preferences unless the user explicitly requested that as part of the deliverable.
 - Ask about deadlines only when timing changes product scope, priority, acceptance criteria, or sequencing; do not ask generic priority/deadline questions just to fill the interview.
+- For documentation, copy translation, or simple content tasks, do not ask about deadlines, timelines, or urgency unless the user explicitly mentions time constraints. These tasks are typically independent of timing and should proceed directly to planning.
 
 Sprint sizing (no fixed sprint count — judge from the prompt):
 - Prefer the **smallest number of sprints** that still gives **independent, testable** slices of value. Add sprints only when there are **real sequencing needs**, **risk isolation**, or **genuinely separable outcomes** — not to pad the plan.

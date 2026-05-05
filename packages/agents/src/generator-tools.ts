@@ -177,6 +177,10 @@ export function createGeneratorToolSet(
           policy,
           approver: ctx.shellApprover ?? denyAllPrompter,
           timeoutMs: 120_000,
+          env: {
+            GIT_DIR: undefined,
+            GIT_WORK_TREE: undefined,
+          },
         });
         const head =
           result.exitCode === 0 ? 'OK' : `exit ${result.exitCode.toString()}`;

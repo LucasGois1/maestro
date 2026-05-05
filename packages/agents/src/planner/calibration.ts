@@ -3,9 +3,11 @@ import { appendCalibrationSection } from '../calibration-format.js';
 import { PLANNER_SYSTEM_PROMPT } from './system-prompt.js';
 import {
   CONTRADICTION,
+  DOC_TASK_NO_DEADLINE,
   IMPLICIT_SCOPE,
   NARROW_DELIVERY,
   SIMPLE,
+  SUMMARY_OUTPUT,
   VAGUE,
 } from './fixtures-data.js';
 
@@ -15,6 +17,16 @@ export const PLANNER_FEW_SHOT_EXAMPLES: readonly FewShotExample[] = [
     input: NARROW_DELIVERY.input,
     output: NARROW_DELIVERY.output,
     note: 'tarefa fechada → 1 sprint com entrega visível',
+  },
+  {
+    input: DOC_TASK_NO_DEADLINE.input,
+    output: DOC_TASK_NO_DEADLINE.output,
+    note: 'documentação/copy → plano direto, sem perguntas de deadline',
+  },
+  {
+    input: SUMMARY_OUTPUT.input,
+    output: SUMMARY_OUTPUT.output,
+    note: 'summary → nulls out questions, continuePrompt, escalation, and plan fields',
   },
   {
     input: SIMPLE.input,

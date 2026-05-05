@@ -43,6 +43,113 @@ export const NARROW_DELIVERY: {
   },
 };
 
+/** Documentation task without deadline questions (negative example for calibration). */
+export const DOC_TASK_NO_DEADLINE: {
+  readonly input: { readonly prompt: string };
+  readonly output: PlannerModelOutput;
+} = {
+  input: {
+    prompt:
+      'Translate CONTRIBUTING.md from Portuguese to English US. Keep technical content intact, adjust tone for clarity.',
+  },
+  output: {
+    kind: 'plan',
+    escalationReason: null,
+    questions: null,
+    continuePrompt: null,
+    summaryMarkdown: null,
+    interviewState: null,
+    feature: 'EN CONTRIBUTING.md',
+    overview:
+      'Contributors read English US guidelines.\nTechnical content preserved with clearer wording.',
+    userStories: [
+      {
+        id: 1,
+        role: 'contributor',
+        action: 'read contributing guidelines',
+        value: 'understand project norms in English',
+      },
+    ],
+    aiFeatures: [],
+    sprints: [
+      {
+        idx: 1,
+        name: 'Translate CONTRIBUTING.md',
+        objective:
+          'Translate CONTRIBUTING.md to English US while preserving commands, code blocks, and technical examples.',
+        userStoryIds: [1],
+        dependsOn: [],
+        complexity: 'low',
+        keyFeatures: ['EN translation', 'preserved technical content'],
+      },
+    ],
+  },
+};
+
+/** Summary output with proper field nulling (calibration example). */
+export const SUMMARY_OUTPUT: {
+  readonly input: { readonly prompt: string };
+  readonly output: PlannerModelOutput;
+} = {
+  input: {
+    prompt: 'Build a file sharing service',
+  },
+  output: {
+    kind: 'summary',
+    escalationReason: null,
+    questions: null,
+    continuePrompt: null,
+    summaryMarkdown:
+      'Build a file sharing service where users can upload large files without email. Target users are senders (generate upload links) and recipients (download with one click). Features include drag-drop upload, unique links, and configurable expiration.',
+    interviewState: {
+      stage: 'after_answers',
+      roundInBlock: 1,
+      blockIndex: 1,
+      totalRounds: 1,
+      transcript: [
+        {
+          role: 'planner',
+          kind: 'question',
+          text: 'Who is the primary user for this file sharing service?',
+          topic: 'personas',
+          questionId: 'q1',
+          round: 1,
+        },
+        {
+          role: 'user',
+          kind: 'answer',
+          text: 'Senders who want to share large files and recipients who download them',
+          topic: 'personas',
+          questionId: 'q1',
+          round: 1,
+        },
+      ],
+      latestAnswers: [
+        {
+          questionId: 'q1',
+          answer: 'Senders who want to share large files and recipients who download them',
+        },
+      ],
+      context: {
+        goals: ['Share large files without email'],
+        personas: ['Senders', 'Recipients'],
+        requirements: ['Drag-drop upload', 'One-click download'],
+        flows: ['Upload → Generate link → Download'],
+        businessRules: [],
+        constraints: [],
+        outOfScope: [],
+        assumptions: [],
+        openQuestions: [],
+      },
+    },
+    feature: null,
+    overview: null,
+    userStories: null,
+    aiFeatures: null,
+    sprints: null,
+  },
+};
+
 /** Product-sized prompt → multi-sprint plan with real dependency between sprints. */
 export const SIMPLE: {
   readonly input: { readonly prompt: string };
