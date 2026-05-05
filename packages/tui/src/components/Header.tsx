@@ -20,6 +20,17 @@ export function Header({
   const useColor = colorMode === 'color';
   const branch = truncate(header.branch, maxBranchLength);
 
+  // Determine token total display and color thresholds
+  const totalTokens = header.totalTokens ?? null;
+  const tokenColor =
+    totalTokens !== null
+      ? totalTokens >= 100000
+        ? 'red'
+        : totalTokens >= 50000
+        ? 'yellow'
+        : undefined
+      : undefined;
+
   return (
     <Box
       flexDirection="row"
@@ -42,6 +53,11 @@ export function Header({
         ) : null}
         {header.contextPct !== null ? (
           <Text>{` · ctx ${header.contextPct.toString()}%`}</Text>
+        ) : null}
+        {totalTokens !== null ? (
+          <Text {...(useColor && tokenColor ? { color: tokenColor } : {})}>
+            {` · tokens ${totalTokens.toString()}`}
+          </Text>
         ) : null}
         {header.updateAvailable ? (
           <Text {...(useColor ? { color: 'yellow' } : {})}>

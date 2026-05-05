@@ -234,6 +234,7 @@ export interface TuiHeaderState {
   readonly totalSprints: number | null;
   readonly contextPct: number | null;
   readonly updateAvailable: boolean;
+  readonly totalTokens: number | null;
 }
 
 export interface TuiPipelineState {
@@ -425,6 +426,7 @@ export function createInitialTuiState(
       totalSprints: null,
       contextPct: null,
       updateAvailable: false,
+      totalTokens: null,
     },
     pipeline: {
       status: 'idle',
