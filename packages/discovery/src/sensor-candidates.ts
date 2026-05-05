@@ -266,6 +266,57 @@ export function buildCatalogSensorCandidates(
   ];
 }
 
+/**
+ * Retry function with exponential backoff for 429 errors
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  options: {
+    readonly maxRetries?: number;
+    readonly initialDelayMs?: number;
+    readonly maxDelayMs?: number;
+  } = {},
+): Promise<T> {
+  const maxRetries = options.maxRetries ?? 5;
+  const initialDelayMs = options.initialDelayMs ?? 1000;
+  const maxDelayMs = options.maxDelayMs ?? 30000;
+
+  let lastError: Error | undefined;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // Check if it's a 429 error
+      const isRateLimit = 
+        lastError.message.includes('429') ||
+        lastError.message.includes('rate limit') ||
+        lastError.message.includes('too many requests');
+      
+      if (!isRateLimit || attempt === maxRetries) {
+        throw lastError;
+      }
+      
+      // Calculate delay with exponential backoff
+      const delay = Math.min(
+        initialDelayMs * Math.pow(2, attempt),
+        maxDelayMs,
+      );
+      
+      // Add jitter to avoid thundering herd
+      const jitter = Math.random() * 0.2 * delay;
+      const totalDelay = delay + jitter;
+      
+      // Silent retry - no console output to avoid TUI interference
+      await new Promise(resolve => setTimeout(resolve, totalDelay));
+    }
+  }
+  
+  throw lastError;
+}
+
 async function readPackageScriptsJson(repoRoot: string): Promise<string | null> {
   const raw = await readFile(join(repoRoot, 'package.json'), 'utf8').catch(
     () => null,
@@ -348,19 +399,26 @@ export async function runSensorCandidateInference(
       const model = getModel(modelRef, {
         config: options.config,
       });
-      const { output } = await runAgent({
-        definition: sensorSetupAgent,
-        input,
-        context: {
-          agentId: 'sensor-setup',
-          runId: 'sensor-candidates',
-          workingDir: options.repoRoot,
-          metadata: {},
+      
+      const { output } = await retryWithBackoff(
+        async () => {
+          return await runAgent({
+            definition: sensorSetupAgent,
+            input,
+            context: {
+              agentId: 'sensor-setup',
+              runId: 'sensor-candidates',
+              workingDir: options.repoRoot,
+              metadata: {},
+            },
+            bus,
+            config: options.config,
+            model,
+          });
         },
-        bus,
-        config: options.config,
-        model,
-      });
+        { maxRetries: 5, initialDelayMs: 2000, maxDelayMs: 30000 },
+      );
+      
       llmLayer.push(
         ...output.candidates.map((c) => ({
           id: c.id,
@@ -374,8 +432,30 @@ export async function runSensorCandidateInference(
         })),
       );
     } catch (e) {
-      llmWarning =
-        e instanceof Error ? e.message : `LLM sensor discovery failed: ${String(e)}`;
+      let errorMessage = 'LLM sensor discovery failed';
+      if (e instanceof Error) {
+        errorMessage = e.message;
+        // Try to extract more details from the error
+        let details = errorMessage;
+        if ('cause' in e && e.cause instanceof Error) {
+          details += ` | Cause: ${e.cause.message}`;
+        }
+        if ('response' in e) {
+          const response = (e as any).response;
+          if (response) {
+            details += ` | Response: ${JSON.stringify(response)}`;
+          }
+        }
+        if ('statusCode' in e) {
+          details += ` | Status: ${(e as any).statusCode}`;
+        }
+        if ('data' in e) {
+          details += ` | Data: ${JSON.stringify((e as any).data)}`;
+        }
+        llmWarning = details;
+      } else {
+        llmWarning = `${errorMessage}: ${String(e)}`;
+      }
     }
   }
 

@@ -26,6 +26,8 @@ function providerLabel(p: ProviderName): string {
       return 'Google';
     case 'ollama':
       return 'Ollama (local)';
+    case 'openrouter':
+      return 'OpenRouter';
     default:
       return p;
   }

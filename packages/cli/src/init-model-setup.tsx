@@ -61,6 +61,8 @@ function providerLabel(provider: ProviderName): string {
       return 'Google (Gemini)';
     case 'ollama':
       return 'Ollama (local)';
+    case 'openrouter':
+      return 'OpenRouter';
     default:
       return provider;
   }
@@ -88,9 +90,15 @@ export async function mergeWriteProjectConfig(
 }
 
 type WizardPanel =
-  | { readonly kind: 'provider'; readonly agentIdx: number }
+  | { readonly kind: 'applyToAllChoice' }
+  | { readonly kind: 'provider'; readonly agentIdx: number; readonly applyToAll?: boolean }
   | {
       readonly kind: 'model';
+      readonly agentIdx: number;
+      readonly provider: ProviderName;
+    }
+  | {
+      readonly kind: 'customModel';
       readonly agentIdx: number;
       readonly provider: ProviderName;
     }
@@ -117,9 +125,9 @@ type InitModelWizardRootProps = {
 function InitModelWizardRoot(props: InitModelWizardRootProps) {
   const accRef = useRef<MaestroConfigInput>({});
   const promptedRef = useRef(new Set<ProviderName>());
+  const applyToAllRef = useRef<ProviderName | null>(null);
   const [panel, setPanel] = useState<WizardPanel>({
-    kind: 'provider',
-    agentIdx: 0,
+    kind: 'applyToAllChoice',
   });
 
   const effectiveConfig = useCallback(
@@ -195,10 +203,23 @@ function InitModelWizardRoot(props: InitModelWizardRootProps) {
   const onModelPick = useCallback(
     (agentIdx: number, provider: ProviderName, itemKey: string) => {
       if (itemKey === MODEL_PICKER_BACK_KEY) {
-        setPanel({ kind: 'provider', agentIdx });
+        setPanel({ kind: 'provider', agentIdx, applyToAll: applyToAllRef.current !== null });
         return;
       }
       const modelRef = itemKey;
+      if (applyToAllRef.current !== null) {
+        // Apply the same provider/model to all agents
+        for (const name of AGENT_NAMES) {
+          accRef.current = deepMergeAll<MaestroConfigInput>({}, accRef.current, {
+            defaults: {
+              [name]: { model: modelRef },
+            },
+          });
+        }
+        promptedRef.current.add(provider);
+        finishWizard(accRef.current);
+        return;
+      }
       if (!promptedRef.current.has(provider)) {
         if (canUseProviderForInference(effectiveConfig(), provider)) {
           promptedRef.current.add(provider);
@@ -215,18 +236,49 @@ function InitModelWizardRoot(props: InitModelWizardRootProps) {
       }
       commitAgentModelAndAdvance(agentIdx, modelRef);
     },
-    [commitAgentModelAndAdvance, effectiveConfig],
+    [commitAgentModelAndAdvance, effectiveConfig, finishWizard],
   );
 
   const onProviderPick = useCallback((agentIdx: number, itemKey: string) => {
+    if (panel.kind === 'provider' && panel.applyToAll) {
+      applyToAllRef.current = itemKey as ProviderName;
+    }
     setPanel({
       kind: 'model',
       agentIdx,
       provider: itemKey as ProviderName,
     });
-  }, []);
+  }, [panel]);
 
   const body = (() => {
+    if (panel.kind === 'applyToAllChoice') {
+      return (
+        <ListPickerScreen
+          title="Provider Configuration"
+          description="Choose how to configure providers for your agents. You can either configure a different provider for each agent, or select one provider to apply to all agents."
+          items={[
+            {
+              key: 'per-agent',
+              title: 'Configure each agent separately',
+              subtitle: 'Choose a different provider and model for each agent',
+            },
+            {
+              key: 'apply-to-all',
+              title: 'Apply one provider to all agents',
+              subtitle: 'Select a single provider to use for all agents',
+            },
+          ]}
+          colorMode={props.colorMode}
+          onConfirm={(item) => {
+            if (item.key === 'per-agent') {
+              setPanel({ kind: 'provider', agentIdx: 0 });
+            } else {
+              setPanel({ kind: 'provider', agentIdx: 0, applyToAll: true });
+            }
+          }}
+        />
+      );
+    }
     if (panel.kind === 'provider') {
       const agent = agentAt(panel.agentIdx);
       return (
@@ -265,11 +317,45 @@ function InitModelWizardRoot(props: InitModelWizardRootProps) {
               title: c.label,
               subtitle: c.ref,
             })),
+            {
+              key: 'custom',
+              title: 'Custom model name',
+              subtitle: 'Enter a custom model ID (e.g., google/gemma-4-31b-it:free)',
+            },
           ]}
           initialIndex={1}
           colorMode={props.colorMode}
           onConfirm={(item) => {
+            if (item.key === MODEL_PICKER_BACK_KEY) {
+              setPanel({ kind: 'provider', agentIdx: panel.agentIdx, applyToAll: applyToAllRef.current !== null });
+              return;
+            }
+            if (item.key === 'custom') {
+              setPanel({ kind: 'customModel', agentIdx: panel.agentIdx, provider: panel.provider });
+              return;
+            }
             onModelPick(panel.agentIdx, panel.provider, item.key);
+          }}
+        />
+      );
+    }
+    if (panel.kind === 'customModel') {
+      const agent = agentAt(panel.agentIdx);
+      return (
+        <TextInputStep
+          title={`Custom Model — ${AGENT_LABEL[agent]}`}
+          description={`Provider: ${providerLabel(panel.provider)}. Enter the OpenRouter model ID (e.g., google/gemma-4-31b-it:free).`}
+          placeholder="google/..."
+          colorMode={props.colorMode}
+          onDone={(value: string) => {
+            const modelRef = value.trim();
+            if (modelRef.length === 0) {
+              setPanel({ kind: 'model', agentIdx: panel.agentIdx, provider: panel.provider });
+              return;
+            }
+            // Prepend openrouter/ prefix for OpenRouter provider
+            const fullModelRef = panel.provider === 'openrouter' ? `openrouter/${modelRef}` : modelRef;
+            onModelPick(panel.agentIdx, panel.provider, fullModelRef);
           }}
         />
       );
@@ -304,32 +390,35 @@ function InitModelWizardRoot(props: InitModelWizardRootProps) {
         />
       );
     }
-    const p = panel;
-    return (
-      <MaskedSecretPasteStep
-        provider={p.provider}
-        colorMode={props.colorMode}
-        onDone={(secret) => {
-          const trimmed = secret.trim();
-          if (trimmed.length > 0) {
-            if (p.provider === 'ollama') {
-              accRef.current = deepMergeAll<MaestroConfigInput>(
-                {},
-                accRef.current,
-                { providers: { ollama: { baseUrl: trimmed } } },
-              );
-            } else {
-              accRef.current = deepMergeAll<MaestroConfigInput>(
-                {},
-                accRef.current,
-                { providers: { [p.provider]: { apiKey: trimmed } } },
-              );
+    if (panel.kind === 'credPaste') {
+      const p = panel;
+      return (
+        <MaskedSecretPasteStep
+          provider={p.provider}
+          colorMode={props.colorMode}
+          onDone={(secret) => {
+            const trimmed = secret.trim();
+            if (trimmed.length > 0) {
+              if (p.provider === 'ollama') {
+                accRef.current = deepMergeAll<MaestroConfigInput>(
+                  {},
+                  accRef.current,
+                  { providers: { ollama: { baseUrl: trimmed } } },
+                );
+              } else {
+                accRef.current = deepMergeAll<MaestroConfigInput>(
+                  {},
+                  accRef.current,
+                  { providers: { [p.provider]: { apiKey: trimmed } } },
+                );
+              }
             }
-          }
-          afterCredentialStep(p.agentIdx, p.provider, p.modelRef);
-        }}
-      />
-    );
+            afterCredentialStep(p.agentIdx, p.provider, p.modelRef);
+          }}
+        />
+      );
+    }
+    return null;
   })();
 
   return (
@@ -364,7 +453,8 @@ function MaskedSecretPasteStep(props: MaskedPasteProps) {
         return;
       }
       if (
-        input?.length === 1 &&
+        input &&
+        input.length > 0 &&
         !key.ctrl &&
         !key.meta &&
         (input >= ' ' || input === '\t')
@@ -381,13 +471,73 @@ function MaskedSecretPasteStep(props: MaskedPasteProps) {
       </Text>
       <Text dimColor={useColor} wrap="wrap">
         {props.provider === 'ollama'
-          ? 'Example: http://127.0.0.1:11434'
-          : 'Input is masked; avoid shared screens when pasting secrets.'}
+          ? 'Press Enter to confirm, Esc to cancel.'
+          : 'Press Enter to confirm, Esc to cancel.'}
       </Text>
-      <Text>Input: {'*'.repeat(value.length)}</Text>
-      <Text dimColor={useColor}>
-        Enter to confirm · Esc or Q to skip (empty)
+      <Box marginTop={1}>
+        <Text>{'*'.repeat(value.length)}</Text>
+      </Box>
+    </Box>
+  );
+}
+
+type TextInputProps = {
+  readonly title: string;
+  readonly description: string;
+  readonly placeholder: string;
+  readonly colorMode: TuiColorMode;
+  readonly onDone: (value: string) => void;
+};
+
+function TextInputStep(props: TextInputProps) {
+  const useColor = props.colorMode === 'color';
+  const [value, setValue] = useState('');
+  useInput(
+    (input, key) => {
+      if (key.return) {
+        props.onDone(value);
+        return;
+      }
+      if (key.escape) {
+        props.onDone('');
+        return;
+      }
+      if (key.backspace || key.delete) {
+        setValue((v) => v.slice(0, -1));
+        return;
+      }
+      if (
+        input &&
+        input.length > 0 &&
+        !key.ctrl &&
+        !key.meta &&
+        (input >= ' ' || input === '\t')
+      ) {
+        setValue((v) => v + input);
+      }
+    },
+    { isActive: true },
+  );
+  return (
+    <Box flexDirection="column" paddingX={1}>
+      <Text bold {...(useColor ? { color: 'cyan' } : {})}>
+        {props.title}
       </Text>
+      <Box marginTop={1}>
+        <Text dimColor={useColor} wrap="wrap">
+          {props.description}
+        </Text>
+      </Box>
+      <Box marginTop={1}>
+        <Text dimColor={useColor}>
+          Press Enter to confirm, Esc to cancel
+        </Text>
+      </Box>
+      <Box marginTop={1} flexDirection="row">
+        <Text {...(useColor ? { color: 'green' } : {})}>{'❯ '}</Text>
+        <Text>{value || props.placeholder}</Text>
+        <Text {...(useColor ? { color: 'cyan' } : {})}>{'▏'}</Text>
+      </Box>
     </Box>
   );
 }

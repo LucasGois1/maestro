@@ -79,6 +79,23 @@ export const INIT_PICKER_MODELS: Record<
       ref: 'ollama/llama3.2',
     },
   ],
+  openrouter: [
+    {
+      tier: 'frontier',
+      label: 'Claude 3.5 Sonnet (highest quality)',
+      ref: 'openrouter/anthropic/claude-3.5-sonnet',
+    },
+    {
+      tier: 'balanced',
+      label: 'Claude 3.5 Sonnet (balanced)',
+      ref: 'openrouter/anthropic/claude-3.5-sonnet',
+    },
+    {
+      tier: 'efficient',
+      label: 'Claude 3 Haiku (fast / cost-efficient)',
+      ref: 'openrouter/anthropic/claude-3-haiku',
+    },
+  ],
 };
 
 export function initPickerChoicesFor(

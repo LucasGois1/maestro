@@ -18,6 +18,7 @@ export const PROVIDER_NAMES = [
   'openai',
   'google',
   'ollama',
+  'openrouter',
 ] as const;
 
 export type ProviderName = (typeof PROVIDER_NAMES)[number];
@@ -48,6 +49,7 @@ const providersSchema = z
     openai: apiProviderSchema.prefault({}),
     google: apiProviderSchema.prefault({}),
     ollama: ollamaProviderSchema.prefault({}),
+    openrouter: apiProviderSchema.prefault({}),
   })
   .strict();
 
